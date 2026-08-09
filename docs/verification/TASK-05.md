@@ -7,6 +7,7 @@
 - Filter contract tests initially failed because successful and replayed mutations omitted `topicsRevision` and `queueGeneration`.
 - Search component coverage initially lacked an executable assertion that a stale debounced request is aborted without changing Home Topic, Filter or scroll state.
 - Mobile E2E exposed two integration gaps: `/settings/ai` was not registered and direct Entry detail did not load through the same-origin Folo proxy.
+- The live translation harness initially accepted only a Secret file even though local Go-service configuration also permits OS Keychain; the Keychain-only acceptance path failed before any provider call.
 
 ## Implemented boundary
 
@@ -25,4 +26,5 @@
 - Renderer Vitest/typecheck: 52 files, 152/152 PASS, zero type errors after the Entry fallback fix.
 - Mobile Playwright: search/debounce/state preservation, AI Filter atomic apply/edit/reset, fixed server AI settings, search cursor fields and enrichment retry/original content: PASS at 390x844.
 - Spec package validation and `git diff --check`: PASS.
-- Live translation is intentionally not claimed: the credential pasted into chat is exposed and was not copied into a command, file, fixture, Keychain, log or Git. The opt-in test requires an operator-rotated Key in `TANTAN_GEMINI_API_KEY_FILE` with mode `0600`.
+- `TestLiveKeyLoaderFallsBackToServerKeychain`: PASS; the opt-in live test can use the local Go-service Keychain without exporting or printing the credential.
+- Live translation is intentionally not claimed: the credential pasted into chat is exposed and was not copied into a command, file, fixture, Keychain, log or Git. The opt-in test requires an operator-rotated Key in the local Go-service Keychain item or `TANTAN_GEMINI_API_KEY_FILE` with mode `0600`.

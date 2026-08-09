@@ -61,12 +61,17 @@ HTTPS_PROXY=http://127.0.0.1:7897 go run ./cmd/tantan-api serve
 
 端口按本机代理实际监听端口替换。远程代理、带账号密码的代理、SOCKS、自定义路径/查询参数都会被拒绝。
 
-真实 Google 翻译冒烟测试只从私密文件读取 Key，不接收 Key 值环境变量或命令行 Key：
+真实 Google 翻译冒烟测试从 Go 服务相同的 Keychain 项读取 Key；也可显式指定私密文件。
+测试不接收 Key 值环境变量或命令行 Key：
 
 ```bash
 cd services/tantan-api
+TANTAN_LIVE_AI=1 \
+  go test ./internal/ai -run TestLiveGoogleTranslation -count=1 -v
+
+# 服务器 Secret 文件方式
 TANTAN_GEMINI_API_KEY_FILE=/绝对私密路径/gemini.key \
-HTTPS_PROXY=http://127.0.0.1:7897 TANTAN_LIVE_AI=1 \
+TANTAN_LIVE_AI=1 \
   go test ./internal/ai -run TestLiveGoogleTranslation -count=1 -v
 ```
 
