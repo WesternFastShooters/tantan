@@ -97,3 +97,25 @@ production-only secret/forbidden-route scan over internal/storage, sync, search,
 ```
 
 Exit `0`; every Go package passed under the race detector and the production scan reported zero API-key, bearer-token, paid-AI, Wallet, Stripe, Payment, Referral, or Trending references.
+
+## Post-AI dependency audit
+
+The task was reopened after AI enrichment existed. A cross-module Red proved that sync/search refresh still indexed derived data whose `content_hash` no longer matched the Entry:
+
+```text
+go test ./internal/search -run TestRefreshInvalidatesDerivedDataWhenContentHashChanges -count=1
+```
+
+Exit `1`: the changed Entry's enrichment remained `ready`, so old translation, Topic, and Tag terms could survive a sync content update.
+
+Green now makes every search refresh atomically mark mismatched enrichments `stale`; FTS translation/Tag and Topic joins require the current Entry hash; search result translation and `translated` state also require that hash. Fresh original content remains immediately searchable.
+
+Reopened task gates:
+
+```text
+go test ./internal/search ./internal/sync ./internal/storage ./internal/jobs -count=1
+go vet ./internal/storage/... ./internal/sync/... ./internal/search/... ./internal/jobs/...
+go test -race ./internal/storage/... ./internal/sync/... ./internal/search/... -count=1
+```
+
+Exit `0`; race results: storage `1.684s`, sync `4.290s`, search `2.334s`. The 100,000-entry sync/search regression also passed again in the non-race run.

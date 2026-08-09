@@ -53,6 +53,20 @@ func (indexer *Indexer) RefreshTx(ctx context.Context, transaction *sql.Tx, user
 	if _, err := transaction.ExecContext(ctx, "DELETE FROM entry_search WHERE user_id=? AND entry_id IN ("+placeholders+")", deleteArguments...); err != nil {
 		return fmt.Errorf("delete old search rows: %w", err)
 	}
+	staleArguments := make([]any, 0, len(entryIDs))
+	for _, entryID := range entryIDs {
+		staleArguments = append(staleArguments, entryID)
+	}
+	staleStatement := `
+UPDATE entry_enrichments
+SET state='stale',
+    updated_at=COALESCE((SELECT e.updated_at FROM entries e WHERE e.entry_id=entry_enrichments.entry_id),updated_at)
+WHERE state<>'stale'
+  AND entry_id IN (` + placeholders + `)
+  AND content_hash<>(SELECT e.content_hash FROM entries e WHERE e.entry_id=entry_enrichments.entry_id)`
+	if _, err := transaction.ExecContext(ctx, staleStatement, staleArguments...); err != nil {
+		return fmt.Errorf("invalidate stale enrichment: %w", err)
+	}
 	insertArguments := make([]any, 0, len(entryIDs)+1)
 	insertArguments = append(insertArguments, userID)
 	for _, entryID := range entryIDs {
@@ -67,7 +81,7 @@ SELECT
   COALESCE((
     SELECT group_concat(trim(COALESCE(en.translated_title,'') || ' ' || COALESCE(en.translated_content,'')), ' ')
     FROM entry_enrichments en
-    WHERE en.entry_id=e.entry_id AND en.state='ready'
+    WHERE en.entry_id=e.entry_id AND en.state='ready' AND en.content_hash=e.content_hash
   ), ''),
   trim(COALESCE(e.description,'') || ' ' || COALESCE(e.content,'') || ' ' || COALESCE(e.author,'')),
   COALESCE(f.title, ''),
@@ -75,12 +89,12 @@ SELECT
     SELECT group_concat(t.name, ' ')
     FROM entry_topics et
     JOIN topics t ON t.topic_id=et.topic_id AND t.user_id=et.user_id
-    WHERE et.user_id=ae.user_id AND et.entry_id=e.entry_id
+    WHERE et.user_id=ae.user_id AND et.entry_id=e.entry_id AND et.content_hash=e.content_hash
   ), ''),
   COALESCE((
     SELECT group_concat(CAST(tag.value AS TEXT), ' ')
     FROM entry_enrichments en, json_each(en.tags_json) tag
-    WHERE en.entry_id=e.entry_id AND en.state='ready'
+    WHERE en.entry_id=e.entry_id AND en.state='ready' AND en.content_hash=e.content_hash
   ), '')
 FROM entries e
 JOIN account_entries ae ON ae.entry_id=e.entry_id AND ae.user_id=?

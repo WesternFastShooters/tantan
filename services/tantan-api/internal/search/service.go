@@ -152,8 +152,8 @@ WITH ranked AS (
 SELECT
   e.entry_id,
   e.kind,
-  COALESCE((SELECT en.translated_title FROM entry_enrichments en WHERE en.entry_id=e.entry_id AND en.state='ready' AND en.translated_title IS NOT NULL ORDER BY en.updated_at DESC LIMIT 1), e.title),
-  COALESCE((SELECT en.translated_content FROM entry_enrichments en WHERE en.entry_id=e.entry_id AND en.state='ready' AND en.translated_content IS NOT NULL ORDER BY en.updated_at DESC LIMIT 1), e.description, e.content, ''),
+  COALESCE((SELECT en.translated_title FROM entry_enrichments en WHERE en.entry_id=e.entry_id AND en.state='ready' AND en.content_hash=e.content_hash AND en.translated_title IS NOT NULL ORDER BY en.updated_at DESC LIMIT 1), e.title),
+  COALESCE((SELECT en.translated_content FROM entry_enrichments en WHERE en.entry_id=e.entry_id AND en.state='ready' AND en.content_hash=e.content_hash AND en.translated_content IS NOT NULL ORDER BY en.updated_at DESC LIMIT 1), e.description, e.content, ''),
   e.media_json,
   e.published_at,
   COALESCE(f.feed_id,''),
@@ -162,7 +162,7 @@ SELECT
   ae.read_at,
   ae.collected_at,
   COALESCE((SELECT json_group_array(json_object('id',t.topic_id,'name',t.name)) FROM entry_topics et JOIN topics t ON t.topic_id=et.topic_id AND t.user_id=et.user_id WHERE et.user_id=ae.user_id AND et.entry_id=e.entry_id), '[]'),
-  EXISTS(SELECT 1 FROM entry_enrichments en WHERE en.entry_id=e.entry_id AND en.state='ready' AND (en.translated_title IS NOT NULL OR en.translated_content IS NOT NULL)),
+  EXISTS(SELECT 1 FROM entry_enrichments en WHERE en.entry_id=e.entry_id AND en.state='ready' AND en.content_hash=e.content_hash AND (en.translated_title IS NOT NULL OR en.translated_content IS NOT NULL)),
   ranked.score
 FROM ranked
 JOIN entries e ON e.entry_id=ranked.entry_id

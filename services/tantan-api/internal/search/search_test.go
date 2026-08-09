@@ -165,3 +165,42 @@ VALUES('orphan_entry','user_1','orphan','','','','','')`); err != nil {
 		t.Fatalf("degraded status=%q err=%v", status, err)
 	}
 }
+
+func TestRefreshInvalidatesDerivedDataWhenContentHashChanges(t *testing.T) {
+	ctx := context.Background()
+	store := openSearchStore(t)
+	insertSearchFixture(t, store)
+	indexer := search.NewIndexer(store)
+	newHash := strings.Repeat("b", 64)
+	if err := store.Write(ctx, func(transaction *sql.Tx) error {
+		if _, err := transaction.ExecContext(ctx, `
+UPDATE entries SET content='FreshBodyToken',content_hash=?,updated_at='2026-08-09T11:00:00Z'
+WHERE entry_id='entry_main'`, newHash); err != nil {
+			return err
+		}
+		return indexer.RefreshTx(ctx, transaction, "user_1", []string{"entry_main"})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var enrichmentState string
+	if err := store.DB().QueryRowContext(ctx, "SELECT state FROM entry_enrichments WHERE entry_id='entry_main'").Scan(&enrichmentState); err != nil {
+		t.Fatal(err)
+	}
+	if enrichmentState != "stale" {
+		t.Fatalf("changed-content enrichment state=%q", enrichmentState)
+	}
+	service := newSearchService(t, store)
+	for _, oldDerivedTerm := range []string{"译文命中", "TopicToken", "TagToken"} {
+		page, err := service.Search(ctx, search.Query{UserID: "user_1", Text: oldDerivedTerm, Limit: 20})
+		if err != nil {
+			t.Fatalf("search stale term %q: %v", oldDerivedTerm, err)
+		}
+		if resultContains(page.Items, "entry_main") {
+			t.Fatalf("stale derived term %q remained searchable", oldDerivedTerm)
+		}
+	}
+	page, err := service.Search(ctx, search.Query{UserID: "user_1", Text: "FreshBodyToken", Limit: 20})
+	if err != nil || !resultContains(page.Items, "entry_main") {
+		t.Fatalf("fresh original search=%#v err=%v", page, err)
+	}
+}
