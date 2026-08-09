@@ -44,7 +44,7 @@ const devPrint = (): PluginOption => ({
 })
 
 const isWebBuild = process.env.WEB_BUILD === "1"
-// eslint-disable-next-line no-console
+
 console.log(green("Build type:"), isWebBuild ? "Web" : "Unknown")
 
 const proxyConfig = {
@@ -159,7 +159,6 @@ export default ({ mode }) => {
           injectRegister: false,
 
           injectManifest: {
-            injectionPoint: undefined,
             globPatterns: [
               "**/*.{js,json,css,html,txt,svg,png,ico,webp,woff,woff2,ttf,eot,otf,wasm}",
             ],
@@ -182,9 +181,10 @@ export default ({ mode }) => {
 
           manifest: {
             theme_color: "#000000",
-            name: "Folo",
+            name: "Tantan",
+            short_name: "Tantan",
             display: "standalone",
-            background_color: "#ffffff",
+            background_color: "#09090b",
             icons: [
               {
                 src: "pwa-64x64.png",

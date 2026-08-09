@@ -291,11 +291,19 @@
       "allowedWrites": [
         "apps/desktop/layer/renderer/src/pages/(main)/layout.tsx",
         "apps/desktop/layer/renderer/src/pages/(main)/index.sync.tsx",
+        "apps/desktop/layer/renderer/src/pages/(main)/(primary)/**",
+        "apps/desktop/layer/renderer/src/pages/login/**",
+        "apps/desktop/layer/renderer/src/pages/settings/index.tsx",
+        "apps/desktop/layer/renderer/src/pages/settings/layout.tsx",
         "apps/desktop/layer/renderer/src/router.ts",
+        "apps/desktop/layer/renderer/src/router.tsx",
         "apps/desktop/layer/renderer/src/modules/tantan-shell/**",
         "apps/desktop/layer/renderer/src/modules/tantan-service-status/**",
         "apps/desktop/layer/renderer/src/lib/tantan-api/**",
         "apps/desktop/layer/renderer/src/styles/**",
+        "apps/desktop/layer/renderer/src/workers/sw/**",
+        "apps/desktop/layer/renderer/index.html",
+        "apps/desktop/vite.config.ts",
         "apps/desktop/e2e/tests/web/tantan-shell.spec.ts"
       ],
       "forbiddenWrites": [
