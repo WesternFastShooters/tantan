@@ -47,7 +47,7 @@ func TestOpenAppliesApprovedMigrationsAndSecuresDatabase(t *testing.T) {
 	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM schema_migrations").Scan(&migrationCount); err != nil {
 		t.Fatalf("count migrations: %v", err)
 	}
-	if migrationCount != 3 {
+	if migrationCount != 4 {
 		t.Fatalf("migration count=%d", migrationCount)
 	}
 	var templateCount int

@@ -4,11 +4,12 @@ package gen
 
 import "encoding/json"
 
-const ContractSHA256 = "c523f817478aea6d9cf629c094099ae6056d5b7bb3e0449bd71b276f5ce87532"
+const ContractSHA256 = "775d01f09672845d7f112d6803f4712bd5ebef1c45c49daf9720777b27aa9486"
 
 type Identifier string
 type EntryType string
 type AIProviderID string
+type FoloAuthProvider string
 type ErrorCode string
 type FeedbackAction string
 
@@ -20,25 +21,40 @@ const (
 )
 
 const (
-	AIProviderIDOpenai     AIProviderID = "openai"
-	AIProviderIDAnthropic  AIProviderID = "anthropic"
-	AIProviderIDGoogle     AIProviderID = "google"
-	AIProviderIDDeepseek   AIProviderID = "deepseek"
-	AIProviderIDOpenrouter AIProviderID = "openrouter"
+	AIProviderIDGoogleGeminiOpenai AIProviderID = "google-gemini-openai"
+)
+
+const (
+	FoloAuthProviderGoogle     FoloAuthProvider = "google"
+	FoloAuthProviderGithub     FoloAuthProvider = "github"
+	FoloAuthProviderApple      FoloAuthProvider = "apple"
+	FoloAuthProviderCredential FoloAuthProvider = "credential"
+	FoloAuthProviderToken      FoloAuthProvider = "token"
 )
 
 const (
 	ErrorCodeAuthRequired          ErrorCode = "AUTH_REQUIRED"
+	ErrorCodeSessionRequired       ErrorCode = "SESSION_REQUIRED"
+	ErrorCodeAuthInvalid           ErrorCode = "AUTH_INVALID"
+	ErrorCodeAuth2faRequired       ErrorCode = "AUTH_2FA_REQUIRED"
+	ErrorCodeAuthProviderInvalid   ErrorCode = "AUTH_PROVIDER_INVALID"
+	ErrorCodeAuthTokenUsed         ErrorCode = "AUTH_TOKEN_USED"
 	ErrorCodeAuthFlowInvalid       ErrorCode = "AUTH_FLOW_INVALID"
 	ErrorCodeOriginRejected        ErrorCode = "ORIGIN_REJECTED"
+	ErrorCodeCsrfInvalid           ErrorCode = "CSRF_INVALID"
+	ErrorCodeFoloRouteDenied       ErrorCode = "FOLO_ROUTE_DENIED"
 	ErrorCodeFoloRouteNotAllowed   ErrorCode = "FOLO_ROUTE_NOT_ALLOWED"
 	ErrorCodeFoloFeatureRemoved    ErrorCode = "FOLO_FEATURE_REMOVED"
 	ErrorCodeFoloUnavailable       ErrorCode = "FOLO_UNAVAILABLE"
 	ErrorCodeFoloRateLimited       ErrorCode = "FOLO_RATE_LIMITED"
 	ErrorCodeAiNotConfigured       ErrorCode = "AI_NOT_CONFIGURED"
+	ErrorCodeAiPresetInvalid       ErrorCode = "AI_PRESET_INVALID"
+	ErrorCodeAiAuthFailed          ErrorCode = "AI_AUTH_FAILED"
+	ErrorCodeAiRateLimited         ErrorCode = "AI_RATE_LIMITED"
 	ErrorCodeAiProviderUnavailable ErrorCode = "AI_PROVIDER_UNAVAILABLE"
 	ErrorCodeAiOutputInvalid       ErrorCode = "AI_OUTPUT_INVALID"
 	ErrorCodeLocalStorageError     ErrorCode = "LOCAL_STORAGE_ERROR"
+	ErrorCodeDbBusy                ErrorCode = "DB_BUSY"
 	ErrorCodeValidationError       ErrorCode = "VALIDATION_ERROR"
 	ErrorCodeVersionConflict       ErrorCode = "VERSION_CONFLICT"
 	ErrorCodeCursorMismatch        ErrorCode = "CURSOR_MISMATCH"
@@ -61,9 +77,11 @@ type HealthResponse struct {
 }
 
 type ReadinessChecks struct {
-	SQLite     string `json:"sqlite"`
-	Migrations string `json:"migrations"`
-	Keychain   string `json:"keychain"`
+	SQLite       string `json:"sqlite"`
+	Migrations   string `json:"migrations"`
+	SecretStore  string `json:"secretStore"`
+	RoutePolicy  string `json:"routePolicy"`
+	StaticAssets string `json:"staticAssets"`
 }
 
 type ReadinessResponse struct {
@@ -79,8 +97,33 @@ type SessionUser struct {
 }
 
 type SessionResponse struct {
-	User     SessionUser `json:"user"`
-	Timezone string      `json:"timezone"`
+	User      SessionUser `json:"user"`
+	Timezone  string      `json:"timezone"`
+	CSRFToken string      `json:"csrfToken"`
+}
+
+type FoloAuthProvidersResponse struct {
+	Providers []FoloAuthProvider `json:"providers"`
+}
+
+type FoloSocialStartRequest struct {
+	Provider FoloAuthProvider `json:"provider"`
+}
+
+type FoloSocialStartResponse struct {
+	AuthorizeURL string `json:"authorizeUrl"`
+	Handoff      string `json:"handoff"`
+}
+
+type FoloTokenLoginRequest struct {
+	Token    string  `json:"token"`
+	ReturnTo *string `json:"returnTo,omitempty"`
+}
+
+type FoloEmailLoginRequest struct {
+	Email    string  `json:"email"`
+	Password string  `json:"password"`
+	ReturnTo *string `json:"returnTo,omitempty"`
 }
 
 type Topic struct {
@@ -95,6 +138,7 @@ type Topic struct {
 
 type TopicsResponse struct {
 	Version        int         `json:"version"`
+	TopicsRevision int         `json:"topicsRevision"`
 	ActiveFilterID *Identifier `json:"activeFilterId"`
 	Topics         []Topic     `json:"topics"`
 }
@@ -121,9 +165,11 @@ type ActiveFilter struct {
 }
 
 type FilterMutationResponse struct {
-	Filter  *ActiveFilter `json:"filter"`
-	Topics  []Topic       `json:"topics"`
-	QueueID Identifier    `json:"queueId"`
+	Filter          *ActiveFilter `json:"filter"`
+	Topics          []Topic       `json:"topics"`
+	TopicsRevision  int           `json:"topicsRevision"`
+	QueueID         Identifier    `json:"queueId"`
+	QueueGeneration Identifier    `json:"queueGeneration"`
 }
 
 type FeedbackRequest struct {
@@ -168,6 +214,7 @@ type HomeCard struct {
 type QueueState struct {
 	ID                  Identifier `json:"id"`
 	Version             int        `json:"version"`
+	Generation          Identifier `json:"generation"`
 	Total               int        `json:"total"`
 	Unread              int        `json:"unread"`
 	Finished            bool       `json:"finished"`
@@ -176,9 +223,10 @@ type QueueState struct {
 }
 
 type HomeResponse struct {
-	Items      []HomeCard `json:"items"`
-	NextCursor *string    `json:"nextCursor"`
-	Queue      QueueState `json:"queue"`
+	Items           []HomeCard `json:"items"`
+	NextCursor      *string    `json:"nextCursor"`
+	Queue           QueueState `json:"queue"`
+	QueueGeneration Identifier `json:"queueGeneration"`
 }
 
 type SearchResponse struct {
@@ -200,6 +248,7 @@ type ErrorField struct {
 type ErrorObject struct {
 	Code           ErrorCode    `json:"code"`
 	Message        string       `json:"message"`
+	Retryable      bool         `json:"retryable"`
 	FieldErrors    []ErrorField `json:"fieldErrors,omitempty"`
 	RetryAfterMS   *int         `json:"retryAfterMs,omitempty"`
 	CurrentVersion *int         `json:"currentVersion,omitempty"`
@@ -214,18 +263,6 @@ type EnrichmentResponse struct {
 	State string          `json:"state"`
 	Data  json.RawMessage `json:"data"`
 	Error *ErrorObject    `json:"error"`
-}
-
-type AIProviderPutRequest struct {
-	ProviderID AIProviderID `json:"providerId"`
-	Model      string       `json:"model"`
-	APIKey     *string      `json:"apiKey,omitempty"`
-}
-
-type AIProviderTestRequest struct {
-	ProviderID AIProviderID `json:"providerId"`
-	Model      string       `json:"model"`
-	APIKey     string       `json:"apiKey"`
 }
 
 type AIProviderResponse struct {

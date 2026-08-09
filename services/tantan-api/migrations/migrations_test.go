@@ -15,6 +15,7 @@ var migrationFiles = []string{
 	"0001_core.sql",
 	"0002_search_fts.sql",
 	"0003_seed_core_topics.sql",
+	"0004_mobile_web_v2.sql",
 }
 
 func TestApprovedMigrationsApplyExactlyOnce(t *testing.T) {
@@ -70,8 +71,8 @@ func TestApprovedMigrationsApplyExactlyOnce(t *testing.T) {
 	if err := database.QueryRowContext(context, "SELECT COUNT(*) FROM schema_migrations").Scan(&migrationCount); err != nil {
 		t.Fatalf("count migrations: %v", err)
 	}
-	if migrationCount != 3 {
-		t.Fatalf("expected 3 migrations exactly once, got %d", migrationCount)
+	if migrationCount != 4 {
+		t.Fatalf("expected 4 migrations exactly once, got %d", migrationCount)
 	}
 
 	foreignKeyRows, err := database.QueryContext(context, "PRAGMA foreign_key_check")

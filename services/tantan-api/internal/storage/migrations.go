@@ -21,6 +21,7 @@ var approvedMigrations = []migration{
 	{version: 1, name: "0001_core.sql", checksum: "spec-package-1.0.0-0001-core"},
 	{version: 2, name: "0002_search_fts.sql", checksum: "spec-package-1.0.0-0002-search-fts"},
 	{version: 3, name: "0003_seed_core_topics.sql", checksum: "spec-package-1.0.0-0003-core-topic-templates"},
+	{version: 4, name: "0004_mobile_web_v2.sql", checksum: "spec-package-2.0.0-0004-mobile-web-v2"},
 }
 
 func applyMigrations(ctx context.Context, database *sql.DB) error {

@@ -1,18 +1,19 @@
 {
-  "schemaVersion": "1.0.0",
-  "packageVersion": "1.0.0",
+  "schemaVersion": "2.0.0",
+  "packageVersion": "2.0.0",
   "status": "approved",
-  "approvedAt": "2026-08-09",
-  "approvalRecord": "User requested continuation until a practical, safe, agent-codable spec package exists; phase-one execution is locked to PC Web and responsive Mobile Web/PWA.",
+  "approvedAt": "2026-08-10",
+  "approvalRecord": "User approved a Mobile-Web/PWA-only implementation, Folo Mobile parity outside Home, all Folo login methods, and a Go-server-owned Gemini secret configuration; the Codex Goal must continue through coding, tests, and mobile acceptance.",
   "phase": {
-    "name": "phase-one-local",
-    "clients": ["pc-web", "mobile-web-pwa"],
+    "name": "phase-one-mobile-web",
+    "clients": ["mobile-web-pwa"],
     "excluded": [
+      "pc-web",
+      "electron",
       "ios-android-native",
-      "server-deployment",
-      "public-network-listener",
       "remote-telemetry",
       "custom-ai-provider-url",
+      "browser-supplied-ai-key",
       "folo-paid-ai-and-membership"
     ]
   },
@@ -42,21 +43,48 @@
     "playwright": "1.61.1"
   },
   "lockedDecisions": [
-    "Folo supplies account, subscription, feed, entry, read, collection and source discovery data only.",
-    "Folo paid AI, membership, plan, power, wallet, payment, upgrade CTA and AI Chat are removed from the product and denied by proxy policy.",
-    "RSS subscription storage is preserved and must never be removed by name-based deletion.",
-    "All browser business requests go to 127.0.0.1:3000.",
-    "User AI keys exist only in OS Keychain and AI provider endpoints are selected from built-in presets.",
-    "Home uses a persisted seven-day unread daily queue with initial size 50 and same-day hard limit 60.",
-    "Normal search navigates to /search without mutating Home; the AI icon opens an in-place filter sheet.",
-    "OpenAPI, JSON Schema, SQLite migrations and Folo route policy require a spec amendment before change."
+    "The only product client is deployable Mobile Web/PWA; PC-specific UI, Electron runtime, and native apps are excluded.",
+    "Folo Mobile supplies the non-Home information architecture and interaction baseline; Home alone is replaced by the approved prototype flow.",
+    "Tantan exposes Google, GitHub, Apple, Email, and authorization-token Folo login methods; social login uses the official Folo page and one-time-token handoff.",
+    "All browser business requests are same-origin relative /api requests; Go is the only Folo and Gemini egress owner.",
+    "Gemini is fixed to provider google-gemini-openai, the official OpenAI-compatible endpoint, and model gemini-3.5-flash-lite.",
+    "The Gemini API key is loaded only by Go from an operator-controlled secret file or local Keychain; no browser API accepts it and SQLite does not store it.",
+    "Folo paid AI, membership, plan, power, wallet, payment, upgrade CTA and AI Chat are absent and denied by proxy policy; RSS subscription storage is preserved.",
+    "Home uses a persisted seven-day unread daily queue with initial size 50 and same-day hard limit 60; pagination never reranks.",
+    "Normal search navigates to /search without mutating Home; the AI icon opens an in-place filter sheet and commit changes Filter, Topics, and Queue atomically.",
+    "OpenAPI, JSON Schema, SQLite migrations and Folo route policy require an approved spec amendment before implementation changes."
   ],
   "validationEntry": "bash spec-package/scripts/validate-package.sh",
   "files": [
     {
+      "path": "00-project.md",
+      "role": "project-scope-and-decisions",
+      "sha256": "661a7b5ac3c4d5d49c4e5cf24f4b6c7c3dbbb33e58811f8568affcdb02e4a501"
+    },
+    {
+      "path": "10-frontend.md",
+      "role": "frontend-domain-spec",
+      "sha256": "c469f5561d39ded649e1da2433daba5e16f77b0d18c231b4ae924127ea6a8917"
+    },
+    {
+      "path": "20-backend.md",
+      "role": "backend-domain-spec",
+      "sha256": "cbcdcbb8f24b45e38ce874d83c73d3a1555142c9f30ee8cba5e9e919edcfa193"
+    },
+    {
+      "path": "80-cross-domain.md",
+      "role": "cross-domain-contract",
+      "sha256": "ff20f98fa1d49e9d78a6edd76bbe7e53666d0942ed7d211dfe2d1a96aac4abde"
+    },
+    {
+      "path": "90-delivery.md",
+      "role": "delivery-and-acceptance-spec",
+      "sha256": "a8aef92891dd08a27fcdbf4019610841d2529a77352285f14417e4a1771b70ac"
+    },
+    {
       "path": "README.md",
       "role": "package-index",
-      "sha256": "c89393fbf75432cb843d64b994b66e5ae929cec48844db60063f27ecbb4ba0f7"
+      "sha256": "aa12431430c0b014e9f24d899fa05a5474b34800edec2a2990fedd413e99621a"
     },
     {
       "path": "agent/BASELINE_IMPORT.md",
@@ -66,27 +94,27 @@
     {
       "path": "agent/EXECUTION.md",
       "role": "agent-safety-protocol",
-      "sha256": "e24b270140346b401b925a4e01492c68d7d138fe9db84da1b4f16a7f85e7035a"
+      "sha256": "5da77021105818bbee67a7242de08c98fd972f53878463c98e300c78a4926e9e"
     },
     {
       "path": "agent/paid-feature-removal.md",
       "role": "removal-policy",
-      "sha256": "97ac3bd0ab717dc407a40b0912139502914902d7016f62d78e2bfa58e2def04b"
+      "sha256": "eb91d22ccb362bbc25298f9cd7e57447854d3a60198ba81a91aed32d9ef4430a"
     },
     {
       "path": "agent/task-manifest.json",
       "role": "task-dag-and-write-boundaries",
-      "sha256": "9f4ff0705354b46cb27b56f55ff35926bbf948cb3fa7768250bbd36f64f8f306"
+      "sha256": "95a152a02721d9a91e7e37492457e24b38b96fad0eac7319554f8c2eed626cfd"
     },
     {
       "path": "api/folo-route-policy.json",
       "role": "upstream-route-policy",
-      "sha256": "780dad2814c560a626e9ad738c97a5cdc66d84a465d7a9b70bb1e269a86c8bbb"
+      "sha256": "7ece98fe06172c6e7c011e0d30737b10db14e2ea45c9c01681f963372b12acf9"
     },
     {
       "path": "api/openapi.json",
       "role": "public-http-contract",
-      "sha256": "4296305bfbdc5046f8de5db646d7a7aa748a963266d14e27293e2d339368d23b"
+      "sha256": "fffee801acd3443a0c838601e15516d27d9a746e7ab348a3c6c401e243c099ec"
     },
     {
       "path": "db/0001_core.sql",
@@ -104,6 +132,11 @@
       "sha256": "ba89ba40d804a05ab5a32d57e490e5d0b4bf728eb76710673fd3d0f897b97b51"
     },
     {
+      "path": "db/0004_mobile_web_v2.sql",
+      "role": "sqlite-migration",
+      "sha256": "1ce30c907bdceab4a5c0230aa668a31ebc3e70b62a4f7a9c092d7483330ad527"
+    },
+    {
       "path": "examples/ai-enrichment-v1.json",
       "role": "schema-example",
       "sha256": "a3d2bb2a536fc43a970faf02e9144636a271bd5d62d3c976b624d2bf80c37c6f"
@@ -116,7 +149,7 @@
     {
       "path": "examples/home-response.json",
       "role": "schema-example",
-      "sha256": "2dac6b6bf53b186cf99c19bb691ce9451e524ccbf578b7ba75fec3d001c849eb"
+      "sha256": "10e352a5b4a76e24b5f240d0661283e6230516ddfce7abe525b8780ffd6ab938"
     },
     {
       "path": "examples/topic-classification-v1.json",
@@ -136,7 +169,7 @@
     {
       "path": "schemas/home-response.schema.json",
       "role": "public-dto-schema",
-      "sha256": "8879bd84aff76f114e2d42a0a173f8eb99defe0d2d3ebfefe7deb4da5be57c1f"
+      "sha256": "26873533cc3d62556adf85ea7dba1e154ab5f12c52f4060500d67d807c4900bb"
     },
     {
       "path": "schemas/topic-classification-v1.schema.json",
@@ -146,31 +179,36 @@
     {
       "path": "scripts/validate-package.rb",
       "role": "offline-contract-validator",
-      "sha256": "073d4552082072eb4d289138ebaaa09a93c3434786e15356fceee13b1dd1b3d8"
+      "sha256": "aae5475cb3526384e7300dcd7dd58565e69e1460ed7951735a05b998c3ff96e5"
     },
     {
       "path": "scripts/validate-package.sh",
       "role": "validation-entry",
-      "sha256": "2ff85546305e813c5a7322690f0bb2bd29ca455efd6c493ecd51ad8e0de30bef"
+      "sha256": "16c6afaff62e60a8af7eaeccc27040a435d7846a50ae624a7bb536ff22cf335e"
+    },
+    {
+      "path": "spec.yaml",
+      "role": "standard-project-spec-manifest",
+      "sha256": "58343761ad9e12495025b0449ebf34a75089861270d95a8c59ec9b3b5c351371"
     },
     {
       "path": "tests/acceptance-matrix.md",
       "role": "acceptance-tests",
-      "sha256": "34aeaa4da2d961e6a83ab3a311c93c96047eb81c9d88107f2f2b047f00d97599"
+      "sha256": "710dc5406f43b29bf6ecd3829102f1ea15f93a8220c38347390f02c61318f88c"
     }
   ],
   "inputs": [
     {
       "path": "../2026-08-09-tantan-实施落地方案.md",
-      "sha256": "9017c1121fd8187a962a5993a7137121192dcb52be56ae5a2573e54ff37793da"
+      "sha256": "40d84ceee73204ac9a9033d1041ff38bf4c4e8b50bd303669b85de3ebcec69d3"
     },
     {
       "path": "../2026-08-09-tantan-frontend-spec.md",
-      "sha256": "a6a9a063d727a621afa92561761db7a701c92ac0652c4aba9ef32ec8444fde4f"
+      "sha256": "09a42e4a061898c87a64083cd99f03b47f81702f612471e33c180eec0c84fbf8"
     },
     {
       "path": "../2026-08-09-tantan-backend-spec.md",
-      "sha256": "a20252cbd1c98f3140c3f0afeab5960fa6b6349c2987a036f71d2422a8523e7a"
+      "sha256": "87a8fd63282f8d67b3dd8ab603d488528372882cfa289545b58e4f2a570147ac"
     },
     {
       "path": "../prd(5).md",

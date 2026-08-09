@@ -20,9 +20,11 @@
     }
   ],
   "nextCursor": "eyJxdWV1ZUlkIjoicXVldWVfMDEiLCJ2ZXJzaW9uIjoxfQ",
+  "queueGeneration": "queue_20260810_01",
   "queue": {
     "id": "queue_01JEXAMPLE",
     "version": 1,
+    "generation": "queue_20260810_01",
     "total": 50,
     "unread": 50,
     "finished": false,

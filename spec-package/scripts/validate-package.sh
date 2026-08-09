@@ -12,6 +12,7 @@ validation_db="$validation_tmp/contracts.sqlite"
 sqlite3 "$validation_db" < "$package_root/db/0001_core.sql"
 sqlite3 "$validation_db" < "$package_root/db/0002_search_fts.sql"
 sqlite3 "$validation_db" < "$package_root/db/0003_seed_core_topics.sql"
+sqlite3 "$validation_db" < "$package_root/db/0004_mobile_web_v2.sql"
 
 integrity="$(sqlite3 "$validation_db" 'PRAGMA integrity_check;')"
 if [[ "$integrity" != "ok" ]]; then
@@ -27,7 +28,7 @@ if [[ -n "$foreign_key_rows" ]]; then
 fi
 
 migrations="$(sqlite3 "$validation_db" 'SELECT group_concat(version, ",") FROM schema_migrations ORDER BY version;')"
-if [[ "$migrations" != "1,2,3" ]]; then
+if [[ "$migrations" != "1,2,3,4" ]]; then
   echo "ERROR: migration versions=$migrations" >&2
   exit 1
 fi
@@ -56,22 +57,16 @@ if [[ "$fts_matches" != "1" ]]; then
 fi
 
 if sqlite3 "$validation_db" <<'SQL' >/dev/null 2>&1
-INSERT INTO ai_provider_configs(provider_id,base_url,model,fingerprint,enabled,updated_at)
-VALUES ('openai','https://127.0.0.1:9999','model-a',NULL,1,'2026-08-09T00:00:00Z');
+INSERT INTO secret_records(secret_ref,owner_id,secret_kind,key_version,nonce,ciphertext,created_at,updated_at)
+VALUES ('bad_ai_key','server','ai_api_key',1,zeroblob(12),zeroblob(16),'2026-08-09T00:00:00Z','2026-08-09T00:00:00Z');
 SQL
 then
-  echo "ERROR: database allowed a non-preset AI provider endpoint" >&2
+  echo "ERROR: database allowed a Gemini API key record" >&2
   exit 1
 fi
 
-if sqlite3 "$validation_db" <<'SQL' >/dev/null 2>&1
-INSERT INTO ai_provider_configs(provider_id,base_url,model,fingerprint,enabled,updated_at)
-VALUES ('openai','https://api.openai.com/v1','model-a',NULL,1,'2026-08-09T00:00:00Z');
-INSERT INTO ai_provider_configs(provider_id,base_url,model,fingerprint,enabled,updated_at)
-VALUES ('anthropic','https://api.anthropic.com','model-b',NULL,1,'2026-08-09T00:00:00Z');
-SQL
-then
-  echo "ERROR: database allowed two enabled AI providers" >&2
+if [[ "$(sqlite3 "$validation_db" "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='ai_provider_configs';")" != "0" ]]; then
+  echo "ERROR: database exposes a mutable per-user AI provider config table" >&2
   exit 1
 fi
 
@@ -86,9 +81,7 @@ then
   exit 1
 fi
 
-python3 /Users/mingrui/.codex/skills/frontend-spec/scripts/validate_spec.py \
-  "$repo_root/2026-08-09-tantan-frontend-spec.md" --domain frontend --stage final
-python3 /Users/mingrui/.codex/skills/backend-spec/scripts/validate_spec.py \
-  "$repo_root/2026-08-09-tantan-backend-spec.md" --domain backend --stage final
+python3 /Users/mingrui/.agents/skills/development-scenarios/project-spec/scripts/validate_spec_package.py \
+  "$package_root" --stage final
 
-echo "PASS: spec package SQL migrations, FTS, invariants and final spec gates"
+echo "PASS: v2 spec package, SQL migrations, FTS, invariants and final project-spec gates"

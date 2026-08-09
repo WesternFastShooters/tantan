@@ -1,0 +1,13 @@
+schema_version: "1.0"
+project: "tantan-mobile-web-phase-one"
+status: "approved"
+lifecycle: "incremental"
+domains:
+  - "frontend"
+  - "backend"
+documents:
+  project: "00-project.md"
+  frontend: "10-frontend.md"
+  backend: "20-backend.md"
+  cross_domain: "80-cross-domain.md"
+  delivery: "90-delivery.md"

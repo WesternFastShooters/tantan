@@ -9,40 +9,40 @@
 
 ### 1.1 输入资料
 
-| 资料 | 位置 | 用途 | 已验证 |
-|---|---|---|---|
-| 产品 PRD | `/Users/mingrui/Project/tantan/prd(5).md` | 页面、交互、文案、范围 | 是，完整读取 |
-| 前端原型 | `/Users/mingrui/Project/tantan/tantan前端原型.zip` | 视觉与交互参考 | 是；核心为 56KB 单文件 `src/app/App.tsx`，使用静态卡片和本地状态 |
-| Folo 前端 | `/Users/mingrui/Project/Folo` | 增量改造基线 | 是，提交 `3846c90b67da351b6017cd4fe9d0992b8077224e` |
-| 全栈总览 | `2026-08-09-tantan-实施落地方案.md` | 跨端边界、阶段与验收总线 | 是 |
-| 后端规格 | `2026-08-09-tantan-backend-spec.md` | API Provider 合同 | 与本文共享 `API-*` ID |
-| Agent 规格包 | `spec-package/README.md` | OpenAPI、Schema、DDL、任务与写入边界 | 是，机器合同优先于叙述性细节 |
+| 资料         | 位置                                               | 用途                                 | 已验证                                                           |
+| ------------ | -------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------- |
+| 产品 PRD     | `/Users/mingrui/Project/tantan/prd(5).md`          | 页面、交互、文案、范围               | 是，完整读取                                                     |
+| 前端原型     | `/Users/mingrui/Project/tantan/tantan前端原型.zip` | 视觉与交互参考                       | 是；核心为 56KB 单文件 `src/app/App.tsx`，使用静态卡片和本地状态 |
+| Folo 前端    | `/Users/mingrui/Project/Folo`                      | 增量改造基线                         | 是，提交 `3846c90b67da351b6017cd4fe9d0992b8077224e`              |
+| 全栈总览     | `2026-08-09-tantan-实施落地方案.md`                | 跨端边界、阶段与验收总线             | 是                                                               |
+| 后端规格     | `2026-08-09-tantan-backend-spec.md`                | API Provider 合同                    | 与本文共享 `API-*` ID                                            |
+| Agent 规格包 | `spec-package/README.md`                           | OpenAPI、Schema、DDL、任务与写入边界 | 是，机器合同优先于叙述性细节                                     |
 
 ### 1.2 代码与运行证据
 
-| 事实 | 文件/符号/命令 | 观察结果 |
-|---|---|---|
-| Web 与 Electron 共用 Renderer | `apps/desktop/layer/renderer/src/main.tsx` | 单一 React Root，注入 `followApi`、Auth Client、React Query |
-| 当前 Mobile Web 不进入应用 | `apps/desktop/layer/renderer/src/pages/(main)/layout.tsx` | `<768px` 选择 `DownloadPage` |
-| 当前首页跳转传统 Timeline | `apps/desktop/layer/renderer/src/pages/(main)/index.sync.tsx#loader` | `/` 重定向到 `/timeline/...` |
-| 当前请求直连 `VITE_API_URL` | `apps/desktop/layer/renderer/src/lib/api-client.ts#followClient` | `@follow-app/client-sdk` 直接请求配置的 API |
-| 当前认证使用 Better Auth | `packages/internal/shared/src/auth.ts#Auth` | 包含 Stripe subscription 插件和 Folo 社交登录处理 |
-| 当前本地状态可复用 | `packages/internal/store/src/modules/*` | Entry、Subscription、Read、Collection 已有 Store 与本地 DB 同步 |
-| 搜索不覆盖翻译与 Topic | `apps/desktop/layer/renderer/src/store/search/index.ts#createLocalDbSearch` | Fuse 只索引 Entry/Feed/Subscription 原字段 |
-| 已读与收藏行为可复用 | `packages/internal/store/src/modules/unread/store.ts`、`collection/store.ts` | 已有上游写入、回滚和本地失效逻辑 |
-| PWA 基础已存在 | `apps/desktop/vite.config.ts#VitePWA` | 已包含 `vite-plugin-pwa@1.3.0` 与图标资产 |
-| Masonry 依赖已存在 | `apps/desktop/layer/renderer/package.json` | `masonic@4.1.0` |
-| 测试基础已存在 | `apps/desktop/layer/renderer/package.json`、`apps/desktop/e2e/playwright.config.ts` | Vitest、Playwright Web/Electron 项目已配置 |
-| Folo Web 工具链 | `.nvmrc`、根 `package.json` | Node 22、pnpm 10.17.0、React 19.2.7、Vite 7.3.1 |
+| 事实                          | 文件/符号/命令                                                                      | 观察结果                                                        |
+| ----------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Web 与 Electron 共用 Renderer | `apps/desktop/layer/renderer/src/main.tsx`                                          | 单一 React Root，注入 `followApi`、Auth Client、React Query     |
+| 当前 Mobile Web 不进入应用    | `apps/desktop/layer/renderer/src/pages/(main)/layout.tsx`                           | `<768px` 选择 `DownloadPage`                                    |
+| 当前首页跳转传统 Timeline     | `apps/desktop/layer/renderer/src/pages/(main)/index.sync.tsx#loader`                | `/` 重定向到 `/timeline/...`                                    |
+| 当前请求直连 `VITE_API_URL`   | `apps/desktop/layer/renderer/src/lib/api-client.ts#followClient`                    | `@follow-app/client-sdk` 直接请求配置的 API                     |
+| 当前认证使用 Better Auth      | `packages/internal/shared/src/auth.ts#Auth`                                         | 包含 Stripe subscription 插件和 Folo 社交登录处理               |
+| 当前本地状态可复用            | `packages/internal/store/src/modules/*`                                             | Entry、Subscription、Read、Collection 已有 Store 与本地 DB 同步 |
+| 搜索不覆盖翻译与 Topic        | `apps/desktop/layer/renderer/src/store/search/index.ts#createLocalDbSearch`         | Fuse 只索引 Entry/Feed/Subscription 原字段                      |
+| 已读与收藏行为可复用          | `packages/internal/store/src/modules/unread/store.ts`、`collection/store.ts`        | 已有上游写入、回滚和本地失效逻辑                                |
+| PWA 基础已存在                | `apps/desktop/vite.config.ts#VitePWA`                                               | 已包含 `vite-plugin-pwa@1.3.0` 与图标资产                       |
+| Masonry 依赖已存在            | `apps/desktop/layer/renderer/package.json`                                          | `masonic@4.1.0`                                                 |
+| 测试基础已存在                | `apps/desktop/layer/renderer/package.json`、`apps/desktop/e2e/playwright.config.ts` | Vitest、Playwright Web/Electron 项目已配置                      |
+| Folo Web 工具链               | `.nvmrc`、根 `package.json`                                                         | Node 22、pnpm 10.17.0、React 19.2.7、Vite 7.3.1                 |
 
 ### 1.3 用户决策
 
-| 决策 ID | 问题 | 用户确认结果 | 影响范围 |
-|---|---|---|---|
-| DEC-001 | 是否保留 Folo 付费 AI | 不保留；使用用户自己的 API Key | 设置、详情、AI Filter、请求隔离 |
-| DEC-002 | 首页是否展示历史全部未读 | 否；采用最近 7 天每日有限队列 | 首页、完成态、后端排序 |
-| DEC-003 | 交付平台 | PC Web 与 Mobile 端 | 响应式 Shell、测试矩阵 |
-| DEC-004 | Mobile 是否为 Web/PWA | 是；一期为响应式 Mobile Web/PWA | 复用 Web Renderer；原生 App 需独立规格 |
+| 决策 ID | 问题                     | 用户确认结果                    | 影响范围                               |
+| ------- | ------------------------ | ------------------------------- | -------------------------------------- |
+| DEC-001 | 是否保留 Folo 付费 AI    | 不保留；使用用户自己的 API Key  | 设置、详情、AI Filter、请求隔离        |
+| DEC-002 | 首页是否展示历史全部未读 | 否；采用最近 7 天每日有限队列   | 首页、完成态、后端排序                 |
+| DEC-003 | 交付平台                 | PC Web 与 Mobile 端             | 响应式 Shell、测试矩阵                 |
+| DEC-004 | Mobile 是否为 Web/PWA    | 是；一期为响应式 Mobile Web/PWA | 复用 Web Renderer；原生 App 需独立规格 |
 
 ## 2. 背景、目标与边界
 
@@ -103,24 +103,24 @@ Login、Default Home、AI Filter Sheet、Filtered Home、Search、Article/Post D
 
 ### 3.3 复用、修改、新增、删除与保持不变
 
-| 类型 | 文件/符号 | 原因 | 影响 |
-|---|---|---|---|
-| 复用 | `packages/internal/store/src/modules/{entry,subscription,feed,unread,collection}` | Folo 数据与本地缓存 | 保持上游数据语义 |
-| 复用 | `modules/entry-content` 正文 Renderer 与媒体组件 | Article/Post Detail | AI 区域替换数据源 |
-| 复用 | `modules/discover` 的 Source Preview/订阅动作 | Add Subscription | 移除陌生推荐与 RSSHub 高级配置入口 |
-| 修改 | `src/pages/(main)/layout.tsx` | Mobile Web 进入真实 Shell | 删除 DownloadPage 分支 |
-| 修改 | `src/pages/(main)/index.sync.tsx` | `/` 成为首页 | 不再重定向 Timeline |
-| 修改 | `src/lib/api-client.ts`、`src/lib/auth.ts` | 只连接本地 Go | Folo 数据仍走兼容代理 |
-| 新增 | `src/modules/tantan-shell/**` | PC/Mobile 一级导航 | 单一 App Root |
-| 新增 | `src/modules/tantan-home/**` | Masonry、Topic、AI Filter | 首页状态由 React Query + URL 拥有 |
-| 新增 | `src/modules/tantan-search/**` | 统一搜索 | 替代产品入口中的 Fuse 搜索 |
-| 新增 | `src/modules/tantan-settings/**` | AI Provider、频道、偏好 | Key 不进入客户端状态 |
-| 删除 | `src/modules/{plan,power,wallet}`、`src/queries/wallet.tsx` 与关联页面 | 付费/钱包产品范围外 | 先断开消费方和路由，再按明确文件清单删除 |
-| 删除 | `src/modules/{ai-chat,ai-chat-session,ai-task,ai-onboarding}` 与 AI 页面 | 禁止 Folo 付费 AI/Chat | 本地 AI 组件独立实现 |
-| 删除 | `src/pages/.../power`、`src/pages/settings/(settings)/plan.tsx` | 不得访问 | 生成路由中不出现 |
-| 删除 | Folo PostHog/Sentry/通知初始化 | 本期本地优先与隐私边界 | 使用本地诊断日志 |
-| 禁用 | `src/modules/upgrade/**` 的 OTA/版本更新消费方 | 本期无发布与 OTA，它不属于付费 Upgrade | 与付费功能分开审计；消费方归零后再删除 |
-| 保持不动 | `apps/mobile/**` | 一期 Mobile 由 Web/PWA 交付 | 未来原生端需独立规格，本期 Agent 禁止写入 |
+| 类型     | 文件/符号                                                                         | 原因                                   | 影响                                      |
+| -------- | --------------------------------------------------------------------------------- | -------------------------------------- | ----------------------------------------- |
+| 复用     | `packages/internal/store/src/modules/{entry,subscription,feed,unread,collection}` | Folo 数据与本地缓存                    | 保持上游数据语义                          |
+| 复用     | `modules/entry-content` 正文 Renderer 与媒体组件                                  | Article/Post Detail                    | AI 区域替换数据源                         |
+| 复用     | `modules/discover` 的 Source Preview/订阅动作                                     | Add Subscription                       | 移除陌生推荐与 RSSHub 高级配置入口        |
+| 修改     | `src/pages/(main)/layout.tsx`                                                     | Mobile Web 进入真实 Shell              | 删除 DownloadPage 分支                    |
+| 修改     | `src/pages/(main)/index.sync.tsx`                                                 | `/` 成为首页                           | 不再重定向 Timeline                       |
+| 修改     | `src/lib/api-client.ts`、`src/lib/auth.ts`                                        | 只连接本地 Go                          | Folo 数据仍走兼容代理                     |
+| 新增     | `src/modules/tantan-shell/**`                                                     | PC/Mobile 一级导航                     | 单一 App Root                             |
+| 新增     | `src/modules/tantan-home/**`                                                      | Masonry、Topic、AI Filter              | 首页状态由 React Query + URL 拥有         |
+| 新增     | `src/modules/tantan-search/**`                                                    | 统一搜索                               | 替代产品入口中的 Fuse 搜索                |
+| 新增     | `src/modules/tantan-settings/**`                                                  | AI Provider、频道、偏好                | Key 不进入客户端状态                      |
+| 删除     | `src/modules/{plan,power,wallet}`、`src/queries/wallet.tsx` 与关联页面            | 付费/钱包产品范围外                    | 先断开消费方和路由，再按明确文件清单删除  |
+| 删除     | `src/modules/{ai-chat,ai-chat-session,ai-task,ai-onboarding}` 与 AI 页面          | 禁止 Folo 付费 AI/Chat                 | 本地 AI 组件独立实现                      |
+| 删除     | `src/pages/.../power`、`src/pages/settings/(settings)/plan.tsx`                   | 不得访问                               | 生成路由中不出现                          |
+| 删除     | Folo PostHog/Sentry/通知初始化                                                    | 本期本地优先与隐私边界                 | 使用本地诊断日志                          |
+| 禁用     | `src/modules/upgrade/**` 的 OTA/版本更新消费方                                    | 本期无发布与 OTA，它不属于付费 Upgrade | 与付费功能分开审计；消费方归零后再删除    |
+| 保持不动 | `apps/mobile/**`                                                                  | 一期 Mobile 由 Web/PWA 交付            | 未来原生端需独立规格，本期 Agent 禁止写入 |
 
 ### 3.4 冲突与兼容边界
 
@@ -132,16 +132,16 @@ Login、Default Home、AI Filter Sheet、Filtered Home、Search、Article/Post D
 
 ## 4. 用户旅程与导航
 
-| Journey ID | 用户/前置条件 | 入口 | 步骤与分支 | 退出/恢复 | 最终结果 |
-|---|---|---|---|---|---|
-| J-001 登录 | 未登录、Go ready | `/login` | 点 Google→`API-AUTH-START`→Folo→回调 | 失败回登录并显示稳定错误 | `/` 恢复账号数据 |
-| J-002 首页消费 | 已登录、有订阅 | `/` | 加载队列→切 Topic→开详情→标已读→返回 | 保留 Topic/滚动；失败显示缓存 | 已读卡从所有首页视图退出 |
-| J-003 AI Filter | 已登录、AI 配置有效 | 首页 ✨ | 输入 1..300→生成→Topic/卡片变化 | 失败保留旧首页；编辑/重置 | Active Filter 持久化 |
-| J-004 搜索 | 已登录 | `/search?q=` | 输入→等待 250ms→结果分页→开详情 | 返回恢复 q/滚动 | 已读与历史结果均可见 |
-| J-005 订阅管理 | 已登录 | `/subscriptions` | 媒体类型→分组→Source→详情/订阅 | 返回恢复分组展开状态 | 查看/添加/取消订阅 |
-| J-006 收藏 | 已登录 | `/favorites` | 浏览→详情→取消收藏 | 与 read 状态无关 | 收藏集合正确更新 |
-| J-007 AI 设置 | 已登录 | `/settings/ai` | 填 Provider→测试→保存 | Key 错误原位提示；可删除 | Go Keychain 保存成功 |
-| J-008 频道管理 | 已登录 | `/settings/topics` | 排序/固定/隐藏/恢复 | 离开后持久化 | 首页 Topic 顺序同步 |
+| Journey ID      | 用户/前置条件       | 入口               | 步骤与分支                           | 退出/恢复                     | 最终结果                 |
+| --------------- | ------------------- | ------------------ | ------------------------------------ | ----------------------------- | ------------------------ |
+| J-001 登录      | 未登录、Go ready    | `/login`           | 点 Google→`API-AUTH-START`→Folo→回调 | 失败回登录并显示稳定错误      | `/` 恢复账号数据         |
+| J-002 首页消费  | 已登录、有订阅      | `/`                | 加载队列→切 Topic→开详情→标已读→返回 | 保留 Topic/滚动；失败显示缓存 | 已读卡从所有首页视图退出 |
+| J-003 AI Filter | 已登录、AI 配置有效 | 首页 ✨            | 输入 1..300→生成→Topic/卡片变化      | 失败保留旧首页；编辑/重置     | Active Filter 持久化     |
+| J-004 搜索      | 已登录              | `/search?q=`       | 输入→等待 250ms→结果分页→开详情      | 返回恢复 q/滚动               | 已读与历史结果均可见     |
+| J-005 订阅管理  | 已登录              | `/subscriptions`   | 媒体类型→分组→Source→详情/订阅       | 返回恢复分组展开状态          | 查看/添加/取消订阅       |
+| J-006 收藏      | 已登录              | `/favorites`       | 浏览→详情→取消收藏                   | 与 read 状态无关              | 收藏集合正确更新         |
+| J-007 AI 设置   | 已登录              | `/settings/ai`     | 填 Provider→测试→保存                | Key 错误原位提示；可删除      | Go Keychain 保存成功     |
+| J-008 频道管理  | 已登录              | `/settings/topics` | 排序/固定/隐藏/恢复                  | 离开后持久化                  | 首页 Topic 顺序同步      |
 
 PC 路由用左侧一级导航；Mobile 用底栏导航。详情路由不显示底栏，返回后恢复上一页状态。浏览器 Back/Forward 必须可用。
 
@@ -149,32 +149,32 @@ PC 路由用左侧一级导航；Mobile 用底栏导航。详情路由不显示�
 
 ### 5.1 操作合同
 
-| Action ID | 可用条件 | 触发 | 即时反馈 | Pending | 成功 | 失败/恢复 | 撤销/取消 |
-|---|---|---|---|---|---|---|---|
-| ACT-LOGIN | 未登录 | Google 按钮 | 按钮禁用 | 跳转中 | 回首页 | 显示 `AUTH_*` 文案 | 浏览器返回 |
-| ACT-TOPIC | 首页 populated | 点击/键盘选择 | underline 移动 | 新数据 Skeleton 只覆盖内容区 | 新 Topic 卡片 | 保留旧卡并显示重试 | 再选原 Topic |
-| ACT-READ | Detail 打开且设置开启 | 路由完成后触发 | 不阻塞正文 | 单次写入，去重 entryId | 返回时卡片移除 | 保留卡片并显示同步失败 | 设置中可关闭自动已读 |
-| ACT-FILTER | Prompt 有效 | 生成 | CTA 禁用、Spinner | 60s 超时 | 状态栏与 Topic 更新 | 旧首页不变、保留输入 | Sheet 取消/重置 |
-| ACT-FEEDBACK | 卡片 `...` 或长按 | 选择动作 | 菜单关闭、卡片动画 | 乐观隐藏 | 队列更新 | 回滚卡片并 Toast | `不感兴趣` 5 秒撤销；屏蔽 Source 只能在设置恢复 |
-| ACT-SEARCH | q 长度≥1 | 输入 250ms | 清除旧错误 | 请求可取消 | 分页结果 | 保留 q、显示重试 | 清空 q |
-| ACT-SEARCH-OPEN | 首页可交互 | 点搜索图标 | 保存 topicId/scrollY 到 history.state | 路由跳转 | `/search`，首页状态不变 | 留在首页并 Toast | 浏览器返回恢复首页 |
-| ACT-AI-FILTER-OPEN | 首页可交互 | 点 AI 图标 | Sheet 打开 | 无 | 焦点进入 Prompt | 无 | Esc/下滑/关闭按钮恢复图标焦点 |
-| ACT-AI-SAVE | 字段通过校验 | 测试并保存 | 表单禁用 | 60s | 显示“连接成功” | Key 不清空，错误关联字段 | 取消恢复已保存非密钥字段 |
+| Action ID          | 可用条件              | 触发           | 即时反馈                              | Pending                      | 成功                    | 失败/恢复                | 撤销/取消                                       |
+| ------------------ | --------------------- | -------------- | ------------------------------------- | ---------------------------- | ----------------------- | ------------------------ | ----------------------------------------------- |
+| ACT-LOGIN          | 未登录                | Google 按钮    | 按钮禁用                              | 跳转中                       | 回首页                  | 显示 `AUTH_*` 文案       | 浏览器返回                                      |
+| ACT-TOPIC          | 首页 populated        | 点击/键盘选择  | underline 移动                        | 新数据 Skeleton 只覆盖内容区 | 新 Topic 卡片           | 保留旧卡并显示重试       | 再选原 Topic                                    |
+| ACT-READ           | Detail 打开且设置开启 | 路由完成后触发 | 不阻塞正文                            | 单次写入，去重 entryId       | 返回时卡片移除          | 保留卡片并显示同步失败   | 设置中可关闭自动已读                            |
+| ACT-FILTER         | Prompt 有效           | 生成           | CTA 禁用、Spinner                     | 60s 超时                     | 状态栏与 Topic 更新     | 旧首页不变、保留输入     | Sheet 取消/重置                                 |
+| ACT-FEEDBACK       | 卡片 `...` 或长按     | 选择动作       | 菜单关闭、卡片动画                    | 乐观隐藏                     | 队列更新                | 回滚卡片并 Toast         | `不感兴趣` 5 秒撤销；屏蔽 Source 只能在设置恢复 |
+| ACT-SEARCH         | q 长度≥1              | 输入 250ms     | 清除旧错误                            | 请求可取消                   | 分页结果                | 保留 q、显示重试         | 清空 q                                          |
+| ACT-SEARCH-OPEN    | 首页可交互            | 点搜索图标     | 保存 topicId/scrollY 到 history.state | 路由跳转                     | `/search`，首页状态不变 | 留在首页并 Toast         | 浏览器返回恢复首页                              |
+| ACT-AI-FILTER-OPEN | 首页可交互            | 点 AI 图标     | Sheet 打开                            | 无                           | 焦点进入 Prompt         | 无                       | Esc/下滑/关闭按钮恢复图标焦点                   |
+| ACT-AI-SAVE        | 字段通过校验          | 测试并保存     | 表单禁用                              | 60s                          | 显示“连接成功”          | Key 不清空，错误关联字段 | 取消恢复已保存非密钥字段                        |
 
 ### 5.2 UI 状态清单
 
-| State ID | 进入条件 | 展示/文案 | 可用操作 | 离开事件 | 无障碍反馈 |
-|---|---|---|---|---|---|
-| UI-LOADING | 首次加载 | 卡片 Skeleton | 导航 | 成功/失败 | `aria-busy=true` |
-| UI-POPULATED | 有队列项 | Masonry | 全部操作 | 切 Topic/读完 | 无额外播报 |
-| UI-DONE-DAY | 推荐队列为空 | `今天值得看的内容已经看完 ✓` | 查看最近已读 | 新内容/明日 | polite live region |
-| UI-DONE-TOPIC | Topic 队列为空 | `今天的 {Topic} 内容已经看完 ✓` | 查看最近已读 | 新内容/切 Topic | polite live region |
-| UI-NO-SUB | 无订阅 | PRD 无订阅文案 | 添加订阅/导入 OPML | 建立订阅 | 标题聚焦 |
-| UI-STALE | 同步失败且有缓存 | `暂时无法同步新内容，正在展示已有内容` | 重试 | 同步成功 | status role |
-| UI-OFFLINE-GO | Go 不可达 | `本地服务未启动` | 查看诊断/重试 | health 恢复 | alert role |
-| UI-AI-PENDING | enrichment 未完成 | `AI 处理中…`，原文正常显示 | 原文/离开 | 成功/失败 | 不抢焦点 |
-| UI-AI-FAILED | AI 失败 | `AI 处理失败，已显示原文` | 重试 | 成功 | status role |
-| UI-UNAUTH | Session 失效 | 登录页 | 登录 | 成功 | 标题聚焦 |
+| State ID      | 进入条件          | 展示/文案                              | 可用操作           | 离开事件        | 无障碍反馈         |
+| ------------- | ----------------- | -------------------------------------- | ------------------ | --------------- | ------------------ |
+| UI-LOADING    | 首次加载          | 卡片 Skeleton                          | 导航               | 成功/失败       | `aria-busy=true`   |
+| UI-POPULATED  | 有队列项          | Masonry                                | 全部操作           | 切 Topic/读完   | 无额外播报         |
+| UI-DONE-DAY   | 推荐队列为空      | `今天值得看的内容已经看完 ✓`           | 查看最近已读       | 新内容/明日     | polite live region |
+| UI-DONE-TOPIC | Topic 队列为空    | `今天的 {Topic} 内容已经看完 ✓`        | 查看最近已读       | 新内容/切 Topic | polite live region |
+| UI-NO-SUB     | 无订阅            | PRD 无订阅文案                         | 添加订阅/导入 OPML | 建立订阅        | 标题聚焦           |
+| UI-STALE      | 同步失败且有缓存  | `暂时无法同步新内容，正在展示已有内容` | 重试               | 同步成功        | status role        |
+| UI-OFFLINE-GO | Go 不可达         | `本地服务未启动`                       | 查看诊断/重试      | health 恢复     | alert role         |
+| UI-AI-PENDING | enrichment 未完成 | `AI 处理中…`，原文正常显示             | 原文/离开          | 成功/失败       | 不抢焦点           |
+| UI-AI-FAILED  | AI 失败           | `AI 处理失败，已显示原文`              | 重试               | 成功            | status role        |
+| UI-UNAUTH     | Session 失效      | 登录页                                 | 登录               | 成功            | 标题聚焦           |
 
 ### 5.3 状态机
 
@@ -194,16 +194,16 @@ AI Filter：`closed → editing → submitting → active | submitError`。`canc
 
 ### 6.2 设计 Token
 
-| Token/样式 | 复用或新增 | 精确值/来源 | 使用位置 |
-|---|---|---|---|
-| `--tan-bg` | 新增 | `#08090B`，原型 | 页面 |
-| `--tan-surface` | 新增 | `#17181B` | 卡片 |
-| `--tan-surface-2` | 新增 | `#1E1F23` | Sheet/Menu |
-| `--tan-accent` | 新增 | `#FF5A00` | Active/CTA/Unread |
-| `--tan-text` | 新增 | `#F0F0F2` | 主文字 |
-| `--tan-muted` | 新增 | `#9898A6` | 次文字 |
-| 字体 | 复用 | `@fontsource/sn-pro@5.2.6` | 全局 |
-| Motion | 复用 | `motion@12.42.2`；150–220ms | Sheet、卡片退出、Tab underline |
+| Token/样式        | 复用或新增 | 精确值/来源                 | 使用位置                       |
+| ----------------- | ---------- | --------------------------- | ------------------------------ |
+| `--tan-bg`        | 新增       | `#08090B`，原型             | 页面                           |
+| `--tan-surface`   | 新增       | `#17181B`                   | 卡片                           |
+| `--tan-surface-2` | 新增       | `#1E1F23`                   | Sheet/Menu                     |
+| `--tan-accent`    | 新增       | `#FF5A00`                   | Active/CTA/Unread              |
+| `--tan-text`      | 新增       | `#F0F0F2`                   | 主文字                         |
+| `--tan-muted`     | 新增       | `#9898A6`                   | 次文字                         |
+| 字体              | 复用       | `@fontsource/sn-pro@5.2.6`  | 全局                           |
+| Motion            | 复用       | `motion@12.42.2`；150–220ms | Sheet、卡片退出、Tab underline |
 
 ### 6.3 字体、图标、图片、动效与主题
 
@@ -267,20 +267,20 @@ TantanAppShell
 
 ### 7.3 组件合同
 
-| CMP ID | 职责 | 输入/输出 | 状态/API | A11y/响应式 | 文件 |
-|---|---|---|---|---|---|
-| CMP-SHELL | 一级导航与服务状态 | location；navigate | API-SESSION | landmark；PC/Mobile 变体 | `src/modules/tantan-shell/TantanAppShell.tsx` |
-| CMP-HOME | 首页查询与恢复 | topicId/filter/cursor | API-HOME | main、busy/live | `src/modules/tantan-home/HomePage.tsx` |
-| CMP-HOME-HEADER | 首页标题与两个搜索入口 | activeTopicId,activeFilterId,scrollY；navigate/openSheet | 无 | 两个44px按钮具备独立aria-label | `tantan-home/HomeHeader.tsx` |
-| CMP-TOPICS | Topic 选择 | topics, activeId；onSelect | API-TOPICS | tablist/arrow keys | `tantan-home/TopicTabs.tsx` |
-| CMP-MASONRY | 虚拟瀑布流 | items；onVisibleRange | 无本地写 | DOM/焦点顺序稳定 | `tantan-home/MasonryFeed.tsx` |
-| CMP-CARD | 四种卡片与降级 | `HomeEntryCard`；open/menu | API-FEEDBACK | article/link/menu button | `tantan-home/FeedCard.tsx` |
-| CMP-FILTER | AI Filter 表单 | activeFilter；submit/reset | API-FILTER-PUT/DELETE | dialog、focus trap/restore | `tantan-home/AIFilterSheet.tsx` |
-| CMP-SEARCH | 统一搜索 | URL q/cursor | API-SEARCH | search landmark/result count | `tantan-search/SearchPage.tsx` |
-| CMP-DETAIL | 正文、已读、AI | entryId | API-ENRICHMENT-*、API-FOLO-COMPAT | article heading order | `tantan-entry/EntryDetailPage.tsx` |
-| CMP-AI-FORM | Provider 设置 | 非密钥配置；save/test/delete | API-AI-CONFIG-* | 字段错误关联 | `tantan-settings/AIProviderForm.tsx` |
-| CMP-TOPIC-MGR | 排序/固定/隐藏 | topics；patch/reorder | API-TOPIC-PATCH | 键盘排序按钮 | `tantan-settings/TopicManager.tsx` |
-| CMP-SERVICE | Go 断开提示 | health state；retry | `/healthz` | alert + diagnostic | `tantan-shell/LocalServiceGuard.tsx` |
+| CMP ID          | 职责                   | 输入/输出                                                | 状态/API                          | A11y/响应式                    | 文件                                          |
+| --------------- | ---------------------- | -------------------------------------------------------- | --------------------------------- | ------------------------------ | --------------------------------------------- |
+| CMP-SHELL       | 一级导航与服务状态     | location；navigate                                       | API-SESSION                       | landmark；PC/Mobile 变体       | `src/modules/tantan-shell/TantanAppShell.tsx` |
+| CMP-HOME        | 首页查询与恢复         | topicId/filter/cursor                                    | API-HOME                          | main、busy/live                | `src/modules/tantan-home/HomePage.tsx`        |
+| CMP-HOME-HEADER | 首页标题与两个搜索入口 | activeTopicId,activeFilterId,scrollY；navigate/openSheet | 无                                | 两个44px按钮具备独立aria-label | `tantan-home/HomeHeader.tsx`                  |
+| CMP-TOPICS      | Topic 选择             | topics, activeId；onSelect                               | API-TOPICS                        | tablist/arrow keys             | `tantan-home/TopicTabs.tsx`                   |
+| CMP-MASONRY     | 虚拟瀑布流             | items；onVisibleRange                                    | 无本地写                          | DOM/焦点顺序稳定               | `tantan-home/MasonryFeed.tsx`                 |
+| CMP-CARD        | 四种卡片与降级         | `HomeEntryCard`；open/menu                               | API-FEEDBACK                      | article/link/menu button       | `tantan-home/FeedCard.tsx`                    |
+| CMP-FILTER      | AI Filter 表单         | activeFilter；submit/reset                               | API-FILTER-PUT/DELETE             | dialog、focus trap/restore     | `tantan-home/AIFilterSheet.tsx`               |
+| CMP-SEARCH      | 统一搜索               | URL q/cursor                                             | API-SEARCH                        | search landmark/result count   | `tantan-search/SearchPage.tsx`                |
+| CMP-DETAIL      | 正文、已读、AI         | entryId                                                  | API-ENRICHMENT-*、API-FOLO-COMPAT | article heading order          | `tantan-entry/EntryDetailPage.tsx`            |
+| CMP-AI-FORM     | Provider 设置          | 非密钥配置；save/test/delete                             | API-AI-CONFIG-*                   | 字段错误关联                   | `tantan-settings/AIProviderForm.tsx`          |
+| CMP-TOPIC-MGR   | 排序/固定/隐藏         | topics；patch/reorder                                    | API-TOPIC-PATCH                   | 键盘排序按钮                   | `tantan-settings/TopicManager.tsx`            |
+| CMP-SERVICE     | Go 断开提示            | health state；retry                                      | `/healthz`                        | alert + diagnostic             | `tantan-shell/LocalServiceGuard.tsx`          |
 
 ### 7.4 复用和拆分理由
 
@@ -290,18 +290,18 @@ Tantan 模块不修改 Folo Store 的内部 Schema；它通过公开 getter/sync
 
 ### 8.1 状态所有权
 
-| State ID | 类型 | 唯一数据源 | 读取方 | 写入方 | 更新/失效/重置 |
-|---|---|---|---|---|---|
-| ST-SESSION | Server | Go/Folo | Shell/Login | Auth flow | 401 清空全部用户 Query |
-| ST-HOME | Server cache | Go Daily Queue | Home/Masonry | read/feedback/filter | Query invalidation + 精确移除 |
-| ST-TOPICS | Server cache | Go SQLite | Tabs/Manager | Topic Manager/Filter | patch 成功失效 |
-| ST-FILTER-DRAFT | Form local | Sheet | Sheet | 用户 | cancel 丢弃；success 以服务端为准 |
-| ST-FILTER-ACTIVE | Server | Go SQLite | Home/Bar | Filter API | reset 删除 |
-| ST-ENTRY | Folo Store | Folo + local DB | Card/Detail | Folo SyncService | 保持现有同步语义 |
-| ST-ENRICHMENT | Server cache | Go SQLite | Card/Detail/Search | AI Job | 24h stale；provider 变更失效 |
-| ST-SEARCH | URL + Server | `q`/Go FTS | Search | URL input | q 变化取消旧请求 |
-| ST-NAV-RESTORE | Session UI | history.state | Shell/pages | 路由离开 | logout 清空 |
-| ST-HOME-VIEW | Session UI | Zustand memory store | Header/Tabs/Home | Topic选择/Filter成功/scroll | 每Topic保存scrollY；刷新页回recommend顶部；logout清空 |
+| State ID         | 类型         | 唯一数据源           | 读取方             | 写入方                      | 更新/失效/重置                                        |
+| ---------------- | ------------ | -------------------- | ------------------ | --------------------------- | ----------------------------------------------------- |
+| ST-SESSION       | Server       | Go/Folo              | Shell/Login        | Auth flow                   | 401 清空全部用户 Query                                |
+| ST-HOME          | Server cache | Go Daily Queue       | Home/Masonry       | read/feedback/filter        | Query invalidation + 精确移除                         |
+| ST-TOPICS        | Server cache | Go SQLite            | Tabs/Manager       | Topic Manager/Filter        | patch 成功失效                                        |
+| ST-FILTER-DRAFT  | Form local   | Sheet                | Sheet              | 用户                        | cancel 丢弃；success 以服务端为准                     |
+| ST-FILTER-ACTIVE | Server       | Go SQLite            | Home/Bar           | Filter API                  | reset 删除                                            |
+| ST-ENTRY         | Folo Store   | Folo + local DB      | Card/Detail        | Folo SyncService            | 保持现有同步语义                                      |
+| ST-ENRICHMENT    | Server cache | Go SQLite            | Card/Detail/Search | AI Job                      | 24h stale；provider 变更失效                          |
+| ST-SEARCH        | URL + Server | `q`/Go FTS           | Search             | URL input                   | q 变化取消旧请求                                      |
+| ST-NAV-RESTORE   | Session UI   | history.state        | Shell/pages        | 路由离开                    | logout 清空                                           |
+| ST-HOME-VIEW     | Session UI   | Zustand memory store | Header/Tabs/Home   | Topic选择/Filter成功/scroll | 每Topic保存scrollY；刷新页回recommend顶部；logout清空 |
 
 ### 8.2 数据流
 
@@ -382,38 +382,38 @@ interface HomeCard {
 
 ### 8.3 API 消费合同
 
-| API ID | 方法/地址 | 请求 | 成功响应 | 前端映射 | 超时/重试/缓存 |
-|---|---|---|---|---|---|
-| API-AUTH-START | GET `/auth/folo/start` | navigation | 302 | 离开登录页 | 浏览器导航，不重试 |
-| API-SESSION | GET `/tantan/v1/session` | 无 | `{user,timezone}` | ST-SESSION | 10s；GET 重试1；30s |
-| API-HOME | GET `/tantan/v1/home` | topicId,filterId?,cursor,limit=20 | `{items,nextCursor,queue}` | UI 状态 | 10s；重试1；30s |
-| API-TOPICS | GET `/tantan/v1/topics` | 无 | `{topics}` | Tabs/Manager | 10s；重试1；5min |
-| API-TOPIC-PATCH | PATCH `/tantan/v1/topics` | operations[] | `{topics}` | 替换缓存 | 10s；不自动重试 |
-| API-FILTER-PUT | PUT `/tantan/v1/filter` | `{prompt}` | `{filter,topics,queueId}` | 关闭 Sheet、切recommend、失效Home | 60s；不自动重试 |
-| API-FILTER-DELETE | DELETE `/tantan/v1/filter` | 无 | `{topics,queueId}` | 切recommend、恢复默认 | 10s；不自动重试 |
-| API-FEEDBACK | POST `/tantan/v1/recommendation/feedback` | entryId,action,topicId? | `{applied}` | 乐观更新/失败回滚 | 10s；Idempotency-Key |
-| API-SEARCH | GET `/tantan/v1/search` | q,cursor,limit=20 | `{items,nextCursor,indexStatus}` | Results | 10s；重试1；按 q 缓存5min |
-| API-ENRICHMENT-GET | GET `/tantan/v1/entries/:id/enrichment` | language=zh-CN | `{state,data,error}` | 原文/AI 状态 | 10s；30s pending、24h ready |
-| API-ENRICHMENT-ENSURE | POST `/tantan/v1/entries/:id/enrichment` | fields[] | `202 {jobId}` | 开始轮询 | 10s；Idempotency-Key |
-| API-AI-CONFIG-GET | GET `/tantan/v1/settings/ai-provider` | 无 | 非密钥字段+`hasApiKey` | 表单初值 | 10s；不持久缓存 |
-| API-AI-CONFIG-PUT | PUT 同上 | providerId/model/apiKey?；endpoint 不可编辑 | 非密钥字段 | 保存成功 | 60s；不重试 |
-| API-AI-CONFIG-TEST | POST `.../test` | 表单完整值 | `{ok,latencyMs}` | 测试状态 | 60s；不重试 |
-| API-AI-CONFIG-DELETE | DELETE 同上 | 无 | 204 | 清空表单 | 10s；不重试 |
-| API-SYNC-STATUS | GET `/tantan/v1/sync/status` | 无 | counts/state | 设置/搜索提示 | 10s；5s polling 仅 syncing |
-| API-SYNC-TRIGGER | POST `/tantan/v1/sync` | scope | `202 {jobId}` | 进入 syncing | 10s；防重复 |
-| API-FOLO-COMPAT | 原 Folo 路径 | SDK 原请求 | 原响应 | Folo Store | 保持现有策略；禁路由映射产品错误 |
+| API ID                | 方法/地址                                 | 请求                                        | 成功响应                         | 前端映射                          | 超时/重试/缓存                   |
+| --------------------- | ----------------------------------------- | ------------------------------------------- | -------------------------------- | --------------------------------- | -------------------------------- |
+| API-AUTH-START        | GET `/auth/folo/start`                    | navigation                                  | 302                              | 离开登录页                        | 浏览器导航，不重试               |
+| API-SESSION           | GET `/tantan/v1/session`                  | 无                                          | `{user,timezone}`                | ST-SESSION                        | 10s；GET 重试1；30s              |
+| API-HOME              | GET `/tantan/v1/home`                     | topicId,filterId?,cursor,limit=20           | `{items,nextCursor,queue}`       | UI 状态                           | 10s；重试1；30s                  |
+| API-TOPICS            | GET `/tantan/v1/topics`                   | 无                                          | `{topics}`                       | Tabs/Manager                      | 10s；重试1；5min                 |
+| API-TOPIC-PATCH       | PATCH `/tantan/v1/topics`                 | operations[]                                | `{topics}`                       | 替换缓存                          | 10s；不自动重试                  |
+| API-FILTER-PUT        | PUT `/tantan/v1/filter`                   | `{prompt}`                                  | `{filter,topics,queueId}`        | 关闭 Sheet、切recommend、失效Home | 60s；不自动重试                  |
+| API-FILTER-DELETE     | DELETE `/tantan/v1/filter`                | 无                                          | `{topics,queueId}`               | 切recommend、恢复默认             | 10s；不自动重试                  |
+| API-FEEDBACK          | POST `/tantan/v1/recommendation/feedback` | entryId,action,topicId?                     | `{applied}`                      | 乐观更新/失败回滚                 | 10s；Idempotency-Key             |
+| API-SEARCH            | GET `/tantan/v1/search`                   | q,cursor,limit=20                           | `{items,nextCursor,indexStatus}` | Results                           | 10s；重试1；按 q 缓存5min        |
+| API-ENRICHMENT-GET    | GET `/tantan/v1/entries/:id/enrichment`   | language=zh-CN                              | `{state,data,error}`             | 原文/AI 状态                      | 10s；30s pending、24h ready      |
+| API-ENRICHMENT-ENSURE | POST `/tantan/v1/entries/:id/enrichment`  | fields[]                                    | `202 {jobId}`                    | 开始轮询                          | 10s；Idempotency-Key             |
+| API-AI-CONFIG-GET     | GET `/tantan/v1/settings/ai-provider`     | 无                                          | 非密钥字段+`hasApiKey`           | 表单初值                          | 10s；不持久缓存                  |
+| API-AI-CONFIG-PUT     | PUT 同上                                  | providerId/model/apiKey?；endpoint 不可编辑 | 非密钥字段                       | 保存成功                          | 60s；不重试                      |
+| API-AI-CONFIG-TEST    | POST `.../test`                           | 表单完整值                                  | `{ok,latencyMs}`                 | 测试状态                          | 60s；不重试                      |
+| API-AI-CONFIG-DELETE  | DELETE 同上                               | 无                                          | 204                              | 清空表单                          | 10s；不重试                      |
+| API-SYNC-STATUS       | GET `/tantan/v1/sync/status`              | 无                                          | counts/state                     | 设置/搜索提示                     | 10s；5s polling 仅 syncing       |
+| API-SYNC-TRIGGER      | POST `/tantan/v1/sync`                    | scope                                       | `202 {jobId}`                    | 进入 syncing                      | 10s；防重复                      |
+| API-FOLO-COMPAT       | 原 Folo 路径                              | SDK 原请求                                  | 原响应                           | Folo Store                        | 保持现有策略；禁路由映射产品错误 |
 
 所有 fetch 使用 `credentials:"include"`、`X-Request-Id` 和 `X-Tantan-Timezone`。组件卸载或参数变化时用 AbortSignal 取消。401 统一进入 Login；403/410 不重试；429 显示依赖限流；5xx GET 仅重试一次。
 
 ### 8.4 表单与校验
 
-| Form/Field ID | 类型/默认值 | 约束 | 校验与错误 | 提交 |
-|---|---|---|---|---|
-| FILTER.prompt | string/active prompt | trim 后 1..300 | blur+submit；输入框下方 | 单次 PUT，Pending 禁用 |
-| SEARCH.q | string/URL | trim 后 1..200 | 小于1显示空提示 | 250ms debounce |
-| AI.providerId | 枚举 | OpenAI/Anthropic/Google/DeepSeek/OpenRouter；显示只读内置 endpoint | 字段下方 | Test/Save |
-| AI.model | string | trim 后 1..100 | 字段下方 | Test/Save |
-| AI.apiKey | password | 新建必填 8..4096；更新可空表示保留 | 不回显、不写浏览器存储 | Test/Save 后清空 |
+| Form/Field ID | 类型/默认值          | 约束                                                               | 校验与错误              | 提交                   |
+| ------------- | -------------------- | ------------------------------------------------------------------ | ----------------------- | ---------------------- |
+| FILTER.prompt | string/active prompt | trim 后 1..300                                                     | blur+submit；输入框下方 | 单次 PUT，Pending 禁用 |
+| SEARCH.q      | string/URL           | trim 后 1..200                                                     | 小于1显示空提示         | 250ms debounce         |
+| AI.providerId | 枚举                 | OpenAI/Anthropic/Google/DeepSeek/OpenRouter；显示只读内置 endpoint | 字段下方                | Test/Save              |
+| AI.model      | string               | trim 后 1..100                                                     | 字段下方                | Test/Save              |
+| AI.apiKey     | password             | 新建必填 8..4096；更新可空表示保留                                 | 不回显、不写浏览器存储  | Test/Save 后清空       |
 
 ## 9. 横切要求
 
@@ -428,13 +428,13 @@ interface HomeCard {
 
 ### 9.2 性能与资源预算
 
-| 指标 | 目标 | 测量方法 | 失败阈值 |
-|---|---|---|---|
-| LCP | 本地缓存 P75 ≤2.0s | Playwright/Lighthouse，Fast 3G 关闭 | >2.5s |
-| INP | P75 ≤200ms | Chrome Performance | >300ms |
-| 首页 JS 增量 | gzip ≤120KB | Vite analyzer，对比锁定基线 | >150KB |
-| Masonry | 500 条候选只渲染可视窗口；滚动≥50fps | Performance trace | 连续2s低于45fps |
-| 图片 | 首屏外 lazy；最大解码宽度按容器×DPR | Network/Performance | 下载原图且宽度>需求2倍 |
+| 指标         | 目标                                 | 测量方法                            | 失败阈值               |
+| ------------ | ------------------------------------ | ----------------------------------- | ---------------------- |
+| LCP          | 本地缓存 P75 ≤2.0s                   | Playwright/Lighthouse，Fast 3G 关闭 | >2.5s                  |
+| INP          | P75 ≤200ms                           | Chrome Performance                  | >300ms                 |
+| 首页 JS 增量 | gzip ≤120KB                          | Vite analyzer，对比锁定基线         | >150KB                 |
+| Masonry      | 500 条候选只渲染可视窗口；滚动≥50fps | Performance trace                   | 连续2s低于45fps        |
+| 图片         | 首屏外 lazy；最大解码宽度按容器×DPR  | Network/Performance                 | 下载原图且宽度>需求2倍 |
 
 ### 9.3 安全与隐私
 
@@ -458,27 +458,27 @@ interface HomeCard {
 
 ### 10.1 依赖
 
-| DEP ID | 类别 | 名称/用途 | 状态 | 精确版本/来源 | 命令/影响文件 |
-|---|---|---|---|---|---|
-| DEP-FE-001 | Runtime | Node.js | 复用 | 22，`.nvmrc` | `nvm use` |
-| DEP-FE-002 | Package Manager | pnpm | 复用 | 10.17.0，根 packageManager | `corepack prepare pnpm@10.17.0 --activate` |
-| DEP-FE-003 | 上游代码 | Folo | 锁定 | commit `3846c90...` | 导入 Tantan 仓库 |
-| DEP-FE-004 | SDK | `@follow-app/client-sdk` | 复用 | 0.3.95 | `pnpm install --frozen-lockfile` |
-| DEP-FE-005 | UI Runtime | React/React DOM | 复用 | 19.2.7 | 原 lockfile |
-| DEP-FE-006 | Masonry | masonic | 复用 | 4.1.0 | 原 renderer package |
-| DEP-FE-007 | Server State | React Query | 复用 | 5.101.2 | 原 renderer package |
-| DEP-FE-008 | Router | React Router | 复用 | 8.2.0 | 原 renderer package |
-| DEP-FE-009 | PWA | vite-plugin-pwa | 复用/重配 | 1.3.0 | `apps/desktop/vite.config.ts` |
-| DEP-FE-010 | Test | Vitest/Playwright | 复用 | 4.1.10 / 1.61.1 | renderer/desktop package |
-| DEP-BE | Local API | 后端规格全部 `DEP-BE-*` | 新增 | 见后端规格 | 必须先通过 `/readyz` |
+| DEP ID     | 类别            | 名称/用途                | 状态      | 精确版本/来源              | 命令/影响文件                              |
+| ---------- | --------------- | ------------------------ | --------- | -------------------------- | ------------------------------------------ |
+| DEP-FE-001 | Runtime         | Node.js                  | 复用      | 22，`.nvmrc`               | `nvm use`                                  |
+| DEP-FE-002 | Package Manager | pnpm                     | 复用      | 10.17.0，根 packageManager | `corepack prepare pnpm@10.17.0 --activate` |
+| DEP-FE-003 | 上游代码        | Folo                     | 锁定      | commit `3846c90...`        | 导入 Tantan 仓库                           |
+| DEP-FE-004 | SDK             | `@follow-app/client-sdk` | 复用      | 0.3.95                     | `pnpm install --frozen-lockfile`           |
+| DEP-FE-005 | UI Runtime      | React/React DOM          | 复用      | 19.2.7                     | 原 lockfile                                |
+| DEP-FE-006 | Masonry         | masonic                  | 复用      | 4.1.0                      | 原 renderer package                        |
+| DEP-FE-007 | Server State    | React Query              | 复用      | 5.101.2                    | 原 renderer package                        |
+| DEP-FE-008 | Router          | React Router             | 复用      | 8.2.0                      | 原 renderer package                        |
+| DEP-FE-009 | PWA             | vite-plugin-pwa          | 复用/重配 | 1.3.0                      | `apps/desktop/vite.config.ts`              |
+| DEP-FE-010 | Test            | Vitest/Playwright        | 复用      | 4.1.10 / 1.61.1            | renderer/desktop package                   |
+| DEP-BE     | Local API       | 后端规格全部 `DEP-BE-*`  | 新增      | 见后端规格                 | 必须先通过 `/readyz`                       |
 
 ### 10.2 配置与启动
 
-| 配置 | 值 | 启动/验证 | 成功结果 |
-|---|---|---|---|
+| 配置           | 值                      | 启动/验证                         | 成功结果                |
+| -------------- | ----------------------- | --------------------------------- | ----------------------- |
 | `VITE_API_URL` | `http://127.0.0.1:3000` | `pnpm --dir apps/desktop dev:web` | 浏览器请求只到 loopback |
-| `VITE_WEB_URL` | `http://127.0.0.1:5173` | 同上 | Auth Start 回到本地 |
-| Go readiness | `/readyz` | `curl --fail .../readyz` | sqlite/keyring ok |
+| `VITE_WEB_URL` | `http://127.0.0.1:5173` | 同上                              | Auth Start 回到本地     |
+| Go readiness   | `/readyz`               | `curl --fail .../readyz`          | sqlite/keyring ok       |
 
 ### 10.3 实施启动门禁
 
@@ -654,44 +654,44 @@ interface HomeCard {
 
 ### 12.1 功能需求追踪
 
-| FR ID | 需求 | CMP/API | TASK | AC | TC |
-|---|---|---|---|---|---|
-| FR-001 | PC/Mobile Web/PWA | CMP-SHELL/CMP-SERVICE | FE-02,06 | AC-004、AC-006、AC-021 | TC-004、TC-006、TC-021 |
-| FR-002 | Folo 登录恢复 | CMP-SHELL/API-AUTH-START/SESSION | FE-02 | AC-005 | TC-005 |
-| FR-003 | 每日 Masonry/已读/反馈 | CMP-HOME/TOPICS/MASONRY/CARD | FE-03 | AC-007..AC-011、AC-022 | TC-007..TC-011、TC-022 |
-| FR-004 | Topic 与 AI Filter | CMP-HOME-HEADER/FILTER/TOPIC-MGR | FE-05 | AC-016、AC-017、AC-023 | TC-016、TC-017、TC-023 |
-| FR-005 | 独立统一搜索 | CMP-HOME-HEADER/SEARCH/API-SEARCH | FE-04 | AC-006、AC-012、AC-023 | TC-006、TC-012、TC-023 |
-| FR-006 | 本地 AI | CMP-DETAIL/AI-FORM | FE-01,04,05 | AC-003、AC-013、AC-016 | TC-003、TC-013、TC-016 |
-| FR-007 | 移除付费 | API-FOLO-COMPAT | FE-01,06 | AC-002、AC-003 | TC-002、TC-003 |
-| FR-008 | 故障降级 | CMP-SERVICE/DETAIL | FE-04,06 | AC-019 | TC-019 |
+| FR ID  | 需求                   | CMP/API                           | TASK        | AC                     | TC                     |
+| ------ | ---------------------- | --------------------------------- | ----------- | ---------------------- | ---------------------- |
+| FR-001 | PC/Mobile Web/PWA      | CMP-SHELL/CMP-SERVICE             | FE-02,06    | AC-004、AC-006、AC-021 | TC-004、TC-006、TC-021 |
+| FR-002 | Folo 登录恢复          | CMP-SHELL/API-AUTH-START/SESSION  | FE-02       | AC-005                 | TC-005                 |
+| FR-003 | 每日 Masonry/已读/反馈 | CMP-HOME/TOPICS/MASONRY/CARD      | FE-03       | AC-007..AC-011、AC-022 | TC-007..TC-011、TC-022 |
+| FR-004 | Topic 与 AI Filter     | CMP-HOME-HEADER/FILTER/TOPIC-MGR  | FE-05       | AC-016、AC-017、AC-023 | TC-016、TC-017、TC-023 |
+| FR-005 | 独立统一搜索           | CMP-HOME-HEADER/SEARCH/API-SEARCH | FE-04       | AC-006、AC-012、AC-023 | TC-006、TC-012、TC-023 |
+| FR-006 | 本地 AI                | CMP-DETAIL/AI-FORM                | FE-01,04,05 | AC-003、AC-013、AC-016 | TC-003、TC-013、TC-016 |
+| FR-007 | 移除付费               | API-FOLO-COMPAT                   | FE-01,06    | AC-002、AC-003         | TC-002、TC-003         |
+| FR-008 | 故障降级               | CMP-SERVICE/DETAIL                | FE-04,06    | AC-019                 | TC-019                 |
 
 ### 12.2 验收标准
 
-| AC ID | 精确可观察结果 |
-|---|---|
-| AC-001 | 锁定提交、依赖与基线命令结果已记录且可复现 |
-| AC-002 | `/ai`、`/power`、`/settings/plan` 不存在，UI 无会员/升级/钱包 |
-| AC-003 | Folo AI、Wallet、Payment、Stripe Subscription 请求计数为0 |
-| AC-004 | 390px 进入应用并显示三项底栏，不显示 DownloadPage |
-| AC-005 | Google 登录完成后显示同一 Folo 用户及其订阅/已读/收藏 |
+| AC ID  | 精确可观察结果                                                                        |
+| ------ | ------------------------------------------------------------------------------------- |
+| AC-001 | 锁定提交、依赖与基线命令结果已记录且可复现                                            |
+| AC-002 | `/ai`、`/power`、`/settings/plan` 不存在，UI 无会员/升级/钱包                         |
+| AC-003 | Folo AI、Wallet、Payment、Stripe Subscription 请求计数为0                             |
+| AC-004 | 390px 进入应用并显示三项底栏，不显示 DownloadPage                                     |
+| AC-005 | Google 登录完成后显示同一 Folo 用户及其订阅/已读/收藏                                 |
 | AC-006 | PC/Mobile 导航、普通搜索和详情返回恢复 route、Topic、Filter、scroll，搜索不改首页状态 |
-| AC-007 | 首页按视口显示2/3/4列且四类卡片降级正确 |
-| AC-008 | broken image 自动退化为文字卡，无破图图标 |
-| AC-009 | Entry 标记已读成功后从全部 Home Topic 缓存消失 |
-| AC-010 | 50条队列消费完显示今日完成态，历史仍可访问 |
-| AC-011 | 反馈成功更新队列；失败回滚；屏蔽 Source 在设置可恢复 |
-| AC-012 | 搜索命中已读、未读、原文、译文、Source、Topic、Tag，并支持游标分页 |
-| AC-013 | AI pending/failed 时原文始终可读 |
-| AC-014 | 订阅四类筛选、收藏、Source 历史与 Add Subscription 可用 |
-| AC-015 | Detail 支持译文/原文、摘要、收藏、原文链接 |
-| AC-016 | AI Key 不出现在 response、storage、URL、日志、Folo 请求 |
-| AC-017 | Filter 生效后仍在首页，Topic/顺序/内容变化，编辑和重置可用 |
-| AC-018 | 500候选达到性能预算，虚拟列表不一次渲染全部卡片 |
-| AC-019 | Folo/模型/Go 部分失败按合同降级，有缓存时可阅读 |
-| AC-020 | Topic 可固定、隐藏、排序；推荐不可删除 |
-| AC-021 | PWA 可安装；API 不缓存；键盘、焦点、对比和 reduced-motion 通过 |
-| AC-022 | 连续翻页时队列版本不变、卡片不跳位，分页边界相同entryId只渲染一次 |
-| AC-023 | 搜索图标进入/search；AI图标只开Sheet；两个回调的路由与首页副作用完全隔离 |
+| AC-007 | 首页按视口显示2/3/4列且四类卡片降级正确                                               |
+| AC-008 | broken image 自动退化为文字卡，无破图图标                                             |
+| AC-009 | Entry 标记已读成功后从全部 Home Topic 缓存消失                                        |
+| AC-010 | 50条队列消费完显示今日完成态，历史仍可访问                                            |
+| AC-011 | 反馈成功更新队列；失败回滚；屏蔽 Source 在设置可恢复                                  |
+| AC-012 | 搜索命中已读、未读、原文、译文、Source、Topic、Tag，并支持游标分页                    |
+| AC-013 | AI pending/failed 时原文始终可读                                                      |
+| AC-014 | 订阅四类筛选、收藏、Source 历史与 Add Subscription 可用                               |
+| AC-015 | Detail 支持译文/原文、摘要、收藏、原文链接                                            |
+| AC-016 | AI Key 不出现在 response、storage、URL、日志、Folo 请求                               |
+| AC-017 | Filter 生效后仍在首页，Topic/顺序/内容变化，编辑和重置可用                            |
+| AC-018 | 500候选达到性能预算，虚拟列表不一次渲染全部卡片                                       |
+| AC-019 | Folo/模型/Go 部分失败按合同降级，有缓存时可阅读                                       |
+| AC-020 | Topic 可固定、隐藏、排序；推荐不可删除                                                |
+| AC-021 | PWA 可安装；API 不缓存；键盘、焦点、对比和 reduced-motion 通过                        |
+| AC-022 | 连续翻页时队列版本不变、卡片不跳位，分页边界相同entryId只渲染一次                     |
+| AC-023 | 搜索图标进入/search；AI图标只开Sheet；两个回调的路由与首页副作用完全隔离              |
 
 ### 12.3 测试用例
 
@@ -699,43 +699,45 @@ interface HomeCard {
 
 ### 12.4 验证命令
 
-| 目的 | 工作目录 | 命令 | 成功观察 |
-|---|---|---|---|
-| 类型 | Tantan 根 | `pnpm typecheck` | exit 0 |
-| Lint | Tantan 根 | `pnpm lint` | exit 0 |
-| 前端单测 | Tantan 根 | `pnpm --filter @follow/web test -- --run` | 目标与基线全部 pass |
-| Web E2E | `apps/desktop` | `pnpm e2e:web` | Tantan PC/Mobile specs 全 pass |
-| 构建 | Tantan 根 | `pnpm build:web` | `apps/desktop/out/web` 生成且 exit 0 |
-| 禁请求 | Tantan 根 | `rg -n 'followApi\.ai|followApi\.wallets|subscription\.upgrade' apps/desktop/layer/renderer/src` | 生产消费方无命中 |
-| 规格最终门禁 | Tantan 根 | `python3 /Users/mingrui/.codex/skills/frontend-spec/scripts/validate_spec.py 2026-08-09-tantan-frontend-spec.md --domain frontend --stage final` | exit 0，0 warnings |
+| 目的         | 工作目录       | 命令                                                                                                                                             | 成功观察                             |
+| ------------ | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------ |
+| 类型         | Tantan 根      | `pnpm typecheck`                                                                                                                                 | exit 0                               |
+| Lint         | Tantan 根      | `pnpm lint`                                                                                                                                      | exit 0                               |
+| 前端单测     | Tantan 根      | `pnpm --filter @follow/web test -- --run`                                                                                                        | 目标与基线全部 pass                  |
+| Web E2E      | `apps/desktop` | `pnpm e2e:web`                                                                                                                                   | Tantan PC/Mobile specs 全 pass       |
+| 构建         | Tantan 根      | `pnpm build:web`                                                                                                                                 | `apps/desktop/out/web` 生成且 exit 0 |
+| 禁请求       | Tantan 根      | `rg -n 'followApi\.ai                                                                                                                            | followApi\.wallets                   | subscription\.upgrade' apps/desktop/layer/renderer/src` | 生产消费方无命中 |
+| 规格最终门禁 | Tantan 根      | `python3 /Users/mingrui/.codex/skills/frontend-spec/scripts/validate_spec.py 2026-08-09-tantan-frontend-spec.md --domain frontend --stage final` | exit 0，0 warnings                   |
 
 ## 13. 覆盖矩阵
 
-| 检查项 | 状态 | 证据 | 结论/不适用原因 |
-|---|---|---|---|
-| FE-01 | 已确定 | 第2节、FR-001..008 | 目标、范围、成功指标和禁区已锁定 |
-| FE-02 | 已确定 | DEC-003/004、第14节 | 一期锁定 PC Web + Mobile Web/PWA，原生 App 不在范围 |
-| FE-03 | 代码证实 | 第1.2、3节 | Folo 当前入口、Store、请求链路和移动下载页已定位 |
-| FE-04 | 已确定 | 第4节 | 八条主旅程包含入口、分支、恢复和完成态 |
-| FE-05 | 已确定 | 第5.1 | 首页、搜索、Filter、反馈和登录操作合同已定义 |
-| FE-06 | 已确定 | 第5.2 | 加载、空、完成、离线和 AI 故障状态均有退出事件 |
-| FE-07 | 已确定 | 第5.3 | Home 与 Filter 状态机含取消、失败和恢复 |
-| FE-08 | 资料证实 | 第6节、PRD、原型 | Token、布局、图片、动效和文案来源已锁定 |
-| FE-09 | 已确定 | 第6.5、DEC-004 | 响应式与触控合同覆盖一期 Mobile Web/PWA |
-| FE-10 | 已确定 | 第9.1 | 键盘、焦点、语义和读屏反馈已定义 |
-| FE-11 | 已确定 | 第6.4、9.4 | 文案、locale、日期和当前暗色主题已定义 |
-| FE-12 | 已确定 | 第7.1/7.2 | 路由、五个首页组件及其它页面树已定义 |
-| FE-13 | 已确定 | 第7.3 | 每个关键组件有职责、输入、API、A11y和落点 |
-| FE-14 | 已确定 | 第8.1/8.2 | Session、Home、Topic、Filter、Search 和恢复状态所有权唯一 |
-| FE-15 | 已确定 | 第8.3、后端第6节 | 共享 API ID、DTO、错误和缓存合同一致 |
-| FE-16 | 已确定 | 第8.4 | Prompt、搜索和 Provider 字段校验已定义 |
-| FE-17 | 已确定 | 第9.3 | Token、Key、缓存、CSP 和禁上游请求边界已定义 |
-| FE-18 | 已确定 | 第9.2 | Masonry、API、图片、Bundle 和长任务预算可测量 |
-| FE-19 | 已确定 | 第9.5 | 只保留本地脱敏诊断，本期无外发分析 |
-| FE-20 | 已确定 | 第10节 | 依赖版本、配置命令和启动门禁已列出 |
-| FE-21 | 已确定 | 第11节 | TDD任务树、写入范围、串并行和回滚已定义 |
-| FE-22 | 已确定 | 第12节 | FR、AC、TC和验证命令形成追踪闭环 |
+| 检查项 | 状态     | 证据                | 结论/不适用原因                                           |
+| ------ | -------- | ------------------- | --------------------------------------------------------- |
+| FE-01  | 已确定   | 第2节、FR-001..008  | 目标、范围、成功指标和禁区已锁定                          |
+| FE-02  | 已确定   | DEC-003/004、第14节 | 一期锁定 PC Web + Mobile Web/PWA，原生 App 不在范围       |
+| FE-03  | 代码证实 | 第1.2、3节          | Folo 当前入口、Store、请求链路和移动下载页已定位          |
+| FE-04  | 已确定   | 第4节               | 八条主旅程包含入口、分支、恢复和完成态                    |
+| FE-05  | 已确定   | 第5.1               | 首页、搜索、Filter、反馈和登录操作合同已定义              |
+| FE-06  | 已确定   | 第5.2               | 加载、空、完成、离线和 AI 故障状态均有退出事件            |
+| FE-07  | 已确定   | 第5.3               | Home 与 Filter 状态机含取消、失败和恢复                   |
+| FE-08  | 资料证实 | 第6节、PRD、原型    | Token、布局、图片、动效和文案来源已锁定                   |
+| FE-09  | 已确定   | 第6.5、DEC-004      | 响应式与触控合同覆盖一期 Mobile Web/PWA                   |
+| FE-10  | 已确定   | 第9.1               | 键盘、焦点、语义和读屏反馈已定义                          |
+| FE-11  | 已确定   | 第6.4、9.4          | 文案、locale、日期和当前暗色主题已定义                    |
+| FE-12  | 已确定   | 第7.1/7.2           | 路由、五个首页组件及其它页面树已定义                      |
+| FE-13  | 已确定   | 第7.3               | 每个关键组件有职责、输入、API、A11y和落点                 |
+| FE-14  | 已确定   | 第8.1/8.2           | Session、Home、Topic、Filter、Search 和恢复状态所有权唯一 |
+| FE-15  | 已确定   | 第8.3、后端第6节    | 共享 API ID、DTO、错误和缓存合同一致                      |
+| FE-16  | 已确定   | 第8.4               | Prompt、搜索和 Provider 字段校验已定义                    |
+| FE-17  | 已确定   | 第9.3               | Token、Key、缓存、CSP 和禁上游请求边界已定义              |
+| FE-18  | 已确定   | 第9.2               | Masonry、API、图片、Bundle 和长任务预算可测量             |
+| FE-19  | 已确定   | 第9.5               | 只保留本地脱敏诊断，本期无外发分析                        |
+| FE-20  | 已确定   | 第10节              | 依赖版本、配置命令和启动门禁已列出                        |
+| FE-21  | 已确定   | 第11节              | TDD任务树、写入范围、串并行和回滚已定义                   |
+| FE-22  | 已确定   | 第12节              | FR、AC、TC和验证命令形成追踪闭环                          |
 
 ## 14. 未决问题
 
 无。如果新需求改变公共接口、安全边界、持久化模型或一期端形态，必须先修订规格包并重跑最终校验。
+
+> **已被替代（2026-08-10）**：本文的 PC/桌面布局与旧 AI Key 交互不再实施。当前唯一前端规格为 `spec-package/10-frontend.md`：只交付 Mobile Web/PWA，非首页忠实采用 Folo Mobile，首页按原型替换。

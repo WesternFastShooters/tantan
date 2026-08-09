@@ -9,41 +9,41 @@
 
 ### 1.1 输入资料
 
-| 资料 | 位置 | 用途 | 已验证 |
-|---|---|---|---|
-| PRD | `/Users/mingrui/Project/tantan/prd(5).md` | 后端能力、状态和验收来源 | 是 |
-| Folo 仓库 | `/Users/mingrui/Project/Folo` | 客户端调用与认证证据 | 是，commit `3846c90...` |
-| Folo SDK | npm `@follow-app/client-sdk@0.3.95` | 路由、请求/响应 TypeScript 合同 | 是，npm tarball 与 lockfile |
-| 前端规格 | `2026-08-09-tantan-frontend-spec.md` | API Consumer 合同 | 是，共享 `API-*` ID |
-| 总览 | `2026-08-09-tantan-实施落地方案.md` | 系统边界与阶段 | 是 |
-| Agent 规格包 | `spec-package/README.md` | OpenAPI、Folo 路由策略、JSON Schema、DDL 与任务边界 | 是，机器合同优先于叙述性细节 |
+| 资料         | 位置                                      | 用途                                                | 已验证                       |
+| ------------ | ----------------------------------------- | --------------------------------------------------- | ---------------------------- |
+| PRD          | `/Users/mingrui/Project/tantan/prd(5).md` | 后端能力、状态和验收来源                            | 是                           |
+| Folo 仓库    | `/Users/mingrui/Project/Folo`             | 客户端调用与认证证据                                | 是，commit `3846c90...`      |
+| Folo SDK     | npm `@follow-app/client-sdk@0.3.95`       | 路由、请求/响应 TypeScript 合同                     | 是，npm tarball 与 lockfile  |
+| 前端规格     | `2026-08-09-tantan-frontend-spec.md`      | API Consumer 合同                                   | 是，共享 `API-*` ID          |
+| 总览         | `2026-08-09-tantan-实施落地方案.md`       | 系统边界与阶段                                      | 是                           |
+| Agent 规格包 | `spec-package/README.md`                  | OpenAPI、Folo 路由策略、JSON Schema、DDL 与任务边界 | 是，机器合同优先于叙述性细节 |
 
 ### 1.2 代码、Schema 与运行证据
 
-| 事实 | 文件/符号/命令 | 观察结果 |
-|---|---|---|
-| Folo API 固定生产地址 | `packages/internal/shared/src/env.common.ts` | `https://api.folo.is` |
-| SDK 基础客户端 | `apps/desktop/layer/renderer/src/lib/api-client.ts` | credentials include、60s timeout、客户端/会话 Header |
-| Folo Auth | `packages/internal/shared/src/auth.ts` | Better Auth，社交登录与 one-time token 插件 |
-| Folo loopback 回调先例 | `apps/ssr/client/modules/login/index.ts#parseCliCallbackUrl` | 允许 `http://127.0.0.1`/`localhost` CLI callback |
-| Entry 同步参数 | SDK `src/modules/entries/types.ts#EntryListRequest` | `limit`、`publishedAfter`、`publishedBefore`、`withContent`；无普通 cursor |
-| Entry 正文批取 | SDK `entriesModule.stream` | `POST /entries/stream`，输入 ids，NDJSON/raw response |
-| 读/收藏状态 | SDK EntryWithFeed | List 响应含 `read`、`collections` |
-| 核心上游路径 | SDK modules | `/entries`、`/subscriptions`、`/reads`、`/collections`、`/feeds`、`/categories` 等 |
-| 被禁路径 | SDK modules | `/ai/**`、`/wallets/**`、`/rsshub/use` |
-| 本机 Go/SQLite | `go version`、`sqlite3 --version` | Go 1.26.2，CLI SQLite 3.43.2 |
-| Pure Go SQLite | [pkg.go.dev modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite) | v1.56.0，darwin/linux/windows 含 SQLite 3.53.3 |
-| OS Keychain | [pkg.go.dev go-keyring](https://pkg.go.dev/github.com/zalando/go-keyring) | v0.2.8，支持 macOS/Linux/Windows 与测试 Mock |
-| 中文子串搜索 | [SQLite FTS5 Trigram](https://www.sqlite.org/fts5.html#the_trigram_tokenizer) | trigram 支持子串匹配 |
+| 事实                   | 文件/符号/命令                                                                | 观察结果                                                                           |
+| ---------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Folo API 固定生产地址  | `packages/internal/shared/src/env.common.ts`                                  | `https://api.folo.is`                                                              |
+| SDK 基础客户端         | `apps/desktop/layer/renderer/src/lib/api-client.ts`                           | credentials include、60s timeout、客户端/会话 Header                               |
+| Folo Auth              | `packages/internal/shared/src/auth.ts`                                        | Better Auth，社交登录与 one-time token 插件                                        |
+| Folo loopback 回调先例 | `apps/ssr/client/modules/login/index.ts#parseCliCallbackUrl`                  | 允许 `http://127.0.0.1`/`localhost` CLI callback                                   |
+| Entry 同步参数         | SDK `src/modules/entries/types.ts#EntryListRequest`                           | `limit`、`publishedAfter`、`publishedBefore`、`withContent`；无普通 cursor         |
+| Entry 正文批取         | SDK `entriesModule.stream`                                                    | `POST /entries/stream`，输入 ids，NDJSON/raw response                              |
+| 读/收藏状态            | SDK EntryWithFeed                                                             | List 响应含 `read`、`collections`                                                  |
+| 核心上游路径           | SDK modules                                                                   | `/entries`、`/subscriptions`、`/reads`、`/collections`、`/feeds`、`/categories` 等 |
+| 被禁路径               | SDK modules                                                                   | `/ai/**`、`/wallets/**`、`/rsshub/use`                                             |
+| 本机 Go/SQLite         | `go version`、`sqlite3 --version`                                             | Go 1.26.2，CLI SQLite 3.43.2                                                       |
+| Pure Go SQLite         | [pkg.go.dev modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite)        | v1.56.0，darwin/linux/windows 含 SQLite 3.53.3                                     |
+| OS Keychain            | [pkg.go.dev go-keyring](https://pkg.go.dev/github.com/zalando/go-keyring)     | v0.2.8，支持 macOS/Linux/Windows 与测试 Mock                                       |
+| 中文子串搜索           | [SQLite FTS5 Trigram](https://www.sqlite.org/fts5.html#the_trigram_tokenizer) | trigram 支持子串匹配                                                               |
 
 ### 1.3 用户决策
 
-| 决策 ID | 问题 | 用户确认结果 | 影响范围 |
-|---|---|---|---|
-| DEC-BE-001 | Folo AI/会员是否保留 | 不保留 | Proxy Policy、AI Module、测试 |
-| DEC-BE-002 | AI 凭据来源 | 用户自带各种 API Key | Keychain、Provider API |
-| DEC-BE-003 | 首页历史范围 | 最近7天的每日有限队列 | Queue、Ranking、完成态 |
-| DEC-BE-004 | 部署 | 本期只在本机运行 | loopback、安全、运维 |
+| 决策 ID    | 问题                 | 用户确认结果          | 影响范围                      |
+| ---------- | -------------------- | --------------------- | ----------------------------- |
+| DEC-BE-001 | Folo AI/会员是否保留 | 不保留                | Proxy Policy、AI Module、测试 |
+| DEC-BE-002 | AI 凭据来源          | 用户自带各种 API Key  | Keychain、Provider API        |
+| DEC-BE-003 | 首页历史范围         | 最近7天的每日有限队列 | Queue、Ranking、完成态        |
+| DEC-BE-004 | 部署                 | 本期只在本机运行      | loopback、安全、运维          |
 
 ## 2. 背景、目标与边界
 
@@ -101,14 +101,14 @@ Go 服务为新建；当前 Folo 前端直接通过 `FollowClient` 和 Better Au
 
 ### 3.3 复用、修改、新增与保持不变
 
-| 类型 | 对象 | 原因 | 影响 |
-|---|---|---|---|
-| 复用 | Folo SDK 0.3.95 的线协议 | 前端 Store 兼容 | Proxy 不重塑核心响应 |
-| 复用 | Folo one-time-token 登录 | 不复制 OAuth | Go 只桥接 session |
-| 新增 | `services/tantan-api` | 本地业务后端 | Go 单进程 |
-| 新增 | SQLite/FTS5 与 Keychain | 本地事实源和凭据 | 无远端数据库 |
-| 保持 | Folo 用户/订阅/Entry/Read/Collection 语义 | 上游事实源 | 本地变更须上游成功后提交 |
-| 拒绝 | Folo AI/Wallet/Payment/Unknown | 用户明确范围 | 403/410，零上游调用 |
+| 类型 | 对象                                      | 原因             | 影响                     |
+| ---- | ----------------------------------------- | ---------------- | ------------------------ |
+| 复用 | Folo SDK 0.3.95 的线协议                  | 前端 Store 兼容  | Proxy 不重塑核心响应     |
+| 复用 | Folo one-time-token 登录                  | 不复制 OAuth     | Go 只桥接 session        |
+| 新增 | `services/tantan-api`                     | 本地业务后端     | Go 单进程                |
+| 新增 | SQLite/FTS5 与 Keychain                   | 本地事实源和凭据 | 无远端数据库             |
+| 保持 | Folo 用户/订阅/Entry/Read/Collection 语义 | 上游事实源       | 本地变更须上游成功后提交 |
+| 拒绝 | Folo AI/Wallet/Payment/Unknown            | 用户明确范围     | 403/410，零上游调用      |
 
 ### 3.4 冲突、兼容和技术债边界
 
@@ -127,19 +127,19 @@ Go 服务为新建；当前 Folo 前端直接通过 `FollowClient` 和 Better Au
 
 ### 4.2 模块/服务清单
 
-| MOD ID | 职责 | 公开接口 | 依赖 | 文件 |
-|---|---|---|---|---|
-| MOD-HTTP | Server、Middleware、错误、CORS、静态资源 | 全部 HTTP | 其余模块 | `internal/httpapi/**` |
-| MOD-AUTH | login state、one-time token、local session | API-AUTH-*、API-SESSION | Folo、Keychain、Storage | `internal/auth/**` |
-| MOD-PROXY | 路由策略、Reverse Proxy、响应观察 | API-FOLO-COMPAT | Auth、Folo | `internal/folo/proxy/**` |
-| MOD-FOLO | 类型化核心 Folo Client 与合同 fixture | 内部接口 | Folo | `internal/folo/client/**` |
-| MOD-STORAGE | SQLite、迁移、Repository、事务 | 内部接口 | modernc sqlite | `internal/storage/**` |
-| MOD-SYNC | 订阅/Entry/正文/状态同步与索引 | API-SYNC-*、JOB-SYNC | Folo、Storage | `internal/sync/**` |
-| MOD-AI | Provider、Keychain、JSON Schema、Enrichment | API-AI-*、API-ENRICHMENT-*、JOB-ENRICH | AI Provider、Storage | `internal/ai/**` |
-| MOD-TOPIC | Topic 分类、合并、频道状态 | API-TOPICS/API-TOPIC-PATCH、JOB-TOPIC | AI、Storage | `internal/topic/**` |
-| MOD-HOME | Filter、Ranking、Daily Queue、Feedback | API-HOME/API-FILTER-*/API-FEEDBACK、JOB-QUEUE | Storage、Topic | `internal/home/**` |
-| MOD-SEARCH | FTS5 写入与查询 | API-SEARCH | Storage | `internal/search/**` |
-| MOD-OPS | Health、Ready、Backup、状态、日志 | `/healthz`,`/readyz`、CLI | Storage/Keychain | `internal/ops/**` |
+| MOD ID      | 职责                                        | 公开接口                                      | 依赖                    | 文件                      |
+| ----------- | ------------------------------------------- | --------------------------------------------- | ----------------------- | ------------------------- |
+| MOD-HTTP    | Server、Middleware、错误、CORS、静态资源    | 全部 HTTP                                     | 其余模块                | `internal/httpapi/**`     |
+| MOD-AUTH    | login state、one-time token、local session  | API-AUTH-*、API-SESSION                       | Folo、Keychain、Storage | `internal/auth/**`        |
+| MOD-PROXY   | 路由策略、Reverse Proxy、响应观察           | API-FOLO-COMPAT                               | Auth、Folo              | `internal/folo/proxy/**`  |
+| MOD-FOLO    | 类型化核心 Folo Client 与合同 fixture       | 内部接口                                      | Folo                    | `internal/folo/client/**` |
+| MOD-STORAGE | SQLite、迁移、Repository、事务              | 内部接口                                      | modernc sqlite          | `internal/storage/**`     |
+| MOD-SYNC    | 订阅/Entry/正文/状态同步与索引              | API-SYNC-*、JOB-SYNC                          | Folo、Storage           | `internal/sync/**`        |
+| MOD-AI      | Provider、Keychain、JSON Schema、Enrichment | API-AI-_、API-ENRICHMENT-_、JOB-ENRICH        | AI Provider、Storage    | `internal/ai/**`          |
+| MOD-TOPIC   | Topic 分类、合并、频道状态                  | API-TOPICS/API-TOPIC-PATCH、JOB-TOPIC         | AI、Storage             | `internal/topic/**`       |
+| MOD-HOME    | Filter、Ranking、Daily Queue、Feedback      | API-HOME/API-FILTER-*/API-FEEDBACK、JOB-QUEUE | Storage、Topic          | `internal/home/**`        |
+| MOD-SEARCH  | FTS5 写入与查询                             | API-SEARCH                                    | Storage                 | `internal/search/**`      |
+| MOD-OPS     | Health、Ready、Backup、状态、日志           | `/healthz`,`/readyz`、CLI                     | Storage/Keychain        | `internal/ops/**`         |
 
 依赖方向：HTTP→Domain Modules→Repository/External Adapters；Domain 不进口 `net/http` 或具体 SQLite driver。
 
@@ -161,43 +161,43 @@ AI：Ensure→按 `entryId+contentHash+providerFingerprint+language` 去重→Jo
 
 ### 5.1 实体、值对象和不变量
 
-| Domain ID | 类型 | 生命周期/关系 | 不变量 | 强制执行位置 |
-|---|---|---|---|---|
-| DOM-SESSION | LocalSession | state→active→expired/revoked | 上游 token 永不进 Browser/DB 明文 | MOD-AUTH+Keychain |
-| DOM-ENTRY | FoloEntryCache | Folo 镜像 | Folo ID 全局唯一；缓存可重建 | MOD-SYNC |
-| DOM-ACCOUNT-ENTRY | AccountEntry | user↔entry | Read/Collection 以上游成功状态为准 | MOD-PROXY/SYNC |
-| DOM-ENRICHMENT | AI 派生数据 | entry+hash+provider+lang | content hash/provider 变化即 stale | MOD-AI |
-| DOM-TOPIC | 用户频道 | core/dynamic/filter | 推荐虚拟 Topic 不入表；同用户规范名唯一 | MOD-TOPIC |
-| DOM-FILTER | Active Filter | draft 不入库；每用户最多1 active | reset 不影响订阅/已读/收藏 | MOD-HOME |
-| DOM-QUEUE | Daily Queue | user+localDate+filterKey | 初始50、上限60；同 key 每日唯一 | MOD-HOME |
-| DOM-FEEDBACK | 推荐反馈 | append-only+blocks | idempotency key 同用户唯一 | MOD-HOME |
-| DOM-JOB | Local Job | queued→running→succeeded/failed | dedupe key 非终态唯一；running 可超时回收 | Worker |
+| Domain ID         | 类型           | 生命周期/关系                    | 不变量                                    | 强制执行位置      |
+| ----------------- | -------------- | -------------------------------- | ----------------------------------------- | ----------------- |
+| DOM-SESSION       | LocalSession   | state→active→expired/revoked     | 上游 token 永不进 Browser/DB 明文         | MOD-AUTH+Keychain |
+| DOM-ENTRY         | FoloEntryCache | Folo 镜像                        | Folo ID 全局唯一；缓存可重建              | MOD-SYNC          |
+| DOM-ACCOUNT-ENTRY | AccountEntry   | user↔entry                       | Read/Collection 以上游成功状态为准        | MOD-PROXY/SYNC    |
+| DOM-ENRICHMENT    | AI 派生数据    | entry+hash+provider+lang         | content hash/provider 变化即 stale        | MOD-AI            |
+| DOM-TOPIC         | 用户频道       | core/dynamic/filter              | 推荐虚拟 Topic 不入表；同用户规范名唯一   | MOD-TOPIC         |
+| DOM-FILTER        | Active Filter  | draft 不入库；每用户最多1 active | reset 不影响订阅/已读/收藏                | MOD-HOME          |
+| DOM-QUEUE         | Daily Queue    | user+localDate+filterKey         | 初始50、上限60；同 key 每日唯一           | MOD-HOME          |
+| DOM-FEEDBACK      | 推荐反馈       | append-only+blocks               | idempotency key 同用户唯一                | MOD-HOME          |
+| DOM-JOB           | Local Job      | queued→running→succeeded/failed  | dedupe key 非终态唯一；running 可超时回收 | Worker            |
 
 所有时间存 UTC RFC3339；Daily Queue 同时保存 IANA timezone 与 `local_date`，不得用服务端本地时间计算日期。
 
 ### 5.2 数据模型
 
-| Schema ID | 表/对象 | 关键字段 | Key/索引 | 保留/删除 |
-|---|---|---|---|---|
-| DB-001 | `accounts` | user_id,name,avatar,timezone,last_success_sync_at | PK user_id | logout 清用户数据时删除 |
-| DB-002 | `local_sessions` | id_hash,user_id,expires_at,last_seen_at | PK id_hash；idx expires | 到期/登出删除；token 在 Keychain |
-| DB-003 | `feeds` | feed_id,title,url,image,view,updated_at | PK feed_id | 可重建 |
-| DB-004 | `entries` | entry_id,feed_id,kind,title,description,content,author,url,language,media_json,published_at,content_hash | PK entry_id；idx published/feed | 清本地数据时删除 |
-| DB-005 | `account_entries` | user_id,entry_id,read_at,collected_at,last_seen_at | PK(user,entry)；idx user/read/collected | 随账号缓存删除 |
-| DB-006 | `entry_enrichments` | entry_id,provider_fp,language,state,translated_*,summary_*,tags_json,quality_score,content_hash,error_code | PK(entry,provider,lang) | provider/hash stale 可清理 |
-| DB-007 | `topics` | topic_id,user_id,name,normalized_name,kind,pinned,hidden,sort_order,stable_until | UNIQUE(user,normalized_name) | 用户清数据时删除 |
-| DB-008 | `entry_topics` | user_id,entry_id,topic_id,confidence,is_primary,content_hash | PK(user,entry,topic) | Entry/Topic cascade |
-| DB-009 | `home_filters` | filter_id,user_id,prompt,normalized_json,status,created_at,updated_at | idx user/status；代码保证1 active | 保留历史 inactive 30条 |
-| DB-010 | `daily_queues` | queue_id,user_id,local_date,filter_key,timezone,target_size=50,hard_limit=60,status,version | UNIQUE(user,date,filter_key) | 保留30天 |
-| DB-011 | `daily_queue_items` | queue_id,entry_id,rank,score,score_json,state,added_at | PK(queue,entry)；UNIQUE(queue,rank) | Queue cascade |
-| DB-012 | `recommendation_events` | event_id,user_id,entry_id,event_type,topic_id,source_id,idempotency_key,created_at | UNIQUE(user,idempotency_key) | 保留365天 |
-| DB-013 | `recommendation_blocks` | user_id,target_type,target_id,strength,created_at | PK(user,type,target) | 用户恢复/清数据时删 |
-| DB-014 | `ai_provider_configs` | provider_id,base_url,model,fingerprint,enabled,updated_at | PK provider_id；base_url 为内置预设快照；不含 Key | 删除 Provider 时删 |
-| DB-015 | `jobs` | job_id,kind,dedupe_key,state,payload_json,attempts,next_run_at,error_code,timestamps | idx state/next_run；active dedupe | 成功30天、失败90天 |
-| DB-016 | `sync_state` | user_id,state,cursor_json,total,processed,error_code,timestamps | PK user_id | 随账号删除 |
-| DB-017 | `entry_search` FTS5 | entry_id/user_id UNINDEXED,title,translation,content,source,topics,tags | `tokenize='trigram'` | 与 Entry/Enrichment 事务同步 |
-| DB-018 | `schema_migrations` | version,checksum,applied_at | PK version | 永久 |
-| DB-019 | `core_topic_templates` | slug,name,sort_order | PK slug；UNIQUE name/order | 永久；只通过新迁移变更 |
+| Schema ID | 表/对象                 | 关键字段                                                                                                   | Key/索引                                          | 保留/删除                        |
+| --------- | ----------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | -------------------------------- |
+| DB-001    | `accounts`              | user_id,name,avatar,timezone,last_success_sync_at                                                          | PK user_id                                        | logout 清用户数据时删除          |
+| DB-002    | `local_sessions`        | id_hash,user_id,expires_at,last_seen_at                                                                    | PK id_hash；idx expires                           | 到期/登出删除；token 在 Keychain |
+| DB-003    | `feeds`                 | feed_id,title,url,image,view,updated_at                                                                    | PK feed_id                                        | 可重建                           |
+| DB-004    | `entries`               | entry_id,feed_id,kind,title,description,content,author,url,language,media_json,published_at,content_hash   | PK entry_id；idx published/feed                   | 清本地数据时删除                 |
+| DB-005    | `account_entries`       | user_id,entry_id,read_at,collected_at,last_seen_at                                                         | PK(user,entry)；idx user/read/collected           | 随账号缓存删除                   |
+| DB-006    | `entry_enrichments`     | entry_id,provider_fp,language,state,translated__,summary__,tags_json,quality_score,content_hash,error_code | PK(entry,provider,lang)                           | provider/hash stale 可清理       |
+| DB-007    | `topics`                | topic_id,user_id,name,normalized_name,kind,pinned,hidden,sort_order,stable_until                           | UNIQUE(user,normalized_name)                      | 用户清数据时删除                 |
+| DB-008    | `entry_topics`          | user_id,entry_id,topic_id,confidence,is_primary,content_hash                                               | PK(user,entry,topic)                              | Entry/Topic cascade              |
+| DB-009    | `home_filters`          | filter_id,user_id,prompt,normalized_json,status,created_at,updated_at                                      | idx user/status；代码保证1 active                 | 保留历史 inactive 30条           |
+| DB-010    | `daily_queues`          | queue_id,user_id,local_date,filter_key,timezone,target_size=50,hard_limit=60,status,version                | UNIQUE(user,date,filter_key)                      | 保留30天                         |
+| DB-011    | `daily_queue_items`     | queue_id,entry_id,rank,score,score_json,state,added_at                                                     | PK(queue,entry)；UNIQUE(queue,rank)               | Queue cascade                    |
+| DB-012    | `recommendation_events` | event_id,user_id,entry_id,event_type,topic_id,source_id,idempotency_key,created_at                         | UNIQUE(user,idempotency_key)                      | 保留365天                        |
+| DB-013    | `recommendation_blocks` | user_id,target_type,target_id,strength,created_at                                                          | PK(user,type,target)                              | 用户恢复/清数据时删              |
+| DB-014    | `ai_provider_configs`   | provider_id,base_url,model,fingerprint,enabled,updated_at                                                  | PK provider_id；base_url 为内置预设快照；不含 Key | 删除 Provider 时删               |
+| DB-015    | `jobs`                  | job_id,kind,dedupe_key,state,payload_json,attempts,next_run_at,error_code,timestamps                       | idx state/next_run；active dedupe                 | 成功30天、失败90天               |
+| DB-016    | `sync_state`            | user_id,state,cursor_json,total,processed,error_code,timestamps                                            | PK user_id                                        | 随账号删除                       |
+| DB-017    | `entry_search` FTS5     | entry_id/user_id UNINDEXED,title,translation,content,source,topics,tags                                    | `tokenize='trigram'`                              | 与 Entry/Enrichment 事务同步     |
+| DB-018    | `schema_migrations`     | version,checksum,applied_at                                                                                | PK version                                        | 永久                             |
+| DB-019    | `core_topic_templates`  | slug,name,sort_order                                                                                       | PK slug；UNIQUE name/order                        | 永久；只通过新迁移变更           |
 
 ### 5.3 事务、一致性和并发
 
@@ -210,11 +210,11 @@ AI：Ensure→按 `entryId+contentHash+providerFingerprint+language` 去重→Jo
 
 ### 5.4 迁移、回填与兼容
 
-| MIG ID | 文件 | 变化 | 验证 | 回滚 |
-|---|---|---|---|---|
-| MIG-001 | `migrations/0001_core.sql` | DB-001..016/018、约束和索引 | `PRAGMA integrity_check='ok'`；schema snapshot | 本期无旧数据；失败删除未提交新 DB |
-| MIG-002 | `migrations/0002_search_fts.sql` | DB-017 trigram FTS | 插入中英文 fixture 后 substring 命中 | drop FTS，不影响事实表 |
-| MIG-003 | `migrations/0003_seed_core_topics.sql` | 创建 DB-019 并写入核心 Topic 模板；MOD-TOPIC 在账号首次同步时复制为用户 Topic | unique/name/order；每用户幂等复制 | 回滚只删模板表，不删用户已修改 Topic |
+| MIG ID  | 文件                                   | 变化                                                                          | 验证                                           | 回滚                                 |
+| ------- | -------------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------ |
+| MIG-001 | `migrations/0001_core.sql`             | DB-001..016/018、约束和索引                                                   | `PRAGMA integrity_check='ok'`；schema snapshot | 本期无旧数据；失败删除未提交新 DB    |
+| MIG-002 | `migrations/0002_search_fts.sql`       | DB-017 trigram FTS                                                            | 插入中英文 fixture 后 substring 命中           | drop FTS，不影响事实表               |
+| MIG-003 | `migrations/0003_seed_core_topics.sql` | 创建 DB-019 并写入核心 Topic 模板；MOD-TOPIC 在账号首次同步时复制为用户 Topic | unique/name/order；每用户幂等复制              | 回滚只删模板表，不删用户已修改 Topic |
 
 迁移启动前对现有 DB 复制 `.bak`；迁移文件一经应用不得修改，只能新增版本。首次历史回填由 JOB-SYNC 完成，可取消和恢复。
 
@@ -225,35 +225,35 @@ AI：Ensure→按 `entryId+contentHash+providerFingerprint+language` 去重→Jo
 所有 `/tantan/v1` JSON 响应含 `X-Request-Id`。错误以 OpenAPI 为准：
 
 ```json
-{"requestId":"...","error":{"code":"STABLE_CODE","message":"面向用户的简短说明"}}
+{ "requestId": "...", "error": { "code": "STABLE_CODE", "message": "面向用户的简短说明" } }
 ```
 
 List cursor 是服务端签名 opaque base64url，包含 sort key、id、query hash；篡改或跨 query 使用返回 `400 CURSOR_MISMATCH`。
 
 ### 6.2 API
 
-| API ID | 方法/地址 | Auth | 请求/校验 | 响应 | 幂等/限流/兼容 |
-|---|---|---|---|---|---|
-| API-AUTH-START | GET `/auth/folo/start` | 无 | Host allowlist；生成state | 302 app.folo.is login | 每IP 10/min；SameSite=Lax state；顶层导航可无 Origin |
-| API-AUTH-CALLBACK | GET `/auth/folo/callback` | state cookie | query token 必填且一次性；state 只从 HttpOnly cookie 取 | local session Cookie+302 `/` | state 消费后不可复用 |
-| API-AUTH-LOGOUT | POST `/auth/logout` | Session+Origin | 无 | 204 | 重复调用仍204 |
-| API-SESSION | GET `/tantan/v1/session` | Session | timezone header 可更新 | `{user,timezone}` | 30s客户端缓存 |
-| API-FOLO-COMPAT | Folo 原路径 | Session+Origin(mutation) | 路由白名单、大小限制 | 原 status/body/content-type | SDK 0.3.95；禁路径不转发 |
-| API-HOME | GET `/tantan/v1/home` | Session | topicId必填,filterId?,cursor?,limit 1..50 | items,nextCursor,queue | Home P95≤150ms；游标绑定queue/version/topic/filter |
-| API-TOPICS | GET `/tantan/v1/topics` | Session | 无 | `{topics:[...]}` | 推荐作为虚拟首项 |
-| API-TOPIC-PATCH | PATCH `/tantan/v1/topics` | Session+Origin | operations≤100；推荐不可变 | `{topics:[...]}` | version 乐观并发，冲突409 |
-| API-FILTER-PUT | PUT `/tantan/v1/filter` | Session+Origin | prompt trim 1..300 | filter,topics,queueId | Idempotency-Key；60s |
-| API-FILTER-DELETE | DELETE `/tantan/v1/filter` | Session+Origin | 无 | topics,queueId | 重复 reset 返回当前 default |
-| API-FEEDBACK | POST `/tantan/v1/recommendation/feedback` | Session+Origin | entryId/action/optional topic | `{applied:true}` | Idempotency-Key 必填 |
-| API-SEARCH | GET `/tantan/v1/search` | Session | q 1..200,cursor,limit1..50 | items,nextCursor,indexStatus | P95≤300ms |
-| API-ENRICHMENT-GET | GET `/tantan/v1/entries/{id}/enrichment` | Session | language IETF | state,data,error | ready 24h客户端缓存 |
-| API-ENRICHMENT-ENSURE | POST 同上 | Session+Origin | fields enum≤4 | 202 jobId | Idempotency-Key；dedupe |
-| API-AI-CONFIG-GET | GET `/tantan/v1/settings/ai-provider` | Session | 无 | 非密钥字段+hasApiKey | Key 永不返回 |
-| API-AI-CONFIG-PUT | PUT 同上 | Session+Origin | providerId/model/apiKey?；endpoint 来自内置预设 | 非密钥字段 | 原子保存；Keychain失败不改config |
-| API-AI-CONFIG-TEST | POST `.../test` | Session+Origin | 完整临时配置 | ok,latencyMs,model | 3/min；不持久化 |
-| API-AI-CONFIG-DELETE | DELETE 同上 | Session+Origin | 无 | 204 | 先删Key，再删config |
-| API-SYNC-STATUS | GET `/tantan/v1/sync/status` | Session | 无 | state/counts/error | 无 |
-| API-SYNC-TRIGGER | POST `/tantan/v1/sync` | Session+Origin | scope enum | 202 jobId | 同 scope 非终态复用 job |
+| API ID                | 方法/地址                                 | Auth                     | 请求/校验                                               | 响应                         | 幂等/限流/兼容                                       |
+| --------------------- | ----------------------------------------- | ------------------------ | ------------------------------------------------------- | ---------------------------- | ---------------------------------------------------- |
+| API-AUTH-START        | GET `/auth/folo/start`                    | 无                       | Host allowlist；生成state                               | 302 app.folo.is login        | 每IP 10/min；SameSite=Lax state；顶层导航可无 Origin |
+| API-AUTH-CALLBACK     | GET `/auth/folo/callback`                 | state cookie             | query token 必填且一次性；state 只从 HttpOnly cookie 取 | local session Cookie+302 `/` | state 消费后不可复用                                 |
+| API-AUTH-LOGOUT       | POST `/auth/logout`                       | Session+Origin           | 无                                                      | 204                          | 重复调用仍204                                        |
+| API-SESSION           | GET `/tantan/v1/session`                  | Session                  | timezone header 可更新                                  | `{user,timezone}`            | 30s客户端缓存                                        |
+| API-FOLO-COMPAT       | Folo 原路径                               | Session+Origin(mutation) | 路由白名单、大小限制                                    | 原 status/body/content-type  | SDK 0.3.95；禁路径不转发                             |
+| API-HOME              | GET `/tantan/v1/home`                     | Session                  | topicId必填,filterId?,cursor?,limit 1..50               | items,nextCursor,queue       | Home P95≤150ms；游标绑定queue/version/topic/filter   |
+| API-TOPICS            | GET `/tantan/v1/topics`                   | Session                  | 无                                                      | `{topics:[...]}`             | 推荐作为虚拟首项                                     |
+| API-TOPIC-PATCH       | PATCH `/tantan/v1/topics`                 | Session+Origin           | operations≤100；推荐不可变                              | `{topics:[...]}`             | version 乐观并发，冲突409                            |
+| API-FILTER-PUT        | PUT `/tantan/v1/filter`                   | Session+Origin           | prompt trim 1..300                                      | filter,topics,queueId        | Idempotency-Key；60s                                 |
+| API-FILTER-DELETE     | DELETE `/tantan/v1/filter`                | Session+Origin           | 无                                                      | topics,queueId               | 重复 reset 返回当前 default                          |
+| API-FEEDBACK          | POST `/tantan/v1/recommendation/feedback` | Session+Origin           | entryId/action/optional topic                           | `{applied:true}`             | Idempotency-Key 必填                                 |
+| API-SEARCH            | GET `/tantan/v1/search`                   | Session                  | q 1..200,cursor,limit1..50                              | items,nextCursor,indexStatus | P95≤300ms                                            |
+| API-ENRICHMENT-GET    | GET `/tantan/v1/entries/{id}/enrichment`  | Session                  | language IETF                                           | state,data,error             | ready 24h客户端缓存                                  |
+| API-ENRICHMENT-ENSURE | POST 同上                                 | Session+Origin           | fields enum≤4                                           | 202 jobId                    | Idempotency-Key；dedupe                              |
+| API-AI-CONFIG-GET     | GET `/tantan/v1/settings/ai-provider`     | Session                  | 无                                                      | 非密钥字段+hasApiKey         | Key 永不返回                                         |
+| API-AI-CONFIG-PUT     | PUT 同上                                  | Session+Origin           | providerId/model/apiKey?；endpoint 来自内置预设         | 非密钥字段                   | 原子保存；Keychain失败不改config                     |
+| API-AI-CONFIG-TEST    | POST `.../test`                           | Session+Origin           | 完整临时配置                                            | ok,latencyMs,model           | 3/min；不持久化                                      |
+| API-AI-CONFIG-DELETE  | DELETE 同上                               | Session+Origin           | 无                                                      | 204                          | 先删Key，再删config                                  |
+| API-SYNC-STATUS       | GET `/tantan/v1/sync/status`              | Session                  | 无                                                      | state/counts/error           | 无                                                   |
+| API-SYNC-TRIGGER      | POST `/tantan/v1/sync`                    | Session+Origin           | scope enum                                              | 202 jobId                    | 同 scope 非终态复用 job                              |
 
 `HomeEntryCard` 公开字段固定为 `entryId,type,title,excerpt,cover,source{id,name,avatar},publishedAt,topics[{id,name}],translated`；`type` 只允许 `article|post|image|video`。响应不得包含完整正文、内部评分、FilterSpec 或 Provider 信息。
 
@@ -267,14 +267,14 @@ List cursor 是服务端签名 opaque base64url，包含 sort key、id、query h
 
 ### 6.4 任务与调度
 
-| JOB ID | 触发/调度 | 输入 | 超时/并发 | 结果/失败/重试 | 观测 |
-|---|---|---|---|---|---|
-| JOB-SYNC | login、手动、每15min | user,scope | 10min/每用户1 | 页级恢复；Folo 429/5xx 最多3次 | sync_state/progress |
-| JOB-CONTENT | Sync metadata 后 | entry ids≤50 | 2min/1 | NDJSON逐条 upsert；缺条重试 | processed/missing |
-| JOB-ENRICH | ensure/新 Entry | entry,fields,provider fp | 90s/全局2 | 429/5xx重试2；invalid JSON修复1次 | token/latency不含内容 |
-| JOB-TOPIC | 新未分类 Entry≥20或10min | entry ids≤20 | 90s/1 | 合并规范名；失败保留未分类 | classified count |
-| JOB-QUEUE | 首次Home、日期变化、Filter变化、Sync完成 | user/date/filter | 30s/每key1 | 原子替换；失败保留旧queue | candidate/selected |
-| JOB-RECONCILE | 本地观察写失败、启动 | user | 5min/1 | 重拉近7天 read/collection | drift corrected |
+| JOB ID        | 触发/调度                                | 输入                     | 超时/并发     | 结果/失败/重试                    | 观测                  |
+| ------------- | ---------------------------------------- | ------------------------ | ------------- | --------------------------------- | --------------------- |
+| JOB-SYNC      | login、手动、每15min                     | user,scope               | 10min/每用户1 | 页级恢复；Folo 429/5xx 最多3次    | sync_state/progress   |
+| JOB-CONTENT   | Sync metadata 后                         | entry ids≤50             | 2min/1        | NDJSON逐条 upsert；缺条重试       | processed/missing     |
+| JOB-ENRICH    | ensure/新 Entry                          | entry,fields,provider fp | 90s/全局2     | 429/5xx重试2；invalid JSON修复1次 | token/latency不含内容 |
+| JOB-TOPIC     | 新未分类 Entry≥20或10min                 | entry ids≤20             | 90s/1         | 合并规范名；失败保留未分类        | classified count      |
+| JOB-QUEUE     | 首次Home、日期变化、Filter变化、Sync完成 | user/date/filter         | 30s/每key1    | 原子替换；失败保留旧queue         | candidate/selected    |
+| JOB-RECONCILE | 本地观察写失败、启动                     | user                     | 5min/1        | 重拉近7天 read/collection         | drift corrected       |
 
 本期无 Event Broker/Webhook，`EVT-*` 不适用；Job 表提供至少一次执行，业务写入通过 dedupe key 幂等。
 
@@ -310,32 +310,32 @@ Prompt 转为 `FilterSpec v1`：`windowDays(1..30), includeTopics[], excludeTopi
 
 ### 7.1 错误模型
 
-| Error ID | 状态/码 | 可重试 | 调用方结果 | 恢复/观测 |
-|---|---|---|---|---|
-| ERR-AUTH-001 | 401 `AUTH_REQUIRED` | 否 | 登录页 | session清理 |
-| ERR-AUTH-002 | 400 `AUTH_FLOW_INVALID` | 否 | 重新登录 | state失败计数 |
-| ERR-SEC-001 | 403 `ORIGIN_REJECTED` | 否 | 拒绝 | 安全日志，不记正文 |
-| ERR-PROXY-001 | 403 `FOLO_ROUTE_NOT_ALLOWED` | 否 | 产品错误 | denied metric |
-| ERR-PROXY-002 | 410 `FOLO_FEATURE_REMOVED` | 否 | 功能不存在 | removed metric |
-| ERR-FOLO-001 | 502 `FOLO_UNAVAILABLE` | 是 | 缓存降级 | upstream latency/status |
-| ERR-FOLO-002 | 429 `FOLO_RATE_LIMITED` | 是 | 稍后重试 | Retry-After |
-| ERR-AI-001 | 409 `AI_NOT_CONFIGURED` | 否 | 设置入口 | config missing |
-| ERR-AI-002 | 502 `AI_PROVIDER_UNAVAILABLE` | 是 | 原文可用 | provider/status/latency |
-| ERR-AI-003 | 422 `AI_OUTPUT_INVALID` | 可人工重试 | 旧状态保留 | schema path，不记原文 |
-| ERR-DATA-001 | 500 `LOCAL_STORAGE_ERROR` | 否 | 缓存只读/诊断 | sqlite code/requestId |
-| ERR-API-001 | 400 `VALIDATION_ERROR` | 否 | 字段错误 | field list |
-| ERR-API-002 | 409 `VERSION_CONFLICT` | 是（先刷新） | 刷新 Topic | current version |
-| ERR-API-003 | 400 `CURSOR_MISMATCH` | 否 | 从第一页请求 | cursor/request mismatch |
-| ERR-API-004 | 409 `QUEUE_VERSION_CHANGED` | 是（从第一页） | 清当前分页缓存 | queue id/version |
+| Error ID      | 状态/码                       | 可重试         | 调用方结果     | 恢复/观测               |
+| ------------- | ----------------------------- | -------------- | -------------- | ----------------------- |
+| ERR-AUTH-001  | 401 `AUTH_REQUIRED`           | 否             | 登录页         | session清理             |
+| ERR-AUTH-002  | 400 `AUTH_FLOW_INVALID`       | 否             | 重新登录       | state失败计数           |
+| ERR-SEC-001   | 403 `ORIGIN_REJECTED`         | 否             | 拒绝           | 安全日志，不记正文      |
+| ERR-PROXY-001 | 403 `FOLO_ROUTE_NOT_ALLOWED`  | 否             | 产品错误       | denied metric           |
+| ERR-PROXY-002 | 410 `FOLO_FEATURE_REMOVED`    | 否             | 功能不存在     | removed metric          |
+| ERR-FOLO-001  | 502 `FOLO_UNAVAILABLE`        | 是             | 缓存降级       | upstream latency/status |
+| ERR-FOLO-002  | 429 `FOLO_RATE_LIMITED`       | 是             | 稍后重试       | Retry-After             |
+| ERR-AI-001    | 409 `AI_NOT_CONFIGURED`       | 否             | 设置入口       | config missing          |
+| ERR-AI-002    | 502 `AI_PROVIDER_UNAVAILABLE` | 是             | 原文可用       | provider/status/latency |
+| ERR-AI-003    | 422 `AI_OUTPUT_INVALID`       | 可人工重试     | 旧状态保留     | schema path，不记原文   |
+| ERR-DATA-001  | 500 `LOCAL_STORAGE_ERROR`     | 否             | 缓存只读/诊断  | sqlite code/requestId   |
+| ERR-API-001   | 400 `VALIDATION_ERROR`        | 否             | 字段错误       | field list              |
+| ERR-API-002   | 409 `VERSION_CONFLICT`        | 是（先刷新）   | 刷新 Topic     | current version         |
+| ERR-API-003   | 400 `CURSOR_MISMATCH`         | 否             | 从第一页请求   | cursor/request mismatch |
+| ERR-API-004   | 409 `QUEUE_VERSION_CHANGED`   | 是（从第一页） | 清当前分页缓存 | queue id/version        |
 
 ### 7.2 依赖与降级
 
-| Dependency | 超时/重试责任 | 不可用行为 | 健康检查 |
-|---|---|---|---|
-| Folo | Proxy 60s不重试mutation；Sync 30s重试3 | 读缓存；写返回错误 | `readyz`不因Folo临时失败而down |
-| AI Provider | 60s，Worker重试2 | 原文、默认quality=5、未分类 | 配置 test，不进readyz |
-| SQLite | busy 5s，不自动重试业务写 | ready=false；停止worker | `SELECT 1`+integrity周期检查 |
-| Keychain | 5s，不重试 | ready=false；禁止登录/AI保存 | set/get/delete临时探针或平台能力检查 |
+| Dependency  | 超时/重试责任                          | 不可用行为                   | 健康检查                             |
+| ----------- | -------------------------------------- | ---------------------------- | ------------------------------------ |
+| Folo        | Proxy 60s不重试mutation；Sync 30s重试3 | 读缓存；写返回错误           | `readyz`不因Folo临时失败而down       |
+| AI Provider | 60s，Worker重试2                       | 原文、默认quality=5、未分类  | 配置 test，不进readyz                |
+| SQLite      | busy 5s，不自动重试业务写              | ready=false；停止worker      | `SELECT 1`+integrity周期检查         |
+| Keychain    | 5s，不重试                             | ready=false；禁止登录/AI保存 | set/get/delete临时探针或平台能力检查 |
 
 ### 7.3 部分失败、重复、乱序与对账
 
@@ -353,12 +353,12 @@ Local Cookie `tantan_session` 为256-bit随机值，只存其 SHA-256 hash；Htt
 
 ### 8.2 授权矩阵
 
-| 主体 | 资源/操作 | 条件 | 强制位置 | 审计 |
-|---|---|---|---|---|
-| 未登录Browser | start/callback/health | Host/Origin/state | MOD-AUTH/HTTP | code/requestId |
-| 登录Browser | 本账号数据读写 | active session；Repository强制user_id | Middleware+Repo | mutation type/id hash |
-| Worker | 本账号 Job | job payload user存在 | Worker Claim | job id/state |
-| Proxy | Folo 核心接口 | route policy+session | MOD-PROXY | method/path/status |
+| 主体          | 资源/操作             | 条件                                  | 强制位置        | 审计                  |
+| ------------- | --------------------- | ------------------------------------- | --------------- | --------------------- |
+| 未登录Browser | start/callback/health | Host/Origin/state                     | MOD-AUTH/HTTP   | code/requestId        |
+| 登录Browser   | 本账号数据读写        | active session；Repository强制user_id | Middleware+Repo | mutation type/id hash |
+| Worker        | 本账号 Job            | job payload user存在                  | Worker Claim    | job id/state          |
+| Proxy         | Folo 核心接口         | route policy+session                  | MOD-PROXY       | method/path/status    |
 
 ### 8.3 敏感数据、加密、保留、删除与导出
 
@@ -380,14 +380,14 @@ Local Cookie `tantan_session` 为256-bit随机值，只存其 SHA-256 hash；Htt
 
 ### 9.1 负载和资源预算
 
-| 指标 | 正常/峰值目标 | 测量 | 失败阈值/降级 |
-|---|---|---|---|
-| 数据量 | 10万 Entry、5GB DB | 固定生成器 | >5GB告警，不自动删用户数据 |
-| Home | P50≤50ms/P95≤150ms | 500候选/10万库 | >300ms记录slow query |
-| Search | P50≤100ms/P95≤300ms | trigram 10万库 | >500ms限制20条并记录 |
-| Proxy开销 | P95≤30ms，不含上游 | httptest/本地 mock | >60ms |
-| Memory | 正常≤200MB/峰值≤300MB | runtime metrics | >400MB停止新AI Job |
-| AI并发 | 2 | Worker gauge | 队列>100暂停自动enrich，只保留用户显式ensure |
+| 指标      | 正常/峰值目标         | 测量               | 失败阈值/降级                                |
+| --------- | --------------------- | ------------------ | -------------------------------------------- |
+| 数据量    | 10万 Entry、5GB DB    | 固定生成器         | >5GB告警，不自动删用户数据                   |
+| Home      | P50≤50ms/P95≤150ms    | 500候选/10万库     | >300ms记录slow query                         |
+| Search    | P50≤100ms/P95≤300ms   | trigram 10万库     | >500ms限制20条并记录                         |
+| Proxy开销 | P95≤30ms，不含上游    | httptest/本地 mock | >60ms                                        |
+| Memory    | 正常≤200MB/峰值≤300MB | runtime metrics    | >400MB停止新AI Job                           |
+| AI并发    | 2                     | Worker gauge       | 队列>100暂停自动enrich，只保留用户显式ensure |
 
 ### 9.2 SLI/SLO
 
@@ -409,14 +409,14 @@ Local Cookie `tantan_session` 为256-bit随机值，只存其 SHA-256 hash；Htt
 
 ### 10.1 配置
 
-| Key | 默认/格式 | 来源 | 说明 |
-|---|---|---|---|
-| `TANTAN_LISTEN_ADDR` | `127.0.0.1:3000` | env/flag | 非loopback拒绝 |
-| `TANTAN_DATA_DIR` | `os.UserConfigDir()/Tantan` | env/flag | 测试用临时目录 |
-| `TANTAN_FOLO_API_URL` | `https://api.folo.is` | compile default；测试可改为loopback mock | 正式运行只允许该host |
-| `TANTAN_FOLO_WEB_URL` | `https://app.folo.is` | 同上 | Auth start |
-| `TANTAN_DEV_ORIGINS` | `http://127.0.0.1:5173` | env | 逗号分隔严格URL |
-| `TANTAN_LOG_LEVEL` | `info` | env | debug仍不记录秘密 |
+| Key                   | 默认/格式                   | 来源                                     | 说明                 |
+| --------------------- | --------------------------- | ---------------------------------------- | -------------------- |
+| `TANTAN_LISTEN_ADDR`  | `127.0.0.1:3000`            | env/flag                                 | 非loopback拒绝       |
+| `TANTAN_DATA_DIR`     | `os.UserConfigDir()/Tantan` | env/flag                                 | 测试用临时目录       |
+| `TANTAN_FOLO_API_URL` | `https://api.folo.is`       | compile default；测试可改为loopback mock | 正式运行只允许该host |
+| `TANTAN_FOLO_WEB_URL` | `https://app.folo.is`       | 同上                                     | Auth start           |
+| `TANTAN_DEV_ORIGINS`  | `http://127.0.0.1:5173`     | env                                      | 逗号分隔严格URL      |
+| `TANTAN_LOG_LEVEL`    | `info`                      | env                                      | debug仍不记录秘密    |
 
 优先级：CLI flag > env > default；secret 不接受命令行参数，避免进程列表泄漏。
 
@@ -438,14 +438,14 @@ Local Cookie `tantan_session` 为256-bit随机值，只存其 SHA-256 hash；Htt
 
 ### 11.1 新增、升级或重新配置
 
-| DEP ID | 类别 | 名称/用途 | 状态 | 版本/来源 | 安装/初始化 | 影响 |
-|---|---|---|---|---|---|---|
-| DEP-BE-001 | Runtime | Go | 新增 | 1.26.2，本机验证 | `go version` | `go.mod` |
-| DEP-BE-002 | Database Driver | `modernc.org/sqlite` | 新增 | v1.56.0，[pkg.go.dev](https://pkg.go.dev/modernc.org/sqlite) | `go get modernc.org/sqlite@v1.56.0` | go.mod/sum |
-| DEP-BE-003 | Secret Store | `github.com/zalando/go-keyring` | 新增 | v0.2.8，[pkg.go.dev](https://pkg.go.dev/github.com/zalando/go-keyring) | `go get github.com/zalando/go-keyring@v0.2.8` | go.mod/sum |
-| DEP-BE-004 | External API | Folo API/Web | 复用 | SDK contract 0.3.95；固定hosts | 脱敏fixture | Folo adapters |
-| DEP-BE-005 | External API | OpenAI/Anthropic/Google/DeepSeek/OpenRouter | 用户选内置 Provider 并配置 model/key | preset endpoint/model/key | Settings API | AI adapter |
-| DEP-BE-006 | Storage Feature | SQLite FTS5 trigram | 新增 | SQLite 3.53.3 from DEP-BE-002 | MIG-002 | Search |
+| DEP ID     | 类别            | 名称/用途                                   | 状态                                 | 版本/来源                                                              | 安装/初始化                                   | 影响          |
+| ---------- | --------------- | ------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------- | --------------------------------------------- | ------------- |
+| DEP-BE-001 | Runtime         | Go                                          | 新增                                 | 1.26.2，本机验证                                                       | `go version`                                  | `go.mod`      |
+| DEP-BE-002 | Database Driver | `modernc.org/sqlite`                        | 新增                                 | v1.56.0，[pkg.go.dev](https://pkg.go.dev/modernc.org/sqlite)           | `go get modernc.org/sqlite@v1.56.0`           | go.mod/sum    |
+| DEP-BE-003 | Secret Store    | `github.com/zalando/go-keyring`             | 新增                                 | v0.2.8，[pkg.go.dev](https://pkg.go.dev/github.com/zalando/go-keyring) | `go get github.com/zalando/go-keyring@v0.2.8` | go.mod/sum    |
+| DEP-BE-004 | External API    | Folo API/Web                                | 复用                                 | SDK contract 0.3.95；固定hosts                                         | 脱敏fixture                                   | Folo adapters |
+| DEP-BE-005 | External API    | OpenAI/Anthropic/Google/DeepSeek/OpenRouter | 用户选内置 Provider 并配置 model/key | preset endpoint/model/key                                              | Settings API                                  | AI adapter    |
+| DEP-BE-006 | Storage Feature | SQLite FTS5 trigram                         | 新增                                 | SQLite 3.53.3 from DEP-BE-002                                          | MIG-002                                       | Search        |
 
 `modernc.org/sqlite` 的 `libc` 使用其 go.mod 声明的精确传递版本，由 `go get`/`go mod tidy` 写入 go.sum；不得手工升级单个 modernc 传递依赖。
 
@@ -618,44 +618,44 @@ TASK-BE-01→02→03→04→05 默认串行。TASK-BE-03 与 TASK-BE-04 共享 T
 
 ### 13.1 后端需求追踪
 
-| BR ID | MOD/API/JOB/MIG | TASK | AC | TC |
-|---|---|---|---|---|
-| BR-001 | PROXY/FOLO-COMPAT | BE-01 | AC-005..AC-007 | TC-005..TC-007 |
-| BR-002 | AUTH/AUTH-* | BE-01 | AC-003、AC-004 | TC-003、TC-004 |
-| BR-003 | PROXY/FOLO-COMPAT | BE-01 | AC-006、AC-007 | TC-006、TC-007 |
-| BR-004 | STORAGE/SYNC/SEARCH/JOB-SYNC/MIG-001/002 | BE-02 | AC-008..AC-011、AC-018 | TC-008..TC-011、TC-018 |
-| BR-005 | AI/TOPIC/JOB-ENRICH/TOPIC/MIG-003 | BE-03 | AC-012..AC-015 | TC-012..TC-015 |
-| BR-006 | HOME/JOB-QUEUE | BE-04 | AC-016..AC-019 | TC-016..TC-019 |
-| BR-007 | HTTP/OPS | BE-01..05 | AC-005、AC-011、AC-021..AC-023 | TC-005、TC-011、TC-021..TC-023 |
-| BR-008 | AUTH/AI/HTTP/OPS | BE-01,03,05 | AC-004、AC-012、AC-020 | TC-004、TC-012、TC-020 |
+| BR ID  | MOD/API/JOB/MIG                          | TASK        | AC                             | TC                             |
+| ------ | ---------------------------------------- | ----------- | ------------------------------ | ------------------------------ |
+| BR-001 | PROXY/FOLO-COMPAT                        | BE-01       | AC-005..AC-007                 | TC-005..TC-007                 |
+| BR-002 | AUTH/AUTH-*                              | BE-01       | AC-003、AC-004                 | TC-003、TC-004                 |
+| BR-003 | PROXY/FOLO-COMPAT                        | BE-01       | AC-006、AC-007                 | TC-006、TC-007                 |
+| BR-004 | STORAGE/SYNC/SEARCH/JOB-SYNC/MIG-001/002 | BE-02       | AC-008..AC-011、AC-018         | TC-008..TC-011、TC-018         |
+| BR-005 | AI/TOPIC/JOB-ENRICH/TOPIC/MIG-003        | BE-03       | AC-012..AC-015                 | TC-012..TC-015                 |
+| BR-006 | HOME/JOB-QUEUE                           | BE-04       | AC-016..AC-019                 | TC-016..TC-019                 |
+| BR-007 | HTTP/OPS                                 | BE-01..05   | AC-005、AC-011、AC-021..AC-023 | TC-005、TC-011、TC-021..TC-023 |
+| BR-008 | AUTH/AI/HTTP/OPS                         | BE-01,03,05 | AC-004、AC-012、AC-020         | TC-004、TC-012、TC-020         |
 
 ### 13.2 验收标准
 
-| AC ID | 精确可观察结果 |
-|---|---|
-| AC-001 | 新服务在临时数据目录迁移并返回health/ready 200 |
-| AC-002 | SDK 0.3.95 method/path快照与包hash一致且fixture无敏感数据 |
-| AC-003 | state错误/复用被拒绝，成功callback只创建一个local session |
-| AC-004 | Browser/SQLite/log无Folo Token；Keychain中存在且登出删除 |
-| AC-005 | 核心Folo status/body/content-type与fixture等价，proxy overhead达标 |
-| AC-006 | 禁路径返回410且上游mock调用数0 |
-| AC-007 | 未知路径403；Host/Origin/header攻击被拒绝且不dial上游 |
-| AC-008 | 全量同步无丢页/重复，metadata/content/read/collection一致 |
-| AC-009 | 增量5min重叠幂等，kill/restart从checkpoint恢复 |
-| AC-010 | NDJSON部分失败保留成功条目并重试缺失条目 |
-| AC-011 | 中文/英文/译文/Source/Topic/Tag搜索正确，indexStatus准确 |
-| AC-012 | AI Key只存在Keychain和Provider Authorization，永不回传 |
-| AC-013 | Provider timeout/retry/concurrency与URL/IP限制符合合同 |
-| AC-014 | JSON一次修复后成功；二次失败旧enrichment/filter保持 |
-| AC-015 | content/provider/prompt版本变化使旧enrichment stale并重新生成 |
+| AC ID  | 精确可观察结果                                                                          |
+| ------ | --------------------------------------------------------------------------------------- |
+| AC-001 | 新服务在临时数据目录迁移并返回health/ready 200                                          |
+| AC-002 | SDK 0.3.95 method/path快照与包hash一致且fixture无敏感数据                               |
+| AC-003 | state错误/复用被拒绝，成功callback只创建一个local session                               |
+| AC-004 | Browser/SQLite/log无Folo Token；Keychain中存在且登出删除                                |
+| AC-005 | 核心Folo status/body/content-type与fixture等价，proxy overhead达标                      |
+| AC-006 | 禁路径返回410且上游mock调用数0                                                          |
+| AC-007 | 未知路径403；Host/Origin/header攻击被拒绝且不dial上游                                   |
+| AC-008 | 全量同步无丢页/重复，metadata/content/read/collection一致                               |
+| AC-009 | 增量5min重叠幂等，kill/restart从checkpoint恢复                                          |
+| AC-010 | NDJSON部分失败保留成功条目并重试缺失条目                                                |
+| AC-011 | 中文/英文/译文/Source/Topic/Tag搜索正确，indexStatus准确                                |
+| AC-012 | AI Key只存在Keychain和Provider Authorization，永不回传                                  |
+| AC-013 | Provider timeout/retry/concurrency与URL/IP限制符合合同                                  |
+| AC-014 | JSON一次修复后成功；二次失败旧enrichment/filter保持                                     |
+| AC-015 | content/provider/prompt版本变化使旧enrichment stale并重新生成                           |
 | AC-016 | 7天/500候选生成50队列，当日最多60；同queue/version稳定分页、cursor错配拒绝、跨日新queue |
-| AC-017 | 排序分数和多样性Golden顺序稳定，read/block绝不出现 |
-| AC-018 | 10万Entry下Home/Search满足P95预算 |
-| AC-019 | Filter原子生成Dynamic Topic并切换/重置，Feedback幂等且queue状态一致 |
-| AC-020 | canary secret不出现在DB明文字段、日志、错误、响应和Folo请求 |
-| AC-021 | Folo/AI故障降级且不破坏缓存；SQLite故障ready=false |
-| AC-022 | backup不覆盖，restore校验后恢复Tantan偏好与队列 |
-| AC-023 | doctor输出足以定位端口/DB/Keychain/DNS/TLS且完全脱敏 |
+| AC-017 | 排序分数和多样性Golden顺序稳定，read/block绝不出现                                      |
+| AC-018 | 10万Entry下Home/Search满足P95预算                                                       |
+| AC-019 | Filter原子生成Dynamic Topic并切换/重置，Feedback幂等且queue状态一致                     |
+| AC-020 | canary secret不出现在DB明文字段、日志、错误、响应和Folo请求                             |
+| AC-021 | Folo/AI故障降级且不破坏缓存；SQLite故障ready=false                                      |
+| AC-022 | backup不覆盖，restore校验后恢复Tantan偏好与队列                                         |
+| AC-023 | doctor输出足以定位端口/DB/Keychain/DNS/TLS且完全脱敏                                    |
 
 ### 13.3 测试用例
 
@@ -663,47 +663,49 @@ TASK-BE-01→02→03→04→05 默认串行。TASK-BE-03 与 TASK-BE-04 共享 T
 
 ### 13.4 验证命令
 
-| 目的 | 工作目录 | 命令 | 成功观察 |
-|---|---|---|---|
-| 模块校验 | `services/tantan-api` | `go mod verify` | all modules verified |
-| 格式/静态 | 同上 | `test -z "$(gofmt -l .)" && go vet ./...` | 无输出/exit0 |
-| 单元集成 | 同上 | `go test ./...` | 全部pass |
-| Race | 同上 | `go test -race ./...` | 无race、全部pass |
-| 合同 | 同上 | `go test ./internal/folo/... -run Contract` | 全部fixture pass |
-| 安全 | 同上 | `go test ./internal/auth/... ./internal/folo/proxy/... ./internal/ai/... -run 'Security|Secret|Origin|RoutePolicy'` | 全部pass |
-| 负载 | 同上 | `go test ./internal/home/... ./internal/search/... -run Load100K -count=1` | 达到预算 |
-| 迁移 | 同上 | `go test ./internal/storage/... -run Migration` | schema/integrity pass |
-| 构建 | 同上 | `go build ./cmd/tantan-api` | exit0 |
-| Doctor | 同上 | `go run ./cmd/tantan-api doctor --data-dir "$(mktemp -d)"` | sqlite/keyring/dns/tls ok；临时目录仅用于此命令 |
-| 规格最终门禁 | Tantan根 | `python3 /Users/mingrui/.codex/skills/backend-spec/scripts/validate_spec.py 2026-08-09-tantan-backend-spec.md --domain backend --stage final` | exit0，0 warnings |
+| 目的         | 工作目录              | 命令                                                                                                                                          | 成功观察                                        |
+| ------------ | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| 模块校验     | `services/tantan-api` | `go mod verify`                                                                                                                               | all modules verified                            |
+| 格式/静态    | 同上                  | `test -z "$(gofmt -l .)" && go vet ./...`                                                                                                     | 无输出/exit0                                    |
+| 单元集成     | 同上                  | `go test ./...`                                                                                                                               | 全部pass                                        |
+| Race         | 同上                  | `go test -race ./...`                                                                                                                         | 无race、全部pass                                |
+| 合同         | 同上                  | `go test ./internal/folo/... -run Contract`                                                                                                   | 全部fixture pass                                |
+| 安全         | 同上                  | `go test ./internal/auth/... ./internal/folo/proxy/... ./internal/ai/... -run 'Security                                                       | Secret                                          | Origin | RoutePolicy'` | 全部pass |
+| 负载         | 同上                  | `go test ./internal/home/... ./internal/search/... -run Load100K -count=1`                                                                    | 达到预算                                        |
+| 迁移         | 同上                  | `go test ./internal/storage/... -run Migration`                                                                                               | schema/integrity pass                           |
+| 构建         | 同上                  | `go build ./cmd/tantan-api`                                                                                                                   | exit0                                           |
+| Doctor       | 同上                  | `go run ./cmd/tantan-api doctor --data-dir "$(mktemp -d)"`                                                                                    | sqlite/keyring/dns/tls ok；临时目录仅用于此命令 |
+| 规格最终门禁 | Tantan根              | `python3 /Users/mingrui/.codex/skills/backend-spec/scripts/validate_spec.py 2026-08-09-tantan-backend-spec.md --domain backend --stage final` | exit0，0 warnings                               |
 
 ## 14. 覆盖矩阵
 
-| 检查项 | 状态 | 证据 | 结论/不适用原因 |
-|---|---|---|---|
-| BE-01 | 已确定 | 第2.1/2.2 | 参与者、问题、目标和成功指标已锁定 |
-| BE-02 | 已确定 | 第2.3..2.5 | 范围、非目标、约束和优先级已锁定 |
-| BE-03 | 代码证实 | 第1.2、3节 | Folo SDK、认证、请求和持久化现状已定位 |
-| BE-04 | 已确定 | 第4.1 | Browser、Go、Folo、SQLite 和 Keychain 信任边界明确 |
-| BE-05 | 已确定 | 第4.2/4.3 | 模块职责、依赖和运行流程已定义 |
-| BE-06 | 已确定 | 第5.1 | Session、Entry、Topic、Filter、Queue 和 Job 不变量已定义 |
-| BE-07 | 已确定 | 第6.1..6.3 | REST、Proxy、认证、DTO、游标和错误语义已定义 |
-| BE-08 | 不适用 | 第6.4 | 本期无外部Event/Webhook；内部异步只通过持久化Job执行 |
-| BE-09 | 已确定 | 第5.3、6.1/6.2 | 写入事务、幂等键、并发锁和版本冲突已定义 |
-| BE-10 | 已确定 | 第5.2 | 表、字段、主键、索引和保留期已定义 |
-| BE-11 | 已确定 | 第5.3、7.3 | 同步、代理和Job的部分失败、恢复与对账已定义 |
-| BE-12 | 已确定 | 第5.4 | 三个迁移、校验、备份和回填路径已定义 |
-| BE-13 | 已确定 | 第7.2、11节 | Folo、AI、SQLite、Keychain和库依赖的超时与降级已定义 |
-| BE-14 | 已确定 | 第7.1 | 稳定错误码、重试责任和调用方行为已定义 |
-| BE-15 | 已确定 | 第8节 | 身份、授权、密钥、SSRF、保留与删除已定义 |
-| BE-16 | 已确定 | 第9.1 | 10万Entry容量、内存、延迟和并发预算已定义 |
-| BE-17 | 已确定 | 第9.2/9.3 | SLI、日志字段、指标和脱敏规则已定义 |
-| BE-18 | 已确定 | 第10.1、11.2 | 配置键、来源、优先级和启动方式已定义 |
-| BE-19 | 已确定 | 第10.2..10.4 | 功能开关、升级、回滚、备份和恢复已定义 |
-| BE-20 | 已确定 | 第9.4、12.4 | health、ready、doctor、runbook和交付资产已定义 |
-| BE-21 | 已确定 | 第12/13节 | TDD任务树与FR/AC/TC验证闭环已定义 |
-| BE-22 | 已确定 | 第15节 | 后端和一期端形态均无未决项 |
+| 检查项 | 状态     | 证据           | 结论/不适用原因                                          |
+| ------ | -------- | -------------- | -------------------------------------------------------- |
+| BE-01  | 已确定   | 第2.1/2.2      | 参与者、问题、目标和成功指标已锁定                       |
+| BE-02  | 已确定   | 第2.3..2.5     | 范围、非目标、约束和优先级已锁定                         |
+| BE-03  | 代码证实 | 第1.2、3节     | Folo SDK、认证、请求和持久化现状已定位                   |
+| BE-04  | 已确定   | 第4.1          | Browser、Go、Folo、SQLite 和 Keychain 信任边界明确       |
+| BE-05  | 已确定   | 第4.2/4.3      | 模块职责、依赖和运行流程已定义                           |
+| BE-06  | 已确定   | 第5.1          | Session、Entry、Topic、Filter、Queue 和 Job 不变量已定义 |
+| BE-07  | 已确定   | 第6.1..6.3     | REST、Proxy、认证、DTO、游标和错误语义已定义             |
+| BE-08  | 不适用   | 第6.4          | 本期无外部Event/Webhook；内部异步只通过持久化Job执行     |
+| BE-09  | 已确定   | 第5.3、6.1/6.2 | 写入事务、幂等键、并发锁和版本冲突已定义                 |
+| BE-10  | 已确定   | 第5.2          | 表、字段、主键、索引和保留期已定义                       |
+| BE-11  | 已确定   | 第5.3、7.3     | 同步、代理和Job的部分失败、恢复与对账已定义              |
+| BE-12  | 已确定   | 第5.4          | 三个迁移、校验、备份和回填路径已定义                     |
+| BE-13  | 已确定   | 第7.2、11节    | Folo、AI、SQLite、Keychain和库依赖的超时与降级已定义     |
+| BE-14  | 已确定   | 第7.1          | 稳定错误码、重试责任和调用方行为已定义                   |
+| BE-15  | 已确定   | 第8节          | 身份、授权、密钥、SSRF、保留与删除已定义                 |
+| BE-16  | 已确定   | 第9.1          | 10万Entry容量、内存、延迟和并发预算已定义                |
+| BE-17  | 已确定   | 第9.2/9.3      | SLI、日志字段、指标和脱敏规则已定义                      |
+| BE-18  | 已确定   | 第10.1、11.2   | 配置键、来源、优先级和启动方式已定义                     |
+| BE-19  | 已确定   | 第10.2..10.4   | 功能开关、升级、回滚、备份和恢复已定义                   |
+| BE-20  | 已确定   | 第9.4、12.4    | health、ready、doctor、runbook和交付资产已定义           |
+| BE-21  | 已确定   | 第12/13节      | TDD任务树与FR/AC/TC验证闭环已定义                        |
+| BE-22  | 已确定   | 第15节         | 后端和一期端形态均无未决项                               |
 
 ## 15. 未决问题
 
 无。任何新的原生 App、服务器部署、外部 Webhook 或扩大 Folo 代理路由的需求，必须先修订规格包和威胁模型。
+
+> **已被替代（2026-08-10）**：本文的 loopback-only 认证和浏览器提交 AI Key 方案不再实施。当前唯一后端规格为 `spec-package/20-backend.md` 与机器合同：Go 同源 `/api`、Folo 全登录桥、服务端 Secret 配置 Gemini。

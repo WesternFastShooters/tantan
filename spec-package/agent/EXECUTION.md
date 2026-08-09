@@ -1,68 +1,37 @@
-# Agent 安全执行协议
+# Codex Goal 执行协议 v2
 
-## 1. 开工前
+## 唯一目标
 
-1. 验证当前目录是 Tantan 实现仓库，不是 `/Users/mingrui/Project/Folo`。
-2. 记录 `git status --short`；现有更改归用户所有，不得覆盖、还原或夹带修改。
-3. 核对 Folo 导入基线 commit 与 SDK 锁定版本。不同时停止并报告规格偏移。
-4. 运行整包校验；领取一个无未完成依赖的任务。
-5. 列出该任务的预计文件清单。任何不在 `allowedWrites` 的路径都必须先修订任务合同。
+持续交付 Tantan 一期 Mobile Web/PWA。Folo Mobile 是首页之外的 UI/交互基线；首页使用原型瀑布流；Go 是浏览器唯一业务 API 和 Folo/Gemini 出站方。PC、Electron、原生 App、Folo 付费和浏览器直连均不属于目标。
 
-## 2. TDD 和独立验证
+## 每轮开始
 
-- Red：只写测试、fixture 或 mock；保存命令、失败用例名、exit code 和“目标行为尚未存在”的预期失败原因。
-- Green：只实现当前测试要求的最小生产变更，不顺手重构或扩展功能。
-- Refactor：在测试持续通过时清理结构，不改变 OpenAPI、Schema、DDL 与可观察行为。
-- Verify：运行任务门禁和相关回归；高风险安全项必须由未写该生产模块的人或 Agent 复核。
+1. 运行 `bash spec-package/scripts/validate-package.sh`。
+2. 读取 `agent/task-manifest.json`，选择第一个 `pending` 且依赖全部完成的 TASK；一次只激活一个。
+3. 运行 `git status --short`，保护用户修改；确认 `git diff -- apps/mobile` 为空，且不写 `/Users/mingrui/Project/Folo`。
+4. 读取该 TASK 关联的 `00/10/20/80/90` 规格、OpenAPI、Schema、DDL 和 route policy。
 
-不允许先写生产代码再补“Red”，不允许用 snapshot 替代安全或状态机断言。
+## 每个行为
 
-## 3. 写入与并行边界
+1. Red：只改测试/fixture，运行最小命令，保存由目标行为缺失导致的预期失败。
+2. Green：只在 allowedWrites 做最小生产实现，使相同测试通过。
+3. Refactor：行为保持整理；相同测试持续为绿。
+4. Verify：复核 diff，运行目标、受影响、合同、集成、race、安全和手机 E2E；保存命令、exit code、关键观察。
 
-- 一次只能处理一个任务 ID；不得同时展开多个 Green 实现。
-- 共享文件只允许拥有者修改：OpenAPI/Schema/DDL 的拥有者是 `TASK-CONTRACT`，根路由/全局导航是 `TASK-FE-SHELL`。
-- 后续 Agent 只消费契约；如果实现无法满足，不得私自改契约迁就代码。
-- 不得修改 PRD、原型 ZIP、Folo 源仓库、`apps/mobile/**` 或本包外的用户文件。
-- 不得使用 `git reset --hard`、`git checkout --`、`git clean`、宽泛递归删除或任何覆盖用户更改的命令。
+机器合同冲突时停止当前 TASK，报告精确字段、调用方和风险；不得改合同迁就实现。用户文件重叠、真实账号需人工输入或必须轮换后的 Secret 时才请求用户动作。普通实现困难、上下文压缩和部分页面可运行都不是停止原因。
 
-## 4. 删除代码的附加门禁
+## 安全边界
 
-移除 Folo 付费/AI 能力是授权范围，但仍必须逐项满足：
+- 浏览器只调用相对 `/api`；发现 `api.folo.is` 或 Gemini direct request 立即视为失败。
+- 密码、Folo token、AI Key、master key 不进入日志、URL、SQLite 明文、浏览器请求/存储、HAR、fixture、构建或 Git。
+- Gemini Key 只由 Go 从 `gemini_api_key_file` 或本机 Keychain 装载；前端只有只读配置状态和“测试连接”，不得提交 Key、model 或 endpoint。不得把对话中粘贴的旧 Key 写入 shell 或文件。
+- Folo proxy 精确 method+path 默认拒绝；被拒绝路由的 upstream request 必须为 0。
+- RSS subscription store 保留；不做名称批量删除。
 
-1. 目标存在于 `agent/paid-feature-removal.md` 的明确分类，不能只因目录名相似就删除。
-2. 先用静态测试证明当前路由/入口/请求存在，再断开消费方。
-3. 全库搜索证明生产消费方已为零，才能删除源文件。
-4. 使用版本控制中的精确文件删除；删除后立即检查 `git diff --stat` 和 `git status --short`。
-5. RSS 订阅 Store、Entry/Feed/Read/Collection 不可作为付费代码删除。
+## 完成 TASK
 
-## 5. 安全不变量
+只有 requiredGates 全部通过并有 Red/Verify 证据，才把状态改为 `completed`。然后提交一个范围清晰的 commit，再进入下一 TASK。合同/迁移与功能实现必须分开提交。
 
-- HTTP Server 显式 bind `127.0.0.1:3000`，禁止 `0.0.0.0`、`::` 或 LAN IP。
-- 所有受保护变更请求要求有效本地 Session、允许的 `Origin` 和幂等键（按 OpenAPI 要求）。
-- Auth callback 只接受 Folo 签发的一次性 token；不接受任意 redirect，不把 Folo session token 发给浏览器。
-- 上游代理在代码中使用精确方法+正则路径匹配，默认 deny；不接受用户提供的 upstream URL。
-- AI Provider URL 仅能选择内置 provider；自定义 endpoint 需独立后续威胁模型，一期禁用。
-- 日志在序列化前删除 `Authorization`、Cookie、API Key、OAuth token、AI 完整 Prompt/Response 与文章全文。
-- 对 AI 结构化输出执行 Schema 校验、字段长度上限、枚举和数组上限；校验失败不得入库。
+## 完成 Goal
 
-## 6. 必须停工并修订规格的情况
-
-- 需要新增或改变公共 API、错误码、游标绑定或事务语义。
-- 需要修改已应用的 SQL 迁移，或在 Keychain 之外存储密钥。
-- 需要启用 Folo 白名单外路由，特别是 AI、Wallet、Payment、Stripe、Referral 和 Trending。
-- 需要引入原生 App、服务器部署、外部事件/Webhook、自定义 AI endpoint 或远程遥测。
-- 基线与锁定版本不符，或实现需要越过任务写入边界。
-
-## 7. 交付记录模板
-
-```text
-Task ID:
-Baseline commit:
-Files changed:
-Red command / expected failure:
-Green command / result:
-Refactor command / result:
-Verify commands / results:
-Security checks:
-Remaining risks: none | <spec amendment reference>
-```
+TASK-01～TASK-08、AC-01～AC-25、适用的旧 46 项映射、全部最终命令、真实手机核心流程、安全扫描和只读边界全部通过后才调用 Goal complete；交付启动方式、测试结果、变更摘要、提交列表和非阻塞风险。

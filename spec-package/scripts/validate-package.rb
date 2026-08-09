@@ -164,9 +164,11 @@ def validate_manifest
   path = File.join(PACKAGE_ROOT, "manifest.json")
   manifest = load_json(path)
   fail_check("manifest status must be approved") unless manifest["status"] == "approved"
-  fail_check("manifest packageVersion must be 1.0.0") unless manifest["packageVersion"] == "1.0.0"
-  fail_check("manifest phase clients mismatch") unless manifest.dig("phase", "clients") == ["pc-web", "mobile-web-pwa"]
+  fail_check("manifest packageVersion must be 2.0.0") unless manifest["packageVersion"] == "2.0.0"
+  fail_check("manifest phase clients mismatch") unless manifest.dig("phase", "clients") == ["mobile-web-pwa"]
   fail_check("native mobile must be excluded") unless manifest.dig("phase", "excluded").to_a.include?("ios-android-native")
+  fail_check("PC Web must be excluded") unless manifest.dig("phase", "excluded").to_a.include?("pc-web")
+  fail_check("Electron must be excluded") unless manifest.dig("phase", "excluded").to_a.include?("electron")
 
   entries = manifest.fetch("files", [])
   listed = entries.map { |entry| entry["path"] }
@@ -216,17 +218,18 @@ def validate_openapi
   path = File.join(PACKAGE_ROOT, "api", "openapi.json")
   api = load_json(path)
   fail_check("OpenAPI version must be 3.1.0") unless api["openapi"] == "3.1.0"
-  fail_check("OpenAPI server must be loopback only") unless api["servers"] == [{ "url" => "http://127.0.0.1:3000", "description" => "Local loopback" }]
+  fail_check("OpenAPI server must be same-origin") unless api["servers"] == [{ "url" => "/", "description" => "Current Tantan origin" }]
   fail_check("OpenAPI global LocalSession security missing") unless api["security"] == [{ "LocalSession" => [] }]
 
   expected_paths = %w[
-    /healthz /readyz /auth/folo/start /auth/folo/callback /auth/logout
-    /tantan/v1/session /tantan/v1/home /tantan/v1/topics /tantan/v1/filter
-    /tantan/v1/recommendation/feedback /tantan/v1/recommendation/blocks/sources
-    /tantan/v1/recommendation/blocks/sources/{sourceId} /tantan/v1/search
-    /tantan/v1/entries/{entryId}/enrichment /tantan/v1/settings/ai-provider
-    /tantan/v1/settings/ai-provider/test /tantan/v1/sync/status /tantan/v1/sync
-    /tantan/v1/diagnostics
+    /api/healthz /api/readyz /api/auth/folo/providers /api/auth/folo/social-start
+    /api/auth/folo/email /api/auth/folo/token /api/auth/logout
+    /api/tantan/v1/session /api/tantan/v1/home /api/tantan/v1/topics /api/tantan/v1/filter
+    /api/tantan/v1/recommendation/feedback /api/tantan/v1/recommendation/blocks/sources
+    /api/tantan/v1/recommendation/blocks/sources/{sourceId} /api/tantan/v1/search
+    /api/tantan/v1/entries/{entryId}/enrichment /api/tantan/v1/settings/ai-provider
+    /api/tantan/v1/settings/ai-provider/test /api/tantan/v1/sync/status /api/tantan/v1/sync
+    /api/tantan/v1/diagnostics
   ].sort
   fail_check("OpenAPI public path set differs") unless api.fetch("paths", {}).keys.sort == expected_paths
 
@@ -240,30 +243,43 @@ def validate_openapi
       operation_ids << op_id if op_id
       fail_check("#{method.upcase} #{route}: responses missing") unless operation["responses"].is_a?(Hash) && !operation["responses"].empty?
 
-      if route.start_with?("/tantan/v1/") && %w[post put patch delete].include?(method)
+      if route.start_with?("/api/tantan/v1/") && %w[post put patch delete].include?(method)
         refs = Array(operation["parameters"]).map { |param| param["$ref"] if param.is_a?(Hash) }.compact
         fail_check("#{method.upcase} #{route}: mutation missing Origin") unless refs.include?("#/components/parameters/Origin")
+        fail_check("#{method.upcase} #{route}: mutation missing CSRF token") unless refs.include?("#/components/parameters/CsrfToken")
       end
     end
   end
   fail_check("OpenAPI operationId values are not unique") unless operation_ids.uniq.length == operation_ids.length
 
   idempotent_ops = [
-    ["/tantan/v1/filter", "put"],
-    ["/tantan/v1/recommendation/feedback", "post"],
-    ["/tantan/v1/recommendation/blocks/sources/{sourceId}", "delete"],
-    ["/tantan/v1/entries/{entryId}/enrichment", "post"]
+    ["/api/tantan/v1/filter", "put"],
+    ["/api/tantan/v1/recommendation/feedback", "post"],
+    ["/api/tantan/v1/recommendation/blocks/sources/{sourceId}", "delete"],
+    ["/api/tantan/v1/entries/{entryId}/enrichment", "post"]
   ]
   idempotent_ops.each do |route, method|
     refs = api.dig("paths", route, method, "parameters").to_a.map { |param| param["$ref"] }.compact
     fail_check("#{method.upcase} #{route}: missing Idempotency-Key") unless refs.include?("#/components/parameters/IdempotencyKey")
   end
 
-  callback_params = api.dig("paths", "/auth/folo/callback", "get", "parameters").to_a
-  query_names = callback_params.select { |param| param["in"] == "query" }.map { |param| param["name"] }
-  fail_check("auth callback query must contain only token") unless query_names == ["token"]
-  provider_request = api.dig("components", "schemas", "AIProviderPutRequest", "properties") || {}
-  fail_check("AI provider request must not allow baseUrl") if provider_request.key?("baseUrl") || provider_request.key?("baseURL")
+  provider_enum = api.dig("components", "schemas", "FoloAuthProvider", "enum")
+  fail_check("Folo auth methods must match Google/GitHub/Apple/Email/token") unless provider_enum == %w[google github apple credential token]
+  social_pattern = api.dig("components", "schemas", "FoloSocialStartResponse", "properties", "authorizeUrl", "pattern").to_s
+  fail_check("social login URL must be fixed to app.folo.is") unless social_pattern.include?("app\\.folo\\.is/login")
+  fail_check("AI provider must be the locked Gemini preset") unless api.dig("components", "schemas", "AIProviderId", "enum") == ["google-gemini-openai"]
+  provider_path = api.dig("paths", "/api/tantan/v1/settings/ai-provider") || {}
+  fail_check("AI provider settings must be read-only") unless provider_path.keys == ["get"]
+  test_operation = api.dig("paths", "/api/tantan/v1/settings/ai-provider/test", "post") || {}
+  fail_check("AI provider test must not accept a browser request body") if test_operation.key?("requestBody")
+  provider_response = api.dig("components", "schemas", "AIProviderResponse", "properties") || {}
+  model_branches = provider_response.dig("model", "oneOf").to_a
+  fail_check("AI model must be gemini-3.5-flash-lite") unless model_branches.any? { |branch| branch["const"] == "gemini-3.5-flash-lite" }
+  base_branches = provider_response.dig("baseUrl", "oneOf").to_a
+  fail_check("AI endpoint must be the locked Gemini endpoint") unless base_branches.any? { |branch| branch["const"] == "https://generativelanguage.googleapis.com/v1beta/openai" }
+  fail_check("browser-facing schemas must not contain an API key field") if api.fetch("components", {}).fetch("schemas", {}).values.any? do |schema|
+    schema.is_a?(Hash) && schema.fetch("properties", {}).keys.any? { |key| key.casecmp("apiKey").zero? }
+  end
   walk_refs(api, api, File.dirname(path))
 end
 
@@ -298,8 +314,11 @@ def validate_route_policy
   required_disabled = %w[discover-rsshub-analytics entries-transcription feeds-reset feeds-analytics feeds-claim-challenge feeds-claim-list feeds-claim-message inboxes-email inboxes-webhook]
   fail_check("disabled-by-default route set is incomplete") unless (required_disabled - disabled_ids).empty?
 
-  settings_route = enabled.find { |route| route["id"] == "settings-tab" }
-  fail_check("Folo settings proxy must allow only appearance/general tabs") unless settings_route && settings_route["pathPattern"] == "^/settings/(?:appearance|general)$"
+  fail_check("Folo settings must not be publicly proxied") if enabled.any? { |route| route["id"].to_s.start_with?("settings") }
+  internal_auth_ids = policy.fetch("internalAuthRoutes", []).map { |route| route["id"] }
+  %w[auth-sign-in-email auth-token-apply auth-token-verify auth-session auth-sign-out].each do |id|
+    fail_check("internal auth route missing #{id}") unless internal_auth_ids.include?(id)
+  end
 
   removed = policy.fetch("removed", [])
   representative = %w[/ai/config /wallets/balance /payments/create /better-auth/subscription/upgrade /better-auth/stripe/webhook /referrals/list /trending/topics /rsshub/use]
@@ -316,14 +335,14 @@ end
 def validate_task_manifest
   manifest = load_json(File.join(PACKAGE_ROOT, "agent", "task-manifest.json"))
   policy = manifest.fetch("executionPolicy", {})
-  %w[oneActiveTaskPerAgent contractChangeRequiresSpecAmendment redEvidenceRequired independentSecurityVerificationRequired].each do |key|
+  %w[oneActiveTask dependencyOrderRequired contractChangeRequiresSpecAmendment redEvidenceRequired verifyEvidenceRequired].each do |key|
     fail_check("task execution policy #{key} must be true") unless policy[key] == true
   end
   fail_check("task default write action must be deny") unless policy["defaultWriteAction"] == "deny"
 
   tasks = manifest.fetch("tasks", [])
   ids = tasks.map { |task| task["id"] }
-  expected = %w[TASK-BASELINE TASK-CONTRACT TASK-BE-AUTH-PROXY TASK-BE-STORAGE-SYNC TASK-BE-AI-TOPIC TASK-BE-HOME TASK-BE-OPS TASK-FE-POLICY TASK-FE-SHELL TASK-FE-HOME TASK-FE-FLOWS TASK-E2E-RELEASE]
+  expected = %w[TASK-01 TASK-02 TASK-03 TASK-04 TASK-05 TASK-06 TASK-07 TASK-08]
   fail_check("task set differs") unless ids.sort == expected.sort
   fail_check("task ids are not unique") unless ids.uniq.length == ids.length
 
@@ -363,11 +382,7 @@ def validate_acceptance_and_specs
   fail_check("frontend acceptance IDs differ") unless fe_ids == expected
   fail_check("backend acceptance IDs differ") unless be_ids == expected
 
-  scanned = [
-    File.join(REPO_ROOT, "2026-08-09-tantan-实施落地方案.md"),
-    File.join(REPO_ROOT, "2026-08-09-tantan-frontend-spec.md"),
-    File.join(REPO_ROOT, "2026-08-09-tantan-backend-spec.md")
-  ] + Dir.glob(File.join(PACKAGE_ROOT, "**", "*")).select do |path|
+  scanned = Dir.glob(File.join(PACKAGE_ROOT, "**", "*")).select do |path|
     File.file?(path) && !path.end_with?("manifest.json") && !path.end_with?("scripts/validate-package.rb")
   end
   placeholder = /(?:待确认|待定|\bTODO\b|\bTBD\b|等待用户决定|状态：草案)/

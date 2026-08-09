@@ -1,11 +1,11 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Tantan Local API",
-    "version": "1.0.0",
-    "description": "Phase-one loopback-only API. The implementation must bind 127.0.0.1:3000 and must not expose this API to LAN or public networks."
+    "title": "Tantan Mobile Web API",
+    "version": "2.0.0",
+    "description": "Same-origin API for the deployable Tantan Mobile Web/PWA. Production TLS terminates at a trusted reverse proxy and the Go service listens on an internal loopback address."
   },
-  "servers": [{ "url": "http://127.0.0.1:3000", "description": "Local loopback" }],
+  "servers": [{ "url": "/", "description": "Current Tantan origin" }],
   "tags": [
     { "name": "Health" },
     { "name": "Auth" },
@@ -16,7 +16,7 @@
     { "name": "Ops" }
   ],
   "paths": {
-    "/healthz": {
+    "/api/healthz": {
       "get": {
         "tags": ["Health"],
         "operationId": "getHealth",
@@ -31,14 +31,14 @@
         }
       }
     },
-    "/readyz": {
+    "/api/readyz": {
       "get": {
         "tags": ["Health"],
         "operationId": "getReadiness",
         "security": [],
         "responses": {
           "200": {
-            "description": "SQLite migrations and Keychain capability are ready",
+            "description": "SQLite migrations, secret store, route policy and static assets are ready",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/ReadinessResponse" } }
             }
@@ -47,18 +47,45 @@
         }
       }
     },
-    "/auth/folo/start": {
+    "/api/auth/folo/providers": {
       "get": {
         "tags": ["Auth"],
-        "operationId": "startFoloAuth",
+        "operationId": "listFoloAuthProviders",
         "security": [],
-        "parameters": [{ "$ref": "#/components/parameters/Host" }],
         "responses": {
-          "302": {
-            "description": "Redirect to Folo login and set an HttpOnly SameSite=Lax flow cookie",
-            "headers": {
-              "Location": { "schema": { "type": "string", "format": "uri" } },
-              "Set-Cookie": { "schema": { "type": "string" } }
+          "200": {
+            "description": "Folo-compatible login methods in display order",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FoloAuthProvidersResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/folo/social-start": {
+      "post": {
+        "tags": ["Auth"],
+        "operationId": "startFoloSocialLogin",
+        "description": "Returns a fixed official Folo login URL. Tantan never accepts a user-provided OAuth or callback URL.",
+        "security": [],
+        "parameters": [{ "$ref": "#/components/parameters/Origin" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/FoloSocialStartRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Open the official Folo URL in a new browser tab",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FoloSocialStartResponse" }
+              }
             }
           },
           "400": { "$ref": "#/components/responses/ValidationError" },
@@ -66,56 +93,92 @@
         }
       }
     },
-    "/auth/folo/callback": {
-      "get": {
+    "/api/auth/folo/token": {
+      "post": {
         "tags": ["Auth"],
-        "operationId": "completeFoloAuth",
-        "description": "Consumes the one-time token returned by Folo and the local flow cookie. The Folo token and upstream session are never returned to the browser.",
+        "operationId": "applyFoloAuthorizationToken",
+        "description": "Exchanges a single-use Folo token obtained after any official Folo login method and seals the returned Folo session.",
         "security": [],
-        "parameters": [
-          {
-            "name": "token",
-            "in": "query",
-            "required": true,
-            "schema": { "type": "string", "minLength": 20, "maxLength": 4096 }
-          },
-          { "$ref": "#/components/parameters/Host" }
-        ],
+        "parameters": [{ "$ref": "#/components/parameters/Origin" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/FoloTokenLoginRequest" }
+            }
+          }
+        },
         "responses": {
-          "302": {
-            "description": "Create local session cookie and redirect to root",
-            "headers": {
-              "Location": { "schema": { "const": "/" } },
-              "Set-Cookie": { "schema": { "type": "string" } }
+          "200": {
+            "description": "Tantan session created",
+            "headers": { "Set-Cookie": { "schema": { "type": "string", "writeOnly": true } } },
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SessionResponse" } }
             }
           },
-          "400": { "$ref": "#/components/responses/AuthFlowInvalid" },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/AuthInvalid" },
           "403": { "$ref": "#/components/responses/OriginRejected" },
-          "502": { "$ref": "#/components/responses/FoloUnavailable" }
+          "409": { "$ref": "#/components/responses/AuthTokenUsed" },
+          "503": { "$ref": "#/components/responses/FoloUnavailable" }
         }
       }
     },
-    "/auth/logout": {
+    "/api/auth/folo/email": {
+      "post": {
+        "tags": ["Auth"],
+        "operationId": "signInFoloEmail",
+        "description": "Authenticates with Folo from Go, seals the upstream session token and returns only a Tantan session cookie and public user DTO.",
+        "security": [],
+        "parameters": [{ "$ref": "#/components/parameters/Origin" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/FoloEmailLoginRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tantan session created",
+            "headers": { "Set-Cookie": { "schema": { "type": "string", "writeOnly": true } } },
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SessionResponse" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/AuthInvalid" },
+          "403": { "$ref": "#/components/responses/OriginRejected" },
+          "409": { "$ref": "#/components/responses/AuthTwoFactorRequired" },
+          "503": { "$ref": "#/components/responses/FoloUnavailable" }
+        }
+      }
+    },
+    "/api/auth/logout": {
       "post": {
         "tags": ["Auth"],
         "operationId": "logout",
-        "parameters": [{ "$ref": "#/components/parameters/Origin" }],
+        "parameters": [
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CsrfToken" }
+        ],
         "responses": {
           "204": {
-            "description": "Local session and account-scoped Folo token are revoked; repeated calls are successful"
+            "description": "Tantan session and account-scoped sealed Folo token are revoked; repeated calls are successful"
           },
           "403": { "$ref": "#/components/responses/OriginRejected" }
         }
       }
     },
-    "/tantan/v1/session": {
+    "/api/tantan/v1/session": {
       "get": {
         "tags": ["Auth"],
         "operationId": "getSession",
         "parameters": [{ "$ref": "#/components/parameters/Timezone" }],
         "responses": {
           "200": {
-            "description": "Current local session",
+            "description": "Current Tantan session",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/SessionResponse" } }
             }
@@ -124,7 +187,7 @@
         }
       }
     },
-    "/tantan/v1/home": {
+    "/api/tantan/v1/home": {
       "get": {
         "tags": ["Home"],
         "operationId": "getHome",
@@ -165,7 +228,7 @@
         }
       }
     },
-    "/tantan/v1/topics": {
+    "/api/tantan/v1/topics": {
       "get": {
         "tags": ["Home"],
         "operationId": "getTopics",
@@ -182,7 +245,10 @@
       "patch": {
         "tags": ["Home"],
         "operationId": "patchTopics",
-        "parameters": [{ "$ref": "#/components/parameters/Origin" }],
+        "parameters": [
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CsrfToken" }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -203,13 +269,14 @@
         }
       }
     },
-    "/tantan/v1/filter": {
+    "/api/tantan/v1/filter": {
       "put": {
         "tags": ["Home", "AI"],
         "operationId": "putActiveFilter",
         "description": "Converts prompt to FilterSpec v1, validates AI output, builds a ready queue and activates filter/topics/queue in one transaction.",
         "parameters": [
           { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CsrfToken" },
           { "$ref": "#/components/parameters/IdempotencyKey" },
           { "$ref": "#/components/parameters/Timezone" }
         ],
@@ -241,6 +308,7 @@
         "operationId": "deleteActiveFilter",
         "parameters": [
           { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CsrfToken" },
           { "$ref": "#/components/parameters/Timezone" }
         ],
         "responses": {
@@ -257,12 +325,13 @@
         }
       }
     },
-    "/tantan/v1/recommendation/feedback": {
+    "/api/tantan/v1/recommendation/feedback": {
       "post": {
         "tags": ["Home"],
         "operationId": "postRecommendationFeedback",
         "parameters": [
           { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CsrfToken" },
           { "$ref": "#/components/parameters/IdempotencyKey" }
         ],
         "requestBody": {
@@ -291,7 +360,7 @@
         }
       }
     },
-    "/tantan/v1/recommendation/blocks/sources": {
+    "/api/tantan/v1/recommendation/blocks/sources": {
       "get": {
         "tags": ["Home"],
         "operationId": "listBlockedSources",
@@ -308,12 +377,13 @@
         }
       }
     },
-    "/tantan/v1/recommendation/blocks/sources/{sourceId}": {
+    "/api/tantan/v1/recommendation/blocks/sources/{sourceId}": {
       "delete": {
         "tags": ["Home"],
         "operationId": "restoreBlockedSource",
         "parameters": [
           { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CsrfToken" },
           { "$ref": "#/components/parameters/IdempotencyKey" },
           {
             "name": "sourceId",
@@ -343,7 +413,7 @@
         }
       }
     },
-    "/tantan/v1/search": {
+    "/api/tantan/v1/search": {
       "get": {
         "tags": ["Search"],
         "operationId": "searchEntries",
@@ -369,7 +439,7 @@
         }
       }
     },
-    "/tantan/v1/entries/{entryId}/enrichment": {
+    "/api/tantan/v1/entries/{entryId}/enrichment": {
       "parameters": [
         {
           "name": "entryId",
@@ -411,6 +481,7 @@
         "operationId": "ensureEntryEnrichment",
         "parameters": [
           { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CsrfToken" },
           { "$ref": "#/components/parameters/IdempotencyKey" }
         ],
         "requestBody": {
@@ -438,13 +509,13 @@
         }
       }
     },
-    "/tantan/v1/settings/ai-provider": {
+    "/api/tantan/v1/settings/ai-provider": {
       "get": {
         "tags": ["AI"],
         "operationId": "getAIProviderSettings",
         "responses": {
           "200": {
-            "description": "Non-secret provider settings; API key is never returned",
+            "description": "Read-only status for the server-owned Gemini preset; the API key is never accepted from or returned to a browser",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/AIProviderResponse" }
@@ -453,62 +524,17 @@
           },
           "401": { "$ref": "#/components/responses/AuthRequired" }
         }
-      },
-      "put": {
-        "tags": ["AI"],
-        "operationId": "putAIProviderSettings",
-        "parameters": [{ "$ref": "#/components/parameters/Origin" }],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/AIProviderPutRequest" }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Settings and optional Keychain secret were atomically saved",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/AIProviderResponse" }
-              }
-            }
-          },
-          "400": { "$ref": "#/components/responses/ValidationError" },
-          "401": { "$ref": "#/components/responses/AuthRequired" },
-          "403": { "$ref": "#/components/responses/OriginRejected" },
-          "500": { "$ref": "#/components/responses/LocalStorageError" }
-        }
-      },
-      "delete": {
-        "tags": ["AI"],
-        "operationId": "deleteAIProviderSettings",
-        "parameters": [{ "$ref": "#/components/parameters/Origin" }],
-        "responses": {
-          "204": {
-            "description": "Keychain key is deleted before non-secret config; repeated calls are successful"
-          },
-          "401": { "$ref": "#/components/responses/AuthRequired" },
-          "403": { "$ref": "#/components/responses/OriginRejected" },
-          "500": { "$ref": "#/components/responses/LocalStorageError" }
-        }
       }
     },
-    "/tantan/v1/settings/ai-provider/test": {
+    "/api/tantan/v1/settings/ai-provider/test": {
       "post": {
         "tags": ["AI"],
         "operationId": "testAIProviderSettings",
-        "description": "Tests a temporary preset provider configuration without persisting the key. Limited to three requests per minute per local session.",
-        "parameters": [{ "$ref": "#/components/parameters/Origin" }],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/AIProviderTestRequest" }
-            }
-          }
-        },
+        "description": "Tests the fixed server-owned Gemini configuration. No key, model or endpoint is accepted from the browser. Limited to three requests per minute per local session.",
+        "parameters": [
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CsrfToken" }
+        ],
         "responses": {
           "200": {
             "description": "Provider responded successfully",
@@ -526,7 +552,7 @@
         }
       }
     },
-    "/tantan/v1/sync/status": {
+    "/api/tantan/v1/sync/status": {
       "get": {
         "tags": ["Sync"],
         "operationId": "getSyncStatus",
@@ -543,11 +569,14 @@
         }
       }
     },
-    "/tantan/v1/sync": {
+    "/api/tantan/v1/sync": {
       "post": {
         "tags": ["Sync"],
         "operationId": "triggerSync",
-        "parameters": [{ "$ref": "#/components/parameters/Origin" }],
+        "parameters": [
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CsrfToken" }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -569,7 +598,7 @@
         }
       }
     },
-    "/tantan/v1/diagnostics": {
+    "/api/tantan/v1/diagnostics": {
       "get": {
         "tags": ["Ops"],
         "operationId": "getDiagnostics",
@@ -593,8 +622,8 @@
       "LocalSession": {
         "type": "apiKey",
         "in": "cookie",
-        "name": "tantan_session",
-        "description": "HttpOnly SameSite=Lax local session. Server stores only SHA-256 hash."
+        "name": "__Host-tantan_session",
+        "description": "Secure HttpOnly SameSite=Lax Tantan session. The upstream Folo token is separately sealed and never returned."
       }
     },
     "parameters": {
@@ -602,24 +631,14 @@
         "name": "Origin",
         "in": "header",
         "required": true,
-        "schema": {
-          "type": "string",
-          "enum": [
-            "http://127.0.0.1:3000",
-            "http://127.0.0.1:5173",
-            "http://localhost:3000",
-            "http://localhost:5173"
-          ]
-        }
+        "description": "Must exactly equal the configured public_origin; production requires HTTPS.",
+        "schema": { "type": "string", "format": "uri", "maxLength": 2048 }
       },
-      "Host": {
-        "name": "Host",
+      "CsrfToken": {
+        "name": "X-CSRF-Token",
         "in": "header",
         "required": true,
-        "schema": {
-          "type": "string",
-          "enum": ["127.0.0.1:3000", "localhost:3000"]
-        }
+        "schema": { "type": "string", "minLength": 32, "maxLength": 256 }
       },
       "IdempotencyKey": {
         "name": "Idempotency-Key",
@@ -676,19 +695,78 @@
           "checks": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["sqlite", "migrations", "keychain"],
+            "required": ["sqlite", "migrations", "secretStore", "routePolicy", "staticAssets"],
             "properties": {
               "sqlite": { "type": "string", "enum": ["ok", "error"] },
               "migrations": { "type": "string", "enum": ["ok", "error"] },
-              "keychain": { "type": "string", "enum": ["ok", "error"] }
+              "secretStore": { "type": "string", "enum": ["ok", "error"] },
+              "routePolicy": { "type": "string", "enum": ["ok", "error"] },
+              "staticAssets": { "type": "string", "enum": ["ok", "error"] }
             }
           }
+        }
+      },
+      "FoloAuthProvider": {
+        "type": "string",
+        "enum": ["google", "github", "apple", "credential", "token"]
+      },
+      "FoloAuthProvidersResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["providers"],
+        "properties": {
+          "providers": {
+            "type": "array",
+            "minItems": 5,
+            "maxItems": 5,
+            "items": { "$ref": "#/components/schemas/FoloAuthProvider" }
+          }
+        }
+      },
+      "FoloSocialStartRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["provider"],
+        "properties": {
+          "provider": { "type": "string", "enum": ["google", "github", "apple"] }
+        }
+      },
+      "FoloSocialStartResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["authorizeUrl", "handoff"],
+        "properties": {
+          "authorizeUrl": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://app\\.folo\\.is/login\\?provider=(google|github|apple)$"
+          },
+          "handoff": { "type": "string", "const": "one-time-token" }
+        }
+      },
+      "FoloTokenLoginRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["token"],
+        "properties": {
+          "token": { "type": "string", "minLength": 20, "maxLength": 4096, "writeOnly": true },
+          "returnTo": { "type": "string", "pattern": "^/[A-Za-z0-9/_?&=.%:-]*$", "maxLength": 1024 }
+        }
+      },
+      "FoloEmailLoginRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["email", "password"],
+        "properties": {
+          "email": { "type": "string", "format": "email", "maxLength": 254 },
+          "password": { "type": "string", "minLength": 8, "maxLength": 128, "writeOnly": true },
+          "returnTo": { "type": "string", "pattern": "^/[A-Za-z0-9/_?&=.%:-]*$", "maxLength": 1024 }
         }
       },
       "SessionResponse": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["user", "timezone"],
+        "required": ["user", "timezone", "csrfToken"],
         "properties": {
           "user": {
             "type": "object",
@@ -701,7 +779,8 @@
               "image": { "type": ["string", "null"], "format": "uri", "maxLength": 2048 }
             }
           },
-          "timezone": { "type": "string", "minLength": 1, "maxLength": 64 }
+          "timezone": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "csrfToken": { "type": "string", "minLength": 32, "maxLength": 256, "writeOnly": false }
         }
       },
       "Topic": {
@@ -721,9 +800,10 @@
       "TopicsResponse": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["version", "activeFilterId", "topics"],
+        "required": ["version", "topicsRevision", "activeFilterId", "topics"],
         "properties": {
           "version": { "type": "integer", "minimum": 1 },
+          "topicsRevision": { "type": "integer", "minimum": 1 },
           "activeFilterId": { "type": ["string", "null"], "maxLength": 128 },
           "topics": {
             "type": "array",
@@ -760,13 +840,13 @@
         "additionalProperties": false,
         "required": ["prompt"],
         "properties": {
-          "prompt": { "type": "string", "minLength": 1, "maxLength": 300 }
+          "prompt": { "type": "string", "minLength": 1, "maxLength": 1000 }
         }
       },
       "FilterMutationResponse": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["filter", "topics", "queueId"],
+        "required": ["filter", "topics", "topicsRevision", "queueId", "queueGeneration"],
         "properties": {
           "filter": {
             "type": ["object", "null"],
@@ -774,7 +854,7 @@
             "required": ["id", "prompt", "createdAt"],
             "properties": {
               "id": { "$ref": "#/components/schemas/Identifier" },
-              "prompt": { "type": "string", "minLength": 1, "maxLength": 300 },
+              "prompt": { "type": "string", "minLength": 1, "maxLength": 1000 },
               "createdAt": { "type": "string", "format": "date-time" }
             }
           },
@@ -783,7 +863,9 @@
             "maxItems": 100,
             "items": { "$ref": "#/components/schemas/Topic" }
           },
-          "queueId": { "$ref": "#/components/schemas/Identifier" }
+          "topicsRevision": { "type": "integer", "minimum": 1 },
+          "queueId": { "$ref": "#/components/schemas/Identifier" },
+          "queueGeneration": { "$ref": "#/components/schemas/Identifier" }
         }
       },
       "FeedbackRequest": {
@@ -873,27 +955,7 @@
       },
       "AIProviderId": {
         "type": "string",
-        "enum": ["openai", "anthropic", "google", "deepseek", "openrouter"]
-      },
-      "AIProviderPutRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["providerId", "model"],
-        "properties": {
-          "providerId": { "$ref": "#/components/schemas/AIProviderId" },
-          "model": { "type": "string", "minLength": 1, "maxLength": 100 },
-          "apiKey": { "type": "string", "minLength": 8, "maxLength": 4096, "writeOnly": true }
-        }
-      },
-      "AIProviderTestRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["providerId", "model", "apiKey"],
-        "properties": {
-          "providerId": { "$ref": "#/components/schemas/AIProviderId" },
-          "model": { "type": "string", "minLength": 1, "maxLength": 100 },
-          "apiKey": { "type": "string", "minLength": 8, "maxLength": 4096, "writeOnly": true }
-        }
+        "enum": ["google-gemini-openai"]
       },
       "AIProviderResponse": {
         "type": "object",
@@ -904,10 +966,24 @@
           "providerId": {
             "oneOf": [{ "$ref": "#/components/schemas/AIProviderId" }, { "type": "null" }]
           },
-          "model": { "type": ["string", "null"], "maxLength": 100 },
-          "baseUrl": { "type": ["string", "null"], "format": "uri", "readOnly": true },
+          "model": {
+            "oneOf": [{ "type": "string", "const": "gemini-3.5-flash-lite" }, { "type": "null" }]
+          },
+          "baseUrl": {
+            "oneOf": [
+              {
+                "type": "string",
+                "const": "https://generativelanguage.googleapis.com/v1beta/openai"
+              },
+              { "type": "null" }
+            ],
+            "readOnly": true
+          },
           "hasApiKey": { "type": "boolean" },
-          "keyFingerprint": { "type": ["string", "null"], "pattern": "^[a-f0-9]{12}$" }
+          "keyFingerprint": {
+            "oneOf": [{ "type": "string", "pattern": "^[A-F0-9]{8}$" }, { "type": "null" }],
+            "readOnly": true
+          }
         }
       },
       "AIProviderTestResponse": {
@@ -996,22 +1072,33 @@
       "ErrorObject": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["code", "message"],
+        "required": ["code", "message", "retryable"],
         "properties": {
           "code": {
             "type": "string",
             "enum": [
               "AUTH_REQUIRED",
+              "SESSION_REQUIRED",
+              "AUTH_INVALID",
+              "AUTH_2FA_REQUIRED",
+              "AUTH_PROVIDER_INVALID",
+              "AUTH_TOKEN_USED",
               "AUTH_FLOW_INVALID",
               "ORIGIN_REJECTED",
+              "CSRF_INVALID",
+              "FOLO_ROUTE_DENIED",
               "FOLO_ROUTE_NOT_ALLOWED",
               "FOLO_FEATURE_REMOVED",
               "FOLO_UNAVAILABLE",
               "FOLO_RATE_LIMITED",
               "AI_NOT_CONFIGURED",
+              "AI_PRESET_INVALID",
+              "AI_AUTH_FAILED",
+              "AI_RATE_LIMITED",
               "AI_PROVIDER_UNAVAILABLE",
               "AI_OUTPUT_INVALID",
               "LOCAL_STORAGE_ERROR",
+              "DB_BUSY",
               "VALIDATION_ERROR",
               "VERSION_CONFLICT",
               "CURSOR_MISMATCH",
@@ -1022,6 +1109,7 @@
             ]
           },
           "message": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "retryable": { "type": "boolean" },
           "fieldErrors": {
             "type": "array",
             "maxItems": 50,
@@ -1052,6 +1140,24 @@
     "responses": {
       "AuthRequired": {
         "description": "AUTH_REQUIRED",
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+        }
+      },
+      "AuthInvalid": {
+        "description": "AUTH_INVALID",
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+        }
+      },
+      "AuthTwoFactorRequired": {
+        "description": "AUTH_2FA_REQUIRED",
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+        }
+      },
+      "AuthTokenUsed": {
+        "description": "AUTH_TOKEN_USED",
         "content": {
           "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
         }

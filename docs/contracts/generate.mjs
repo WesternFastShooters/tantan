@@ -18,6 +18,7 @@ const contractInputs = [
   "spec-package/db/0001_core.sql",
   "spec-package/db/0002_search_fts.sql",
   "spec-package/db/0003_seed_core_topics.sql",
+  "spec-package/db/0004_mobile_web_v2.sql",
 ]
 
 const input = (name) => readFileSync(resolve(repositoryRoot, name))
@@ -37,6 +38,7 @@ const digest = (() => {
 const openapi = jsonInput("spec-package/api/openapi.json")
 const homeSchema = jsonInput("spec-package/schemas/home-response.schema.json")
 const providerIds = openapi.components.schemas.AIProviderId.enum
+const authProviders = openapi.components.schemas.FoloAuthProvider.enum
 const errorCodes = openapi.components.schemas.ErrorObject.properties.code.enum
 const feedbackActions = openapi.components.schemas.FeedbackRequest.properties.action.enum
 const entryTypes = homeSchema.$defs.homeCard.properties.type.enum
@@ -64,6 +66,7 @@ const ContractSHA256 = "${digest}"
 type Identifier string
 type EntryType string
 type AIProviderID string
+type FoloAuthProvider string
 type ErrorCode string
 type FeedbackAction string
 
@@ -73,6 +76,10 @@ ${goConstants("EntryType", entryTypes)}
 
 const (
 ${goConstants("AIProviderID", providerIds)}
+)
+
+const (
+${goConstants("FoloAuthProvider", authProviders)}
 )
 
 const (
@@ -89,9 +96,11 @@ type HealthResponse struct {
 }
 
 type ReadinessChecks struct {
-	SQLite     string \`json:"sqlite"\`
-	Migrations string \`json:"migrations"\`
-	Keychain   string \`json:"keychain"\`
+	SQLite       string \`json:"sqlite"\`
+	Migrations   string \`json:"migrations"\`
+	SecretStore  string \`json:"secretStore"\`
+	RoutePolicy  string \`json:"routePolicy"\`
+	StaticAssets string \`json:"staticAssets"\`
 }
 
 type ReadinessResponse struct {
@@ -107,8 +116,33 @@ type SessionUser struct {
 }
 
 type SessionResponse struct {
-	User     SessionUser \`json:"user"\`
-	Timezone string      \`json:"timezone"\`
+	User      SessionUser \`json:"user"\`
+	Timezone  string      \`json:"timezone"\`
+	CSRFToken string      \`json:"csrfToken"\`
+}
+
+type FoloAuthProvidersResponse struct {
+	Providers []FoloAuthProvider \`json:"providers"\`
+}
+
+type FoloSocialStartRequest struct {
+	Provider FoloAuthProvider \`json:"provider"\`
+}
+
+type FoloSocialStartResponse struct {
+	AuthorizeURL string \`json:"authorizeUrl"\`
+	Handoff      string \`json:"handoff"\`
+}
+
+type FoloTokenLoginRequest struct {
+	Token    string  \`json:"token"\`
+	ReturnTo *string \`json:"returnTo,omitempty"\`
+}
+
+type FoloEmailLoginRequest struct {
+	Email    string  \`json:"email"\`
+	Password string  \`json:"password"\`
+	ReturnTo *string \`json:"returnTo,omitempty"\`
 }
 
 type Topic struct {
@@ -123,6 +157,7 @@ type Topic struct {
 
 type TopicsResponse struct {
 	Version        int         \`json:"version"\`
+	TopicsRevision int         \`json:"topicsRevision"\`
 	ActiveFilterID *Identifier \`json:"activeFilterId"\`
 	Topics         []Topic     \`json:"topics"\`
 }
@@ -149,9 +184,11 @@ type ActiveFilter struct {
 }
 
 type FilterMutationResponse struct {
-	Filter  *ActiveFilter \`json:"filter"\`
-	Topics  []Topic       \`json:"topics"\`
-	QueueID Identifier    \`json:"queueId"\`
+	Filter          *ActiveFilter \`json:"filter"\`
+	Topics          []Topic       \`json:"topics"\`
+	TopicsRevision  int           \`json:"topicsRevision"\`
+	QueueID         Identifier    \`json:"queueId"\`
+	QueueGeneration Identifier    \`json:"queueGeneration"\`
 }
 
 type FeedbackRequest struct {
@@ -196,6 +233,7 @@ type HomeCard struct {
 type QueueState struct {
 	ID                  Identifier \`json:"id"\`
 	Version             int        \`json:"version"\`
+	Generation          Identifier \`json:"generation"\`
 	Total               int        \`json:"total"\`
 	Unread              int        \`json:"unread"\`
 	Finished            bool       \`json:"finished"\`
@@ -204,9 +242,10 @@ type QueueState struct {
 }
 
 type HomeResponse struct {
-	Items      []HomeCard \`json:"items"\`
-	NextCursor *string    \`json:"nextCursor"\`
-	Queue      QueueState \`json:"queue"\`
+	Items           []HomeCard \`json:"items"\`
+	NextCursor      *string    \`json:"nextCursor"\`
+	Queue           QueueState \`json:"queue"\`
+	QueueGeneration Identifier \`json:"queueGeneration"\`
 }
 
 type SearchResponse struct {
@@ -228,6 +267,7 @@ type ErrorField struct {
 type ErrorObject struct {
 	Code           ErrorCode    \`json:"code"\`
 	Message        string       \`json:"message"\`
+	Retryable      bool         \`json:"retryable"\`
 	FieldErrors    []ErrorField \`json:"fieldErrors,omitempty"\`
 	RetryAfterMS   *int         \`json:"retryAfterMs,omitempty"\`
 	CurrentVersion *int         \`json:"currentVersion,omitempty"\`
@@ -244,24 +284,12 @@ type EnrichmentResponse struct {
 	Error *ErrorObject    \`json:"error"\`
 }
 
-type AIProviderPutRequest struct {
-	ProviderID AIProviderID \`json:"providerId"\`
-	Model      string       \`json:"model"\`
-	APIKey     *string      \`json:"apiKey,omitempty"\`
-}
-
-type AIProviderTestRequest struct {
-	ProviderID AIProviderID \`json:"providerId"\`
-	Model      string       \`json:"model"\`
-	APIKey     string       \`json:"apiKey"\`
-}
-
 type AIProviderResponse struct {
-	Configured    bool          \`json:"configured"\`
-	ProviderID    *AIProviderID \`json:"providerId"\`
-	Model         *string       \`json:"model"\`
-	BaseURL       *string       \`json:"baseUrl"\`
-	HasAPIKey     bool          \`json:"hasApiKey"\`
+	Configured     bool          \`json:"configured"\`
+	ProviderID     *AIProviderID \`json:"providerId"\`
+	Model          *string       \`json:"model"\`
+	BaseURL        *string       \`json:"baseUrl"\`
+	HasAPIKey      bool          \`json:"hasApiKey"\`
 	KeyFingerprint *string      \`json:"keyFingerprint"\`
 }
 
@@ -316,12 +344,14 @@ const tsTypes = `// Code generated by docs/contracts/generate.mjs; DO NOT EDIT.
 export const CONTRACT_SHA256 = "${digest}" as const
 
 export const AI_PROVIDER_IDS = ${JSON.stringify(providerIds)} as const
+export const FOLO_AUTH_PROVIDERS = ${JSON.stringify(authProviders)} as const
 export const ERROR_CODES = ${JSON.stringify(errorCodes)} as const
 export const FEEDBACK_ACTIONS = ${JSON.stringify(feedbackActions)} as const
 export const ENTRY_TYPES = ${JSON.stringify(entryTypes)} as const
 
 export type Identifier = string
 export type AIProviderId = (typeof AI_PROVIDER_IDS)[number]
+export type FoloAuthProvider = (typeof FOLO_AUTH_PROVIDERS)[number]
 export type ErrorCode = (typeof ERROR_CODES)[number]
 export type FeedbackAction = (typeof FEEDBACK_ACTIONS)[number]
 export type EntryType = (typeof ENTRY_TYPES)[number]
@@ -337,12 +367,43 @@ export interface HealthResponse {
 
 export interface ReadinessResponse {
   ready: boolean
-  checks: { sqlite: "ok" | "error"; migrations: "ok" | "error"; keychain: "ok" | "error" }
+  checks: {
+    sqlite: "ok" | "error"
+    migrations: "ok" | "error"
+    secretStore: "ok" | "error"
+    routePolicy: "ok" | "error"
+    staticAssets: "ok" | "error"
+  }
 }
 
 export interface SessionResponse {
   user: { id: Identifier; name: string; email: string | null; image: string | null }
   timezone: string
+  csrfToken: string
+}
+
+export interface FoloAuthProvidersResponse {
+  providers: FoloAuthProvider[]
+}
+
+export interface FoloSocialStartRequest {
+  provider: Extract<FoloAuthProvider, "google" | "github" | "apple">
+}
+
+export interface FoloSocialStartResponse {
+  authorizeUrl: string
+  handoff: "one-time-token"
+}
+
+export interface FoloTokenLoginRequest {
+  token: string
+  returnTo?: string
+}
+
+export interface FoloEmailLoginRequest {
+  email: string
+  password: string
+  returnTo?: string
 }
 
 export interface Topic {
@@ -357,6 +418,7 @@ export interface Topic {
 
 export interface TopicsResponse {
   version: number
+  topicsRevision: number
   activeFilterId: Identifier | null
   topics: Topic[]
 }
@@ -383,7 +445,9 @@ export interface ActiveFilter {
 export interface FilterMutationResponse {
   filter: ActiveFilter | null
   topics: Topic[]
+  topicsRevision: number
   queueId: Identifier
+  queueGeneration: Identifier
 }
 
 export interface FeedbackRequest {
@@ -417,6 +481,7 @@ export interface HomeCard {
 export interface QueueState {
   id: Identifier
   version: number
+  generation: Identifier
   total: number
   unread: number
   finished: boolean
@@ -428,6 +493,7 @@ export interface HomeResponse {
   items: HomeCard[]
   nextCursor: string | null
   queue: QueueState
+  queueGeneration: Identifier
 }
 
 export interface SearchResponse {
@@ -453,6 +519,7 @@ export interface AIEnrichmentV1 {
 export interface ErrorObject {
   code: ErrorCode
   message: string
+  retryable: boolean
   fieldErrors?: Array<{ field: string; reason: string }>
   retryAfterMs?: number
   currentVersion?: number
@@ -467,18 +534,6 @@ export interface EnrichmentResponse {
   state: EnrichmentState
   data: AIEnrichmentV1 | null
   error: ErrorObject | null
-}
-
-export interface AIProviderPutRequest {
-  providerId: AIProviderId
-  model: string
-  apiKey?: string
-}
-
-export interface AIProviderTestRequest {
-  providerId: AIProviderId
-  model: string
-  apiKey: string
 }
 
 export interface AIProviderResponse {
@@ -556,7 +611,9 @@ for (const name of contractInputs.filter((name) => name.startsWith("spec-package
 }
 
 for (const name of contractInputs.filter((name) => name.startsWith("spec-package/db/"))) {
-  outputs.set(`services/tantan-api/migrations/${name.split("/").at(-1)}`, input(name))
+  const fileName = name.split("/").at(-1)
+  outputs.set(`services/tantan-api/migrations/${fileName}`, input(name))
+  outputs.set(`services/tantan-api/internal/storage/migrations/${fileName}`, input(name))
 }
 
 const mismatches = []

@@ -4,7 +4,7 @@
   "title": "HomeResponse",
   "type": "object",
   "additionalProperties": false,
-  "required": ["items", "nextCursor", "queue"],
+  "required": ["items", "nextCursor", "queue", "queueGeneration"],
   "properties": {
     "items": {
       "type": "array",
@@ -16,7 +16,8 @@
       "minLength": 16,
       "maxLength": 2048
     },
-    "queue": { "$ref": "#/$defs/queueState" }
+    "queue": { "$ref": "#/$defs/queueState" },
+    "queueGeneration": { "$ref": "#/$defs/identifier" }
   },
   "$defs": {
     "identifier": {
@@ -89,10 +90,20 @@
     "queueState": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "version", "total", "unread", "finished", "candidateWindowDays", "generatedAt"],
+      "required": [
+        "id",
+        "version",
+        "generation",
+        "total",
+        "unread",
+        "finished",
+        "candidateWindowDays",
+        "generatedAt"
+      ],
       "properties": {
         "id": { "$ref": "#/$defs/identifier" },
         "version": { "type": "integer", "minimum": 1 },
+        "generation": { "$ref": "#/$defs/identifier" },
         "total": { "type": "integer", "minimum": 0, "maximum": 60 },
         "unread": { "type": "integer", "minimum": 0, "maximum": 60 },
         "finished": { "type": "boolean" },
