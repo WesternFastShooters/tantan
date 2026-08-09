@@ -24,6 +24,8 @@ The import used `git archive` into a dedicated `mktemp -d` directory, rejected a
 - Installed `@follow-app/client-sdk`: `0.3.95`
 - Registry `dist.shasum`: `e4d0de60206f4a66b3cb6c29053f51377a165143`
 - Go: `go1.26.2 darwin/arm64`
+- Go module: `tantan.local/tantan-api`
+- Locked Go dependencies: `modernc.org/sqlite@v1.56.0`, `github.com/zalando/go-keyring@v0.2.8`
 
 ## Baseline command evidence
 
@@ -72,6 +74,18 @@ Result: exit 1; both existing Folo tests reached registration, then timed out af
 - Failure location: `apps/desktop/e2e/support/app.ts:193`.
 
 This is recorded as an external-auth-dependent baseline failure. No product implementation existed and no failure was hidden or converted to a pass.
+
+### Go dependency baseline
+
+Commands:
+
+```bash
+cd services/tantan-api
+go mod download all
+go mod verify
+```
+
+Result: exit 0; all modules verified. `go.mod` and the complete downloaded module checksum set are created in `TASK-BASELINE`, because later tasks are default-denied from changing dependency manifests.
 
 ## Safety checks
 
