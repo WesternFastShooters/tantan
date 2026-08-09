@@ -42,23 +42,25 @@ const homeResponse = (items: ReturnType<typeof card>[]) => ({
   queue: {
     id: "queue-flow",
     version: 1,
+    generation: "queue-flow-v1",
     total: items.length,
     unread: items.length,
     finished: true,
     candidateWindowDays: 7,
     generatedAt: "2026-08-09T12:00:00Z",
   },
+  queueGeneration: "queue-flow-v1",
 })
 
 const mockSession = async (page: Page) => {
-  await page.route("http://127.0.0.1:3000/readyz", (route) =>
+  await page.route("**/api/readyz", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify(readyResponse),
     }),
   )
-  await page.route("http://127.0.0.1:3000/tantan/v1/session", (route) =>
+  await page.route("**/api/tantan/v1/session", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -76,7 +78,7 @@ test.describe("Tantan phase-one flows", () => {
     let searchInputAt = 0
     let searchDelay = 0
     let homeMutationCount = 0
-    await page.route("http://127.0.0.1:3000/tantan/v1/topics", (route) =>
+    await page.route("**/api/tantan/v1/topics", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -87,22 +89,22 @@ test.describe("Tantan phase-one flows", () => {
         }),
       }),
     )
-    await page.route("http://127.0.0.1:3000/tantan/v1/home?**", (route) =>
+    await page.route("**/api/tantan/v1/home?**", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify(homeResponse([card("301", "Home AI")])),
       }),
     )
-    await page.route("http://127.0.0.1:3000/tantan/v1/filter", (route) => {
+    await page.route("**/api/tantan/v1/filter", (route) => {
       homeMutationCount += 1
       return route.abort()
     })
-    await page.route("http://127.0.0.1:3000/tantan/v1/recommendation/feedback", (route) => {
+    await page.route("**/api/tantan/v1/recommendation/feedback", (route) => {
       homeMutationCount += 1
       return route.abort()
     })
-    await page.route("http://127.0.0.1:3000/tantan/v1/search?**", (route) => {
+    await page.route("**/api/tantan/v1/search?**", (route) => {
       searchDelay = Date.now() - searchInputAt
       const cursor = new URL(route.request().url()).searchParams.get("cursor")
       const response = cursor
@@ -143,67 +145,51 @@ test.describe("Tantan phase-one flows", () => {
     await expect(page.getByRole("tab", { name: "AI" })).toHaveAttribute("aria-selected", "true")
   })
 
-  test("REQ:FE-05 desktop Provider uses a preset endpoint and never persists or echoes the Key", async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 1440, height: 900 })
+  test("REQ:FE-05 Mobile settings expose only the fixed server Gemini status", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
     await mockSession(page)
     const secretCanary = "sk-flow-secret-canary-123456"
-    let saved = false
-    await page.route("http://127.0.0.1:3000/tantan/v1/settings/ai-provider", async (route) => {
-      if (route.request().method() === "GET") {
-        return route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({
-            configured: false,
-            providerId: null,
-            model: null,
-            baseUrl: null,
-            hasApiKey: false,
-            keyFingerprint: null,
-          }),
-        })
-      }
-      const body = route.request().postDataJSON() as Record<string, unknown>
-      expect(body).toEqual({ providerId: "openai", model: "gpt-5-mini", apiKey: secretCanary })
-      saved = true
+    let testRequests = 0
+    await page.route("**/api/tantan/v1/settings/ai-provider", async (route) => {
+      expect(route.request().method()).toBe("GET")
       return route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
           configured: true,
-          providerId: "openai",
-          model: "gpt-5-mini",
-          baseUrl: "https://api.openai.com/v1",
+          providerId: "google-gemini-openai",
+          model: "gemini-3.5-flash-lite",
+          baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
           hasApiKey: true,
-          keyFingerprint: "a1b2c3d4e5f6",
+          keyFingerprint: "A1B2C3D4",
         }),
       })
     })
-    await page.route("http://127.0.0.1:3000/tantan/v1/settings/ai-provider/test", (route) => {
-      const body = route.request().postDataJSON() as Record<string, unknown>
-      expect(body.apiKey).toBe(secretCanary)
+    await page.route("**/api/tantan/v1/settings/ai-provider/test", (route) => {
+      testRequests += 1
+      expect(route.request().method()).toBe("POST")
+      expect(route.request().postData()).toBeNull()
       return route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ ok: true, latencyMs: 42, model: "gpt-5-mini" }),
+        body: JSON.stringify({ ok: true, latencyMs: 42, model: "gemini-3.5-flash-lite" }),
       })
     })
 
     await page.goto(buildWebAppURL(resolveDesktopE2EEnv(), "/settings/ai"), {
       waitUntil: "domcontentloaded",
     })
-    await expect(page.getByLabel("内置 Endpoint")).toHaveAttribute("readonly", "")
-    await expect(page.getByLabel("内置 Endpoint")).toHaveValue("https://api.openai.com/v1")
-    await page.getByLabel("模型").fill("gpt-5-mini")
-    await page.getByLabel("API Key").fill(secretCanary)
+    await expect(page.getByText("Google Gemini")).toBeVisible()
+    await expect(page.getByText("gemini-3.5-flash-lite")).toBeVisible()
+    await expect(
+      page.getByText("https://generativelanguage.googleapis.com/v1beta/openai"),
+    ).toBeVisible()
+    await expect(page.locator('input[type="password"]')).toHaveCount(0)
+    await expect(page.locator("select")).toHaveCount(0)
+    await expect(page.getByText("保存配置")).toHaveCount(0)
     await page.getByRole("button", { name: "测试连接" }).click()
     await expect(page.getByRole("status")).toContainText("连接成功")
-    await expect(page.getByLabel("API Key")).toHaveValue(secretCanary)
-    await page.getByRole("button", { name: "保存配置" }).click()
-    await expect.poll(() => saved).toBe(true)
-    await expect(page.getByLabel("API Key")).toHaveValue("")
+    expect(testRequests).toBe(1)
     await expect(page.locator("body")).not.toContainText(secretCanary)
 
     const leaked = await page.evaluate((canary) => {
@@ -221,7 +207,7 @@ test.describe("Tantan phase-one flows", () => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await mockSession(page)
     let patched = false
-    await page.route("http://127.0.0.1:3000/tantan/v1/topics", async (route) => {
+    await page.route("**/api/tantan/v1/topics", async (route) => {
       if (route.request().method() === "GET") {
         return route.fulfill({
           status: 200,
@@ -266,7 +252,7 @@ test.describe("Tantan phase-one flows", () => {
     await mockSession(page)
     let added = false
     let removed = false
-    await page.route("http://localhost:3000/subscriptions**", (route) => {
+    await page.route("**/api/folo/subscriptions**", (route) => {
       if (route.request().method() === "GET") {
         return route.fulfill({
           status: 200,
@@ -349,9 +335,9 @@ test.describe("Tantan phase-one flows", () => {
   }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await mockSession(page)
-    const entryId = "41147805272531998"
+    const entryId = "309246809866240003"
     let collectionMethod = ""
-    await page.route("http://127.0.0.1:3000/tantan/v1/topics", (route) =>
+    await page.route("**/api/tantan/v1/topics", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -362,14 +348,14 @@ test.describe("Tantan phase-one flows", () => {
         }),
       }),
     )
-    await page.route("http://127.0.0.1:3000/tantan/v1/home?**", (route) =>
+    await page.route("**/api/tantan/v1/home?**", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify(homeResponse([card(entryId, "Original survives")])),
       }),
     )
-    await page.route(`http://127.0.0.1:3000/tantan/v1/entries/${entryId}/enrichment?**`, (route) =>
+    await page.route(`**/api/tantan/v1/entries/${entryId}/enrichment?**`, (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -380,7 +366,7 @@ test.describe("Tantan phase-one flows", () => {
         }),
       }),
     )
-    await page.route("http://localhost:3000/entries?**", (route) =>
+    await page.route("**/api/folo/entries?**", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -410,14 +396,14 @@ test.describe("Tantan phase-one flows", () => {
         }),
       }),
     )
-    await page.route("http://localhost:3000/reads", (route) =>
+    await page.route("**/api/folo/reads", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({ data: true }),
       }),
     )
-    await page.route("http://localhost:3000/collections", (route) => {
+    await page.route("**/api/folo/collections", (route) => {
       collectionMethod = route.request().method()
       return route.fulfill({
         status: 200,

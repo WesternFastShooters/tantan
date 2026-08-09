@@ -290,7 +290,7 @@ test.describe("Tantan Home", () => {
   }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await mockSession(page)
-    const entryId = "41147805272531997"
+    const entryId = "309246809866240004"
     let read = false
     await page.route("**/api/tantan/v1/topics", (route) =>
       route.fulfill({

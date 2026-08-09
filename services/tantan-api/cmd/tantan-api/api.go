@@ -368,6 +368,10 @@ func (api *localAPI) testAISettings(writer stdhttp.ResponseWriter, request *stdh
 	if !ok {
 		return
 	}
+	if err := requireEmptyBody(request); err != nil {
+		writeLocalError(writer, request, stdhttp.StatusBadRequest, gen.ErrorCodeValidationError, "AI 测试请求不能包含配置", nil)
+		return
+	}
 	if retryAfter, allowed := api.allowProviderTest(record.IDHash); !allowed {
 		writeLocalRateLimit(writer, request, retryAfter)
 		return
@@ -378,6 +382,14 @@ func (api *localAPI) testAISettings(writer stdhttp.ResponseWriter, request *stdh
 		return
 	}
 	writeLocalJSON(writer, stdhttp.StatusOK, gen.AIProviderTestResponse{OK: result.OK, LatencyMS: int(result.LatencyMS), Model: result.Model})
+}
+
+func requireEmptyBody(request *stdhttp.Request) error {
+	contents, err := io.ReadAll(io.LimitReader(request.Body, 1))
+	if err != nil || len(contents) != 0 {
+		return errors.New("request body must be empty")
+	}
+	return nil
 }
 
 func (api *localAPI) syncStatus(writer stdhttp.ResponseWriter, request *stdhttp.Request) {
@@ -636,7 +648,7 @@ func topicItems(items []topic.Item) []gen.Topic {
 }
 
 func filterResponse(response filter.Mutation) gen.FilterMutationResponse {
-	result := gen.FilterMutationResponse{Topics: topicItems(response.Topics), QueueID: gen.Identifier(response.QueueID)}
+	result := gen.FilterMutationResponse{Topics: topicItems(response.Topics), TopicsRevision: int(response.TopicsRevision), QueueID: gen.Identifier(response.QueueID), QueueGeneration: gen.Identifier(response.QueueGeneration)}
 	if response.Filter != nil {
 		result.Filter = &gen.ActiveFilter{ID: gen.Identifier(response.Filter.ID), Prompt: response.Filter.Prompt, CreatedAt: response.Filter.CreatedAt}
 	}

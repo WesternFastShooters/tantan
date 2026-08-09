@@ -197,7 +197,7 @@
     {
       "id": "TASK-05",
       "title": "交付服务端 Gemini、搜索、翻译摘要和 AI Filter",
-      "status": "pending",
+      "status": "in_progress",
       "dependsOn": ["TASK-04"],
       "allowedWrites": [
         "services/tantan-api/cmd/tantan-api/**",
@@ -213,6 +213,7 @@
         "apps/desktop/layer/renderer/src/modules/tantan-home/**",
         "apps/desktop/layer/renderer/src/modules/tantan-settings/**",
         "apps/desktop/layer/renderer/src/modules/tantan-entry/**",
+        "apps/desktop/layer/renderer/src/router.web.tsx",
         "apps/desktop/layer/renderer/src/pages/search/**",
         "apps/desktop/layer/renderer/src/pages/settings/**",
         "apps/desktop/e2e/**",

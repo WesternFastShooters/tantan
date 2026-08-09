@@ -3,10 +3,10 @@ import { expect, test } from "@playwright/test"
 
 import { buildWebAppURL, resolveDesktopE2EEnv } from "../../../support/env"
 
-const entryId = "41147805272531999"
+const entryId = "309246809866240001"
 
 const mockShell = async (page: Page) => {
-  await page.route("http://127.0.0.1:3000/readyz", (route) =>
+  await page.route("**/api/readyz", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -16,7 +16,7 @@ const mockShell = async (page: Page) => {
       }),
     }),
   )
-  await page.route("http://127.0.0.1:3000/tantan/v1/session", (route) =>
+  await page.route("**/api/tantan/v1/session", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -26,7 +26,7 @@ const mockShell = async (page: Page) => {
       }),
     }),
   )
-  await page.route("http://localhost:3000/entries?**", (route) =>
+  await page.route("**/api/folo/entries?**", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -56,7 +56,7 @@ const mockShell = async (page: Page) => {
       }),
     }),
   )
-  await page.route("http://localhost:3000/reads", (route) =>
+  await page.route("**/api/folo/reads", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -68,7 +68,7 @@ const mockShell = async (page: Page) => {
 test("FE:TC-013 failed enrichment keeps original content and exposes retry", async ({ page }) => {
   await mockShell(page)
   let retried = false
-  await page.route(`http://127.0.0.1:3000/tantan/v1/entries/${entryId}/enrichment?**`, (route) =>
+  await page.route(`**/api/tantan/v1/entries/${entryId}/enrichment?**`, (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -79,7 +79,7 @@ test("FE:TC-013 failed enrichment keeps original content and exposes retry", asy
       }),
     }),
   )
-  await page.route(`http://127.0.0.1:3000/tantan/v1/entries/${entryId}/enrichment`, (route) => {
+  await page.route(`**/api/tantan/v1/entries/${entryId}/enrichment`, (route) => {
     retried = true
     return route.fulfill({
       status: 202,

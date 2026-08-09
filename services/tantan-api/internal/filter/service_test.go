@@ -96,11 +96,8 @@ func openFilterFixture(t *testing.T) (*storage.Store, *ai.SettingsService, *home
 	}); err != nil {
 		t.Fatal(err)
 	}
-	settings, err := ai.NewSettingsService(ai.SettingsConfig{Store: store, Secrets: &filterSecrets{values: map[string]string{}}})
+	settings, err := ai.NewSettingsService(ai.SettingsConfig{Secrets: &filterSecrets{values: map[string]string{ai.FixedProviderID: "fixture-filter-server-key"}}})
 	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := settings.Put(ctx, ai.ProviderInput{ProviderID: "openai", Model: "model-test", APIKey: "sk-filter-fixture-key"}); err != nil {
 		t.Fatal(err)
 	}
 	homeService, err := home.NewService(home.Config{Store: store, CursorKey: []byte("filter-home-cursor-key-thirty-two!!"), Now: func() time.Time { return now }})
@@ -125,14 +122,18 @@ func TestFilterRepairsOnceSwitchesAtomicallyAndResetRestoresDefault(t *testing.T
 	}
 	request := filter.Request{UserID: "user_1", Prompt: "多推 Title 相关内容", Timezone: "Asia/Shanghai", IdempotencyKey: "filter-request-key-0001"}
 	mutation, err := service.Put(ctx, request)
-	if err != nil || mutation.Filter == nil || mutation.QueueID == defaultPage.Queue.ID {
+	if err != nil || mutation.Filter == nil || mutation.QueueID == defaultPage.Queue.ID || mutation.TopicsRevision < 1 || mutation.QueueGeneration == "" {
 		t.Fatalf("mutation=%#v err=%v", mutation, err)
+	}
+	var storedGeneration string
+	if err := store.DB().QueryRowContext(ctx, "SELECT generation FROM daily_queues WHERE queue_id=?", mutation.QueueID).Scan(&storedGeneration); err != nil || storedGeneration != mutation.QueueGeneration {
+		t.Fatalf("stored generation=%q mutation=%#v err=%v", storedGeneration, mutation, err)
 	}
 	if len(generator.requests) != 2 || generator.requests[0].Repair || !generator.requests[1].Repair {
 		t.Fatalf("requests=%#v", generator.requests)
 	}
 	replayed, err := service.Put(ctx, request)
-	if err != nil || replayed.QueueID != mutation.QueueID || replayed.Filter == nil || replayed.Filter.ID != mutation.Filter.ID || len(generator.requests) != 2 {
+	if err != nil || replayed.QueueID != mutation.QueueID || replayed.QueueGeneration != mutation.QueueGeneration || replayed.TopicsRevision != mutation.TopicsRevision || replayed.Filter == nil || replayed.Filter.ID != mutation.Filter.ID || len(generator.requests) != 2 {
 		t.Fatalf("replayed=%#v requests=%d err=%v", replayed, len(generator.requests), err)
 	}
 	conflict := request
@@ -205,7 +206,7 @@ WHEN NEW.kind='filter' BEGIN SELECT RAISE(ABORT,'injected filter transaction fai
 		t.Fatalf("rolled-back filter changed state: active=%s ready=%d topic=%d", activeID, stillReady, stillTopic)
 	}
 	reset, err := service.Delete(ctx, "user_1", "Asia/Shanghai")
-	if err != nil || reset.Filter != nil || reset.QueueID != defaultPage.Queue.ID {
+	if err != nil || reset.Filter != nil || reset.QueueID != defaultPage.Queue.ID || reset.QueueGeneration != defaultPage.Queue.Generation || reset.TopicsRevision <= mutation.TopicsRevision {
 		t.Fatalf("reset=%#v err=%v", reset, err)
 	}
 	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM home_filters WHERE user_id='user_1' AND status='active'").Scan(&activeFilters); err != nil {

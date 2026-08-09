@@ -5,13 +5,17 @@ import (
 	"encoding/hex"
 	"errors"
 	"strings"
-	"unicode/utf8"
 )
 
 const (
+	FixedProviderID      = "google-gemini-openai"
+	FixedModel           = "gemini-3.5-flash-lite"
+	FixedBaseURL         = "https://generativelanguage.googleapis.com/v1beta/openai"
 	DefaultPromptVersion = "prompt-v1"
 	EnrichmentSchemaName = "ai-enrichment-v1"
 	TopicSchemaName      = "topic-classification-v1"
+	FilterSchemaName     = "filter-spec-v1"
+	ConnectionSchemaName = "provider-connection-test-v1"
 	SchemaVersion        = "schema-v1"
 )
 
@@ -22,11 +26,7 @@ type Preset struct {
 }
 
 var providerPresets = map[string]Preset{
-	"openai":     {ID: "openai", BaseURL: "https://api.openai.com/v1", Kind: "openai"},
-	"anthropic":  {ID: "anthropic", BaseURL: "https://api.anthropic.com", Kind: "anthropic"},
-	"google":     {ID: "google", BaseURL: "https://generativelanguage.googleapis.com", Kind: "google"},
-	"deepseek":   {ID: "deepseek", BaseURL: "https://api.deepseek.com", Kind: "openai"},
-	"openrouter": {ID: "openrouter", BaseURL: "https://openrouter.ai/api/v1", Kind: "openai"},
+	FixedProviderID: {ID: FixedProviderID, BaseURL: FixedBaseURL, Kind: "openai"},
 }
 
 func ProviderPreset(providerID string) (Preset, error) {
@@ -38,11 +38,15 @@ func ProviderPreset(providerID string) (Preset, error) {
 }
 
 func ValidateModel(model string) error {
-	model = strings.TrimSpace(model)
-	if count := utf8.RuneCountInString(model); count < 1 || count > 100 || strings.ContainsAny(model, "\r\n\x00") {
-		return errors.New("AI model must contain 1 to 100 safe characters")
+	if strings.TrimSpace(model) != FixedModel {
+		return errors.New("unsupported AI model")
 	}
 	return nil
+}
+
+func KeyFingerprint(apiKey string) string {
+	digest := sha256.Sum256([]byte(apiKey))
+	return strings.ToUpper(hex.EncodeToString(digest[:4]))
 }
 
 func ProviderFingerprint(providerID, model, promptVersion, schemaVersion string) (string, error) {

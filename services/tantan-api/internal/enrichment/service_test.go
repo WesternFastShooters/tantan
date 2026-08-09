@@ -104,7 +104,7 @@ func (generator *scriptedGenerator) Generate(_ context.Context, apiKey string, r
 	return step.output, step.err
 }
 
-func openEnrichmentFixture(t *testing.T) (*storage.Store, *ai.SettingsService, *topic.Service, time.Time) {
+func openEnrichmentFixture(t *testing.T) (*storage.Store, *ai.SettingsService, *topic.Service, time.Time, *fakeSecrets) {
 	t.Helper()
 	ctx := context.Background()
 	store, err := storage.Open(ctx, storage.Config{DataDir: t.TempDir()})
@@ -134,18 +134,16 @@ func openEnrichmentFixture(t *testing.T) (*storage.Store, *ai.SettingsService, *
 	}); err != nil {
 		t.Fatalf("insert fixture: %v", err)
 	}
-	settings, err := ai.NewSettingsService(ai.SettingsConfig{Store: store, Secrets: &fakeSecrets{values: map[string]string{}}})
+	secrets := &fakeSecrets{values: map[string]string{ai.FixedProviderID: "fixture-enrichment-server-key"}}
+	settings, err := ai.NewSettingsService(ai.SettingsConfig{Secrets: secrets})
 	if err != nil {
 		t.Fatal(err)
-	}
-	if _, err := settings.Put(ctx, ai.ProviderInput{ProviderID: "openai", Model: "gpt-test", APIKey: "sk-fixture-enrichment-key"}); err != nil {
-		t.Fatalf("save provider: %v", err)
 	}
 	topics := topic.NewService(store, func() time.Time { return now })
 	if err := topics.EnsureCore(ctx, "user_1"); err != nil {
 		t.Fatalf("seed topics: %v", err)
 	}
-	return store, settings, topics, now
+	return store, settings, topics, now, secrets
 }
 
 func validEnrichmentOutput() []byte {
@@ -158,7 +156,7 @@ func validTopicOutput() []byte {
 
 func TestWorkerRepairsJSONOnceThenAtomicallyCommitsEnrichmentTopicsAndFTS(t *testing.T) {
 	ctx := context.Background()
-	store, settings, topics, now := openEnrichmentFixture(t)
+	store, settings, topics, now, _ := openEnrichmentFixture(t)
 	generator := &scriptedGenerator{steps: []generatorStep{{output: []byte(`{"invalid":true}`)}, {output: validEnrichmentOutput()}, {output: validTopicOutput()}}}
 	service, err := enrichment.NewService(enrichment.Config{Store: store, Settings: settings, Generator: generator, Topics: topics, Now: func() time.Time { return now }, PromptVersion: "prompt-v1"})
 	if err != nil {
@@ -192,7 +190,7 @@ func TestWorkerRepairsJSONOnceThenAtomicallyCommitsEnrichmentTopicsAndFTS(t *tes
 
 func TestInvalidSecondAIOutputNeverCommitsDerivedData(t *testing.T) {
 	ctx := context.Background()
-	store, settings, topics, now := openEnrichmentFixture(t)
+	store, settings, topics, now, _ := openEnrichmentFixture(t)
 	generator := &scriptedGenerator{steps: []generatorStep{{output: []byte(`not-json`)}, {output: []byte(`{"still":"invalid"}`)}}}
 	service, err := enrichment.NewService(enrichment.Config{Store: store, Settings: settings, Generator: generator, Topics: topics, Now: func() time.Time { return now }, PromptVersion: "prompt-v1"})
 	if err != nil {
@@ -219,7 +217,7 @@ func TestInvalidSecondAIOutputNeverCommitsDerivedData(t *testing.T) {
 
 func TestProviderFailureKeepsOriginalEntryAndQueuesBoundedRetry(t *testing.T) {
 	ctx := context.Background()
-	store, settings, topics, now := openEnrichmentFixture(t)
+	store, settings, topics, now, _ := openEnrichmentFixture(t)
 	generator := &scriptedGenerator{steps: []generatorStep{{err: ai.ErrProviderUnavailable}}}
 	service, err := enrichment.NewService(enrichment.Config{Store: store, Settings: settings, Generator: generator, Topics: topics, Now: func() time.Time { return now }, PromptVersion: "prompt-v1"})
 	if err != nil {
@@ -246,7 +244,7 @@ func TestProviderFailureKeepsOriginalEntryAndQueuesBoundedRetry(t *testing.T) {
 
 func TestPermanentProviderFailureIsTerminalWithoutRetry(t *testing.T) {
 	ctx := context.Background()
-	store, settings, topics, now := openEnrichmentFixture(t)
+	store, settings, topics, now, _ := openEnrichmentFixture(t)
 	generator := &scriptedGenerator{steps: []generatorStep{{err: permanentProviderError{}}}}
 	service, err := enrichment.NewService(enrichment.Config{Store: store, Settings: settings, Generator: generator, Topics: topics, Now: func() time.Time { return now }, PromptVersion: "prompt-v1"})
 	if err != nil {
@@ -273,7 +271,7 @@ func TestPermanentProviderFailureIsTerminalWithoutRetry(t *testing.T) {
 
 func TestEnsureDeduplicatesByEntryFingerprintLanguageAndMergesFields(t *testing.T) {
 	ctx := context.Background()
-	store, settings, topics, now := openEnrichmentFixture(t)
+	store, settings, topics, now, _ := openEnrichmentFixture(t)
 	service, err := enrichment.NewService(enrichment.Config{Store: store, Settings: settings, Generator: &scriptedGenerator{}, Topics: topics, Now: func() time.Time { return now }, PromptVersion: "prompt-v1"})
 	if err != nil {
 		t.Fatal(err)
@@ -307,7 +305,7 @@ func TestEnsureDeduplicatesByEntryFingerprintLanguageAndMergesFields(t *testing.
 
 func TestEnsureDoesNotResetAnActiveEnrichmentToQueued(t *testing.T) {
 	ctx := context.Background()
-	store, settings, topics, now := openEnrichmentFixture(t)
+	store, settings, topics, now, _ := openEnrichmentFixture(t)
 	service, err := enrichment.NewService(enrichment.Config{Store: store, Settings: settings, Generator: &scriptedGenerator{}, Topics: topics, Now: func() time.Time { return now }, PromptVersion: "prompt-v1"})
 	if err != nil {
 		t.Fatal(err)
@@ -338,7 +336,7 @@ func TestEnsureDoesNotResetAnActiveEnrichmentToQueued(t *testing.T) {
 
 func TestReadyEnrichmentWithoutTopicsQueuesLaterTopicRequest(t *testing.T) {
 	ctx := context.Background()
-	store, settings, topics, now := openEnrichmentFixture(t)
+	store, settings, topics, now, _ := openEnrichmentFixture(t)
 	generator := &scriptedGenerator{steps: []generatorStep{{output: validEnrichmentOutput()}}}
 	service, err := enrichment.NewService(enrichment.Config{Store: store, Settings: settings, Generator: generator, Topics: topics, Now: func() time.Time { return now }, PromptVersion: "prompt-v1"})
 	if err != nil {
@@ -362,7 +360,7 @@ func TestReadyEnrichmentWithoutTopicsQueuesLaterTopicRequest(t *testing.T) {
 
 func TestWorkerCannotOverwriteNewContentEnrichmentAfterProviderReturns(t *testing.T) {
 	ctx := context.Background()
-	store, settings, topics, now := openEnrichmentFixture(t)
+	store, settings, topics, now, _ := openEnrichmentFixture(t)
 	var service *enrichment.Service
 	mutated := false
 	generator := generatorFunc(func(_ context.Context, _ string, _ ai.GenerationRequest) ([]byte, error) {
@@ -407,14 +405,14 @@ func TestWorkerCannotOverwriteNewContentEnrichmentAfterProviderReturns(t *testin
 	}
 }
 
-func TestWorkerRevalidatesContentAndProviderBeforeCommit(t *testing.T) {
+func TestWorkerRevalidatesContentAndServerKeyBeforeCommit(t *testing.T) {
 	for _, test := range []struct {
 		name   string
-		mutate func(*testing.T, *storage.Store, *ai.SettingsService)
+		mutate func(*testing.T, *storage.Store, *fakeSecrets)
 	}{
 		{
 			name: "content hash",
-			mutate: func(t *testing.T, store *storage.Store, _ *ai.SettingsService) {
+			mutate: func(t *testing.T, store *storage.Store, _ *fakeSecrets) {
 				t.Helper()
 				if _, err := store.DB().ExecContext(context.Background(), "UPDATE entries SET content='changed during AI',content_hash=? WHERE entry_id='entry_1'", strings.Repeat("d", 64)); err != nil {
 					t.Fatal(err)
@@ -422,23 +420,21 @@ func TestWorkerRevalidatesContentAndProviderBeforeCommit(t *testing.T) {
 			},
 		},
 		{
-			name: "provider fingerprint",
-			mutate: func(t *testing.T, _ *storage.Store, settings *ai.SettingsService) {
+			name: "server key removed",
+			mutate: func(t *testing.T, _ *storage.Store, secrets *fakeSecrets) {
 				t.Helper()
-				if _, err := settings.Put(context.Background(), ai.ProviderInput{ProviderID: "openai", Model: "model-changed-during-AI"}); err != nil {
-					t.Fatal(err)
-				}
+				delete(secrets.values, ai.FixedProviderID)
 			},
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
-			store, settings, topics, now := openEnrichmentFixture(t)
+			store, settings, topics, now, secrets := openEnrichmentFixture(t)
 			mutated := false
 			generator := generatorFunc(func(_ context.Context, _ string, _ ai.GenerationRequest) ([]byte, error) {
 				if !mutated {
 					mutated = true
-					test.mutate(t, store, settings)
+					test.mutate(t, store, secrets)
 				}
 				return validEnrichmentOutput(), nil
 			})
@@ -469,7 +465,7 @@ func TestWorkerRevalidatesContentAndProviderBeforeCommit(t *testing.T) {
 
 func TestGetNeverServesReadyDataForAChangedContentHash(t *testing.T) {
 	ctx := context.Background()
-	store, settings, topics, now := openEnrichmentFixture(t)
+	store, settings, topics, now, _ := openEnrichmentFixture(t)
 	generator := &scriptedGenerator{steps: []generatorStep{{output: validEnrichmentOutput()}}}
 	service, err := enrichment.NewService(enrichment.Config{Store: store, Settings: settings, Generator: generator, Topics: topics, Now: func() time.Time { return now }, PromptVersion: "prompt-v1"})
 	if err != nil {
@@ -490,9 +486,9 @@ func TestGetNeverServesReadyDataForAChangedContentHash(t *testing.T) {
 	}
 }
 
-func TestProviderPromptAndContentChangesCreateNewDedupeIdentityAndStaleOldRows(t *testing.T) {
+func TestPromptAndContentChangesCreateNewDedupeIdentityAndStaleOldRows(t *testing.T) {
 	ctx := context.Background()
-	store, settings, topics, now := openEnrichmentFixture(t)
+	store, settings, topics, now, _ := openEnrichmentFixture(t)
 	service, err := enrichment.NewService(enrichment.Config{Store: store, Settings: settings, Generator: &scriptedGenerator{}, Topics: topics, Now: func() time.Time { return now }, PromptVersion: "prompt-v1"})
 	if err != nil {
 		t.Fatal(err)
@@ -501,48 +497,41 @@ func TestProviderPromptAndContentChangesCreateNewDedupeIdentityAndStaleOldRows(t
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := settings.Put(ctx, ai.ProviderInput{ProviderID: "openai", Model: "gpt-test-2"}); err != nil {
+	serviceV2, err := enrichment.NewService(enrichment.Config{Store: store, Settings: settings, Generator: &scriptedGenerator{}, Topics: topics, Now: func() time.Time { return now.Add(time.Second) }, PromptVersion: "prompt-v2"})
+	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := service.Ensure(ctx, enrichment.EnsureRequest{UserID: "user_1", EntryID: "entry_1", Language: "zh-CN", Fields: []string{"summary"}})
+	second, err := serviceV2.Ensure(ctx, enrichment.EnsureRequest{UserID: "user_1", EntryID: "entry_1", Language: "zh-CN", Fields: []string{"summary"}})
 	if err != nil || second.JobID == first.JobID {
 		t.Fatalf("second=%#v err=%v", second, err)
 	}
-	serviceV2, err := enrichment.NewService(enrichment.Config{Store: store, Settings: settings, Generator: &scriptedGenerator{}, Topics: topics, Now: func() time.Time { return now.Add(time.Second) }, PromptVersion: "prompt-v2"})
-	if err != nil {
+	newHash := strings.Repeat("b", 64)
+	if _, err := store.DB().ExecContext(ctx, "UPDATE entries SET content='changed',content_hash=? WHERE entry_id='entry_1'", newHash); err != nil {
 		t.Fatal(err)
 	}
 	third, err := serviceV2.Ensure(ctx, enrichment.EnsureRequest{UserID: "user_1", EntryID: "entry_1", Language: "zh-CN", Fields: []string{"summary"}})
 	if err != nil || third.JobID == second.JobID {
 		t.Fatalf("third=%#v err=%v", third, err)
 	}
-	newHash := strings.Repeat("b", 64)
-	if _, err := store.DB().ExecContext(ctx, "UPDATE entries SET content='changed',content_hash=? WHERE entry_id='entry_1'", newHash); err != nil {
-		t.Fatal(err)
-	}
-	fourth, err := serviceV2.Ensure(ctx, enrichment.EnsureRequest{UserID: "user_1", EntryID: "entry_1", Language: "zh-CN", Fields: []string{"summary"}})
-	if err != nil || fourth.JobID == third.JobID {
-		t.Fatalf("fourth=%#v err=%v", fourth, err)
-	}
 	var stale, queued int
 	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FILTER (WHERE state='stale'),COUNT(*) FILTER (WHERE state='queued') FROM entry_enrichments WHERE entry_id='entry_1'").Scan(&stale, &queued); err != nil {
 		t.Fatal(err)
 	}
-	if stale < 2 || queued != 1 {
+	if stale < 1 || queued != 1 {
 		t.Fatalf("stale=%d queued=%d", stale, queued)
 	}
 	var activeJobs int
 	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM jobs WHERE kind='enrich' AND state IN ('queued','running')").Scan(&activeJobs); err != nil {
 		t.Fatal(err)
 	}
-	if activeJobs != 4 {
+	if activeJobs != 3 {
 		t.Fatalf("active enrichment jobs=%d", activeJobs)
 	}
 }
 
 func TestEnrichmentProviderConcurrencyNeverExceedsTwo(t *testing.T) {
 	ctx := context.Background()
-	store, settings, topics, now := openEnrichmentFixture(t)
+	store, settings, topics, now, _ := openEnrichmentFixture(t)
 	timestamp := now.Format(time.RFC3339Nano)
 	hash := strings.Repeat("c", 64)
 	if err := store.Write(ctx, func(transaction *sql.Tx) error {

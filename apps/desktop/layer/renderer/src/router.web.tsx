@@ -4,6 +4,7 @@ import { NotFound } from "./components/common/NotFound"
 import { EntryDetailPage } from "./modules/tantan-entry/EntryDetailPage"
 import { FavoritesPage } from "./modules/tantan-favorites/FavoritesPage"
 import { SearchPage } from "./modules/tantan-search/SearchPage"
+import { AISettingsPage } from "./modules/tantan-settings/AISettingsPage"
 import { DiscoverRoute } from "./modules/tantan-shell/DiscoverRoute"
 import { HomeRoute } from "./modules/tantan-shell/HomeRoute"
 import { LoginRoute } from "./modules/tantan-shell/LoginRoute"
@@ -26,6 +27,7 @@ export const router = createBrowserRouter([
           { path: "subscriptions", Component: SubscriptionsRoute },
           { path: "discover", Component: DiscoverRoute },
           { path: "settings", Component: SettingsRoute },
+          { path: "settings/ai", Component: AISettingsPage },
           { path: "search", Component: SearchPage },
           { path: "favorites", Component: FavoritesPage },
           { path: "entries/:entryId", Component: EntryDetailPage },

@@ -1,15 +1,16 @@
 import { FeedViewType } from "@follow/constants"
 import { useIsEntryStarred } from "@follow/store/collection/hooks"
 import { collectionSyncService } from "@follow/store/collection/store"
-import { useEntry, usePrefetchEntryDetail } from "@follow/store/entry/hooks"
+import { useEntry } from "@follow/store/entry/hooks"
 import { unreadSyncService } from "@follow/store/unread/store"
-import { useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useLocation, useNavigate, useParams } from "react-router"
 
 import type { HomeCard } from "~/lib/tantan-api/gen/types"
 import { removeEntryFromAllHomeQueries } from "~/modules/tantan-home/home-cache"
 
+import { getEntryDetail } from "./entry-api"
 import { useEntryEnrichment } from "./useEntryEnrichment"
 
 const safeURL = (value: string | null | undefined) => {
@@ -37,7 +38,13 @@ export function EntryDetailPage() {
     publishedAt: value.publishedAt,
     read: value.read,
   }))
-  const detailQuery = usePrefetchEntryDetail(entryId)
+  const detailQuery = useQuery({
+    queryKey: ["tantan", "entry", entryId],
+    queryFn: ({ signal }) => getEntryDetail(entryId, signal),
+    enabled: entryId.length > 0,
+    staleTime: 5 * 60_000,
+  })
+  const resolvedEntry = entry ?? detailQuery.data
   const enrichment = useEntryEnrichment(entryId)
   const starred = useIsEntryStarred(entryId)
   const [readError, setReadError] = useState<string | null>(null)
@@ -47,9 +54,9 @@ export function EntryDetailPage() {
   const attemptedEntryIdRef = useRef<string | null>(null)
 
   useEffect(() => {
-    if (!entry || !entryId || attemptedEntryIdRef.current === entryId) return
+    if (!resolvedEntry || !entryId || attemptedEntryIdRef.current === entryId) return
     attemptedEntryIdRef.current = entryId
-    if (entry.read) {
+    if (resolvedEntry.read) {
       removeEntryFromAllHomeQueries(queryClient, entryId)
       return
     }
@@ -60,14 +67,20 @@ export function EntryDetailPage() {
         attemptedEntryIdRef.current = null
         setReadError(error instanceof Error ? error.message : "已读同步失败")
       })
-  }, [entry, entryId, queryClient])
+  }, [entryId, queryClient, resolvedEntry])
 
-  const sourceURL = safeURL(entry?.url)
+  const sourceURL = safeURL(resolvedEntry?.url)
   const content = useMemo(
-    () => entry?.content || entry?.description || card?.excerpt || "正文暂不可用。",
-    [card?.excerpt, entry?.content, entry?.description],
+    () => resolvedEntry?.content || resolvedEntry?.description || card?.excerpt || "正文暂不可用。",
+    [card?.excerpt, resolvedEntry?.content, resolvedEntry?.description],
   )
-  const title = entry?.title || card?.title || "内容详情"
+  const title = resolvedEntry?.title || card?.title || "内容详情"
+  const publishedAt =
+    card?.publishedAt ||
+    (resolvedEntry?.publishedAt instanceof Date
+      ? resolvedEntry.publishedAt.toISOString()
+      : resolvedEntry?.publishedAt) ||
+    null
   const enrichmentData = enrichment.data?.data
   const translatedContent = enrichmentData?.contentZh || enrichmentData?.titleZh
   const collectionView =
@@ -80,7 +93,7 @@ export function EntryDetailPage() {
           : FeedViewType.Articles
 
   const toggleCollection = async () => {
-    if (!entry) return
+    if (!resolvedEntry) return
     setCollectionPending(true)
     setCollectionError(null)
     try {
@@ -108,7 +121,7 @@ export function EntryDetailPage() {
         <button
           type="button"
           aria-label={starred ? "取消收藏" : "收藏"}
-          disabled={!entry || collectionPending}
+          disabled={!resolvedEntry || collectionPending}
           onClick={toggleCollection}
           className="flex size-11 items-center justify-center rounded-full text-orange-400 outline-none hover:bg-orange-500/10 focus-visible:ring-2 focus-visible:ring-orange-500 disabled:opacity-40"
         >
@@ -137,9 +150,9 @@ export function EntryDetailPage() {
           {title}
         </h1>
         <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-500">
-          <span>{entry?.author || card?.source.name}</span>
-          <time dateTime={card?.publishedAt}>
-            {card?.publishedAt ? new Date(card.publishedAt).toLocaleString("zh-CN") : ""}
+          <span>{resolvedEntry?.author || card?.source.name}</span>
+          <time dateTime={publishedAt || undefined}>
+            {publishedAt ? new Date(publishedAt).toLocaleString("zh-CN") : ""}
           </time>
         </div>
         {readError && (
@@ -158,7 +171,7 @@ export function EntryDetailPage() {
             {collectionError}
           </p>
         )}
-        {detailQuery.isError && !entry && (
+        {detailQuery.isError && !resolvedEntry && (
           <p
             role="alert"
             className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-200"

@@ -64,7 +64,7 @@ func (service *Service) RunOne(ctx context.Context) (bool, error) {
 	}
 	generator := service.generator
 	if generator == nil {
-		generator, err = ai.NewProviderClient(ai.ProviderClientConfig{ProviderID: active.ProviderID, Model: active.Model})
+		generator, err = ai.NewProviderClient(ai.ProviderClientConfig{})
 		if err != nil {
 			return true, service.failTerminal(ctx, job.ID, payload, "AI_NOT_CONFIGURED", now)
 		}
@@ -214,6 +214,10 @@ func (service *Service) commitReady(ctx context.Context, jobID string, payload j
 	if err != nil {
 		return errors.New("encode enrichment key points")
 	}
+	active, _, err := service.settings.Credential(ctx, payload.PromptVersion)
+	if err != nil || active.Fingerprint != payload.ProviderFP {
+		return errEnrichmentStale
+	}
 	return service.store.Write(ctx, func(transaction *sql.Tx) error {
 		var rawPayload string
 		if err := transaction.QueryRowContext(ctx, "SELECT payload_json FROM jobs WHERE job_id=? AND state='running'", jobID).Scan(&rawPayload); err != nil {
@@ -265,24 +269,6 @@ WHERE ae.user_id=? AND e.entry_id=?`, payload.UserID, payload.EntryID).Scan(&cur
 		return err
 	}
 	if currentHash != payload.ContentHash {
-		return errEnrichmentStale
-	}
-	var providerID string
-	var model string
-	var baseURL string
-	if err := transaction.QueryRowContext(ctx, `
-SELECT provider_id,model,base_url FROM ai_provider_configs WHERE enabled=1`).Scan(&providerID, &model, &baseURL); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return errEnrichmentStale
-		}
-		return err
-	}
-	preset, err := ai.ProviderPreset(providerID)
-	if err != nil || preset.BaseURL != baseURL {
-		return errEnrichmentStale
-	}
-	fingerprint, err := ai.ProviderFingerprint(providerID, model, payload.PromptVersion, ai.SchemaVersion)
-	if err != nil || fingerprint != payload.ProviderFP {
 		return errEnrichmentStale
 	}
 	return nil

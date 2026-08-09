@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -16,21 +15,17 @@ type ConnectionTestResult struct {
 
 // TestConnection calls a locked provider preset with the temporary credential.
 // It deliberately has no storage dependency, so the supplied key cannot be persisted.
-func TestConnection(ctx context.Context, input ProviderInput, transport http.RoundTripper, now func() time.Time) (ConnectionTestResult, error) {
+func TestConnection(ctx context.Context, apiKey string, transport http.RoundTripper, now func() time.Time) (ConnectionTestResult, error) {
 	if now == nil {
 		now = time.Now
 	}
-	client, err := NewProviderClient(ProviderClientConfig{
-		ProviderID: strings.TrimSpace(input.ProviderID),
-		Model:      strings.TrimSpace(input.Model),
-		Transport:  transport,
-	})
+	client, err := NewProviderClient(ProviderClientConfig{Transport: transport})
 	if err != nil {
 		return ConnectionTestResult{}, err
 	}
 	started := now()
-	output, err := client.Generate(ctx, input.APIKey, GenerationRequest{
-		SchemaName:   "provider-connection-test-v1",
+	output, err := client.Generate(ctx, apiKey, GenerationRequest{
+		SchemaName:   ConnectionSchemaName,
 		SystemPrompt: "Return one small JSON object only.",
 		UserPrompt:   `{"ping":"tantan"}`,
 	})
@@ -47,5 +42,5 @@ func TestConnection(ctx context.Context, input ProviderInput, transport http.Rou
 	if latency > providerTimeout.Milliseconds() {
 		latency = providerTimeout.Milliseconds()
 	}
-	return ConnectionTestResult{OK: true, LatencyMS: latency, Model: strings.TrimSpace(input.Model)}, nil
+	return ConnectionTestResult{OK: true, LatencyMS: latency, Model: FixedModel}, nil
 }

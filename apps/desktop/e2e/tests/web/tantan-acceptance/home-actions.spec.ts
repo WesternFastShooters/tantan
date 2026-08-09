@@ -31,16 +31,18 @@ const home = (items: ReturnType<typeof card>[], queueId = "queue-default") => ({
   queue: {
     id: queueId,
     version: 1,
+    generation: `${queueId}-v1`,
     total: items.length,
     unread: items.length,
     finished: true,
     candidateWindowDays: 7,
     generatedAt: "2026-08-09T12:00:00Z",
   },
+  queueGeneration: `${queueId}-v1`,
 })
 
 const mockSession = async (page: Page) => {
-  await page.route("http://127.0.0.1:3000/readyz", (route) =>
+  await page.route("**/api/readyz", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -50,7 +52,7 @@ const mockSession = async (page: Page) => {
       }),
     }),
   )
-  await page.route("http://127.0.0.1:3000/tantan/v1/session", (route) =>
+  await page.route("**/api/tantan/v1/session", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -75,7 +77,7 @@ test.describe("Tantan acceptance Home actions", () => {
     const actions: string[] = []
     let sourceBlocked = false
     let sourceRestored = false
-    await page.route("http://127.0.0.1:3000/tantan/v1/topics", (route) =>
+    await page.route("**/api/tantan/v1/topics", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -86,14 +88,14 @@ test.describe("Tantan acceptance Home actions", () => {
         }),
       }),
     )
-    await page.route("http://127.0.0.1:3000/tantan/v1/home?**", (route) =>
+    await page.route("**/api/tantan/v1/home?**", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify(home(cards)),
       }),
     )
-    await page.route("http://127.0.0.1:3000/tantan/v1/recommendation/feedback", async (route) => {
+    await page.route("**/api/tantan/v1/recommendation/feedback", async (route) => {
       const body = route.request().postDataJSON() as { entryId: string; action: string }
       actions.push(`${body.entryId}:${body.action}`)
       if (body.entryId === "feedback-fail") {
@@ -108,7 +110,7 @@ test.describe("Tantan acceptance Home actions", () => {
         body: JSON.stringify({ applied: true }),
       })
     })
-    await page.route("http://127.0.0.1:3000/tantan/v1/recommendation/blocks/sources/*", (route) => {
+    await page.route("**/api/tantan/v1/recommendation/blocks/sources/*", (route) => {
       sourceRestored = true
       sourceBlocked = false
       return route.fulfill({
@@ -117,7 +119,7 @@ test.describe("Tantan acceptance Home actions", () => {
         body: JSON.stringify({ applied: true }),
       })
     })
-    await page.route("http://127.0.0.1:3000/tantan/v1/recommendation/blocks/sources", (route) =>
+    await page.route("**/api/tantan/v1/recommendation/blocks/sources", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -171,18 +173,19 @@ test.describe("Tantan acceptance Home actions", () => {
     await mockSession(page)
     let activePrompt: string | null = null
     let filterVersion = 0
-    await page.route("http://127.0.0.1:3000/tantan/v1/topics", (route) =>
+    await page.route("**/api/tantan/v1/topics", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
           version: 1 + filterVersion,
+          topicsRevision: 1 + filterVersion,
           activeFilterId: activePrompt ? `filter-${filterVersion}` : null,
           topics: [topic("recommend", "推荐")],
         }),
       }),
     )
-    await page.route("http://127.0.0.1:3000/tantan/v1/home?**", (route) =>
+    await page.route("**/api/tantan/v1/home?**", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -194,7 +197,7 @@ test.describe("Tantan acceptance Home actions", () => {
         ),
       }),
     )
-    await page.route("http://127.0.0.1:3000/tantan/v1/filter", async (route) => {
+    await page.route("**/api/tantan/v1/filter", async (route) => {
       if (route.request().method() === "DELETE") {
         activePrompt = null
         filterVersion += 1
@@ -204,7 +207,9 @@ test.describe("Tantan acceptance Home actions", () => {
           body: JSON.stringify({
             filter: null,
             topics: [topic("recommend", "推荐")],
+            topicsRevision: 1 + filterVersion,
             queueId: "queue-default",
+            queueGeneration: "queue-default-v1",
           }),
         })
       }
@@ -220,7 +225,9 @@ test.describe("Tantan acceptance Home actions", () => {
             createdAt: "2026-08-09T12:00:00Z",
           },
           topics: [topic("recommend", "推荐"), topic(`topic-${filterVersion}`, "动态")],
+          topicsRevision: 1 + filterVersion,
           queueId: `queue-${filterVersion}`,
+          queueGeneration: `queue-${filterVersion}-v1`,
         }),
       })
     })

@@ -108,7 +108,7 @@ func newApplication(ctx context.Context, config applicationConfig) (*application
 	if err != nil {
 		return fail(err)
 	}
-	settings, err := ai.NewSettingsService(ai.SettingsConfig{Store: store, Secrets: config.AISecrets, Now: config.Now})
+	settings, err := ai.NewSettingsService(ai.SettingsConfig{Secrets: config.AISecrets})
 	if err != nil {
 		return fail(err)
 	}
@@ -171,11 +171,11 @@ func newApplication(ctx context.Context, config applicationConfig) (*application
 		Enrichment: enrichmentService,
 		AISettings: settings,
 		ProviderTester: func(providerContext context.Context) (ai.ConnectionTestResult, error) {
-			active, apiKey, credentialErr := settings.Credential(providerContext, ai.DefaultPromptVersion)
+			_, apiKey, credentialErr := settings.Credential(providerContext, ai.DefaultPromptVersion)
 			if credentialErr != nil {
 				return ai.ConnectionTestResult{}, credentialErr
 			}
-			return ai.TestConnection(providerContext, ai.ProviderInput{ProviderID: active.ProviderID, Model: active.Model, APIKey: apiKey}, nil, time.Now)
+			return ai.TestConnection(providerContext, apiKey, nil, time.Now)
 		},
 		Diagnostics: diagnostics,
 		Now:         config.Now,

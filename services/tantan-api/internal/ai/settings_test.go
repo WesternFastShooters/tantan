@@ -1,32 +1,31 @@
 package ai_test
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net"
 	"net/http"
-	"os"
-	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	"tantan.local/tantan-api/internal/ai"
-	"tantan.local/tantan-api/internal/storage"
 )
 
-const aiKeyCanary = "sk-test-DO-NOT-STORE-BE-AI-TOPIC"
+const aiKeyCanary = "test-DO-NOT-STORE-BE-AI-TOPIC"
 
 type memorySecrets struct {
-	values    map[string]string
-	setError  error
-	deleteErr error
+	values   map[string]string
+	getError error
 }
 
 func (secrets *memorySecrets) Get(_ context.Context, account string) (string, error) {
+	if secrets.getError != nil {
+		return "", secrets.getError
+	}
 	value, ok := secrets.values[account]
 	if !ok {
 		return "", ai.ErrSecretNotFound
@@ -34,102 +33,71 @@ func (secrets *memorySecrets) Get(_ context.Context, account string) (string, er
 	return value, nil
 }
 
-func (secrets *memorySecrets) Set(_ context.Context, account, value string) error {
-	if secrets.setError != nil {
-		return secrets.setError
-	}
-	secrets.values[account] = value
-	return nil
+func (*memorySecrets) Set(context.Context, string, string) error {
+	return errors.New("server AI configuration is read-only")
 }
 
-func (secrets *memorySecrets) Delete(_ context.Context, account string) error {
-	if secrets.deleteErr != nil {
-		return secrets.deleteErr
-	}
-	delete(secrets.values, account)
-	return nil
+func (*memorySecrets) Delete(context.Context, string) error {
+	return errors.New("server AI configuration is read-only")
 }
 
-func openAIStore(t *testing.T) (*storage.Store, string) {
-	t.Helper()
-	directory := t.TempDir()
-	store, err := storage.Open(context.Background(), storage.Config{DataDir: directory})
-	if err != nil {
-		t.Fatalf("open storage: %v", err)
-	}
-	return store, directory
-}
-
-func TestAISettingsPersistKeyOnlyInKeychainAndNeverReturnIt(t *testing.T) {
-	ctx := context.Background()
-	store, directory := openAIStore(t)
-	secrets := &memorySecrets{values: map[string]string{}}
-	service, err := ai.NewSettingsService(ai.SettingsConfig{Store: store, Secrets: secrets})
+func TestAISettingsAreFixedAndReadOnly(t *testing.T) {
+	secrets := &memorySecrets{values: map[string]string{ai.FixedProviderID: aiKeyCanary}}
+	service, err := ai.NewSettingsService(ai.SettingsConfig{Secrets: secrets})
 	if err != nil {
 		t.Fatalf("create settings: %v", err)
 	}
-	response, err := service.Put(ctx, ai.ProviderInput{ProviderID: "openai", Model: "gpt-test", APIKey: aiKeyCanary})
+	response, err := service.Get(context.Background())
 	if err != nil {
-		t.Fatalf("save settings: %v", err)
+		t.Fatalf("get settings: %v", err)
 	}
 	encoded, err := json.Marshal(response)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(encoded), aiKeyCanary) || !response.Configured || !response.HasAPIKey || response.BaseURL != "https://api.openai.com/v1" || len(response.KeyFingerprint) != 12 {
+	if strings.Contains(string(encoded), aiKeyCanary) {
+		t.Fatal("AI credential was returned by the public settings response")
+	}
+	if !response.Configured || !response.HasAPIKey || response.ProviderID != ai.FixedProviderID || response.Model != ai.FixedModel || response.BaseURL != ai.FixedBaseURL {
 		t.Fatalf("public settings=%s", encoded)
 	}
-	if secrets.values["openai"] != aiKeyCanary {
-		t.Fatal("API key was not stored in the Keychain abstraction")
+	if !regexp.MustCompile(`^[0-9A-F]{8}$`).MatchString(response.KeyFingerprint) {
+		t.Fatalf("key fingerprint=%q", response.KeyFingerprint)
 	}
-	got, err := service.Get(ctx)
-	if err != nil || got != response {
-		t.Fatalf("get settings=%#v err=%v", got, err)
+
+	active, key, err := service.Credential(context.Background(), ai.DefaultPromptVersion)
+	if err != nil || key != aiKeyCanary {
+		t.Fatalf("credential active=%#v err=%v", active, err)
 	}
-	if err := store.Close(); err != nil {
-		t.Fatalf("close storage: %v", err)
-	}
-	entries, err := os.ReadDir(directory)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, entry := range entries {
-		contents, err := os.ReadFile(filepath.Join(directory, entry.Name()))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if bytes.Contains(contents, []byte(aiKeyCanary)) {
-			t.Fatalf("API key leaked to SQLite file %s", entry.Name())
-		}
+	if active.ProviderID != ai.FixedProviderID || active.Model != ai.FixedModel || active.BaseURL != ai.FixedBaseURL || len(active.Fingerprint) != 12 {
+		t.Fatalf("active provider=%#v", active)
 	}
 }
 
-func TestAISettingsKeychainFailureDoesNotChangeSQLiteAndDeleteIsKeyFirst(t *testing.T) {
-	ctx := context.Background()
-	store, _ := openAIStore(t)
-	defer store.Close()
-	secrets := &memorySecrets{values: map[string]string{}, setError: errors.New("keychain unavailable")}
-	service, err := ai.NewSettingsService(ai.SettingsConfig{Store: store, Secrets: secrets})
+func TestAISettingsRemainReadyWithoutServerKey(t *testing.T) {
+	service, err := ai.NewSettingsService(ai.SettingsConfig{Secrets: &memorySecrets{values: map[string]string{}}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.Put(ctx, ai.ProviderInput{ProviderID: "openai", Model: "gpt-test", APIKey: aiKeyCanary}); err == nil || strings.Contains(err.Error(), aiKeyCanary) {
-		t.Fatalf("save error=%v", err)
-	}
-	var configs int
-	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM ai_provider_configs").Scan(&configs); err != nil || configs != 0 {
-		t.Fatalf("configs=%d err=%v", configs, err)
-	}
-	secrets.setError = nil
-	if _, err := service.Put(ctx, ai.ProviderInput{ProviderID: "openai", Model: "gpt-test", APIKey: aiKeyCanary}); err != nil {
+	response, err := service.Get(context.Background())
+	if err != nil {
 		t.Fatal(err)
 	}
-	secrets.deleteErr = errors.New("keychain delete unavailable")
-	if err := service.Delete(ctx); err == nil {
-		t.Fatal("delete unexpectedly succeeded")
+	if response.Configured || response.HasAPIKey || response.KeyFingerprint != "" || response.ProviderID != ai.FixedProviderID || response.Model != ai.FixedModel || response.BaseURL != ai.FixedBaseURL {
+		t.Fatalf("settings=%#v", response)
 	}
-	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM ai_provider_configs WHERE enabled=1").Scan(&configs); err != nil || configs != 1 {
-		t.Fatalf("config changed after key deletion failure: count=%d err=%v", configs, err)
+	if _, _, err := service.Credential(context.Background(), ai.DefaultPromptVersion); !errors.Is(err, ai.ErrNotConfigured) {
+		t.Fatalf("credential error=%v", err)
+	}
+}
+
+func TestAISettingsSecretFailuresAreRedacted(t *testing.T) {
+	service, err := ai.NewSettingsService(ai.SettingsConfig{Secrets: &memorySecrets{values: map[string]string{}, getError: errors.New("backend-" + aiKeyCanary)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Get(context.Background()); err == nil || strings.Contains(err.Error(), aiKeyCanary) {
+		t.Fatalf("settings error=%v", err)
 	}
 }
 
@@ -139,38 +107,57 @@ func (function roundTripFunc) RoundTrip(request *http.Request) (*http.Response, 
 	return function(request)
 }
 
-func TestProviderUsesOnlyPresetEndpointAndCredentialHeader(t *testing.T) {
+func TestProviderUsesOnlyFixedGeminiOpenAIEndpoint(t *testing.T) {
 	var observedURL string
 	var observedAuthorization string
-	var observedBody string
-	client, err := ai.NewProviderClient(ai.ProviderClientConfig{
-		ProviderID: "openai",
-		Model:      "gpt-test",
-		Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
-			observedURL = request.URL.String()
-			observedAuthorization = request.Header.Get("Authorization")
-			contents, _ := io.ReadAll(request.Body)
-			observedBody = string(contents)
-			return &http.Response{
-				StatusCode: http.StatusOK,
-				Header:     http.Header{"Content-Type": []string{"application/json"}},
-				Body:       io.NopCloser(strings.NewReader(`{"choices":[{"message":{"content":"{\"version\":1}"}}]}`)),
-				Request:    request,
-			}, nil
-		}),
-	})
+	var observedBody map[string]any
+	client, err := ai.NewProviderClient(ai.ProviderClientConfig{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		observedURL = request.URL.String()
+		observedAuthorization = request.Header.Get("Authorization")
+		if err := json.NewDecoder(request.Body).Decode(&observedBody); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"choices":[{"message":{"content":"{\"version\":1}"}}]}`)),
+			Request:    request,
+		}, nil
+	})})
 	if err != nil {
 		t.Fatal(err)
 	}
-	output, err := client.Generate(context.Background(), aiKeyCanary, ai.GenerationRequest{SystemPrompt: "Return JSON", UserPrompt: "fixture"})
+	output, err := client.Generate(context.Background(), aiKeyCanary, ai.GenerationRequest{SchemaName: ai.EnrichmentSchemaName, SystemPrompt: "Return JSON", UserPrompt: "fixture"})
 	if err != nil || string(output) != `{"version":1}` {
 		t.Fatalf("output=%s err=%v", output, err)
 	}
-	if observedURL != "https://api.openai.com/v1/chat/completions" || observedAuthorization != "Bearer "+aiKeyCanary || strings.Contains(observedURL, aiKeyCanary) || strings.Contains(observedBody, aiKeyCanary) {
-		t.Fatalf("url=%q authorization=%q body=%q", observedURL, observedAuthorization, observedBody)
+	if observedURL != ai.FixedBaseURL+"/chat/completions" || observedAuthorization != "Bearer "+aiKeyCanary || strings.Contains(observedURL, aiKeyCanary) {
+		t.Fatalf("url=%q authorization=%q", observedURL, observedAuthorization)
 	}
-	if _, err := ai.NewProviderClient(ai.ProviderClientConfig{ProviderID: "custom", Model: "model", Transport: http.DefaultTransport}); err == nil {
-		t.Fatal("custom provider endpoint was accepted")
+	if observedBody["model"] != ai.FixedModel {
+		t.Fatalf("model=%v", observedBody["model"])
+	}
+	for _, deprecated := range []string{"temperature", "top_p", "top_k"} {
+		if _, exists := observedBody[deprecated]; exists {
+			t.Fatalf("deprecated sampling field %q was sent", deprecated)
+		}
+	}
+	responseFormat, ok := observedBody["response_format"].(map[string]any)
+	if !ok || responseFormat["type"] != "json_schema" {
+		t.Fatalf("response_format=%#v", observedBody["response_format"])
+	}
+	encoded, _ := json.Marshal(observedBody)
+	if strings.Contains(string(encoded), aiKeyCanary) {
+		t.Fatal("credential leaked into request body")
+	}
+	if _, err := ai.ProviderPreset("google"); err == nil {
+		t.Fatal("legacy provider was accepted")
+	}
+	if _, err := ai.ProviderPreset("custom"); err == nil {
+		t.Fatal("custom provider was accepted")
+	}
+	if err := ai.ValidateModel("gemini-custom"); err == nil {
+		t.Fatal("custom model was accepted")
 	}
 	for _, address := range []string{"127.0.0.1", "10.0.0.1", "169.254.169.254", "::1", "fc00::1", "0.0.0.0"} {
 		if err := ai.ValidateDialIP(net.ParseIP(address)); err == nil {
@@ -179,66 +166,35 @@ func TestProviderUsesOnlyPresetEndpointAndCredentialHeader(t *testing.T) {
 	}
 }
 
-func TestProviderFailureDoesNotReflectSecretOrResponseBody(t *testing.T) {
-	client, err := ai.NewProviderClient(ai.ProviderClientConfig{
-		ProviderID: "openai",
-		Model:      "gpt-test",
-		Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
-			return &http.Response{StatusCode: http.StatusInternalServerError, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("private-provider-body-" + aiKeyCanary)), Request: request}, nil
-		}),
-	})
+func TestProviderRejectsUnknownSchemaBeforeNetwork(t *testing.T) {
+	called := false
+	client, err := ai.NewProviderClient(ai.ProviderClientConfig{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		called = true
+		return nil, errors.New("unexpected network")
+	})})
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = client.Generate(context.Background(), aiKeyCanary, ai.GenerationRequest{SystemPrompt: "system", UserPrompt: "user"})
+	_, err = client.Generate(context.Background(), aiKeyCanary, ai.GenerationRequest{SchemaName: "user-controlled-schema", SystemPrompt: "system", UserPrompt: "user"})
+	if err == nil || called {
+		t.Fatalf("error=%v called=%t", err, called)
+	}
+}
+
+func TestProviderFailureDoesNotReflectSecretOrResponseBody(t *testing.T) {
+	client, err := ai.NewProviderClient(ai.ProviderClientConfig{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusInternalServerError, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("private-provider-body-" + aiKeyCanary)), Request: request}, nil
+	})})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.Generate(context.Background(), aiKeyCanary, ai.GenerationRequest{SchemaName: ai.EnrichmentSchemaName, SystemPrompt: "system", UserPrompt: "user"})
 	if err == nil || strings.Contains(err.Error(), aiKeyCanary) || strings.Contains(err.Error(), "private-provider-body") {
 		t.Fatalf("provider error=%v", err)
 	}
 }
 
-func TestAllProviderAdaptersUseLockedEndpointAndHeader(t *testing.T) {
-	tests := []struct {
-		providerID   string
-		wantURL      string
-		wantHeader   string
-		responseBody string
-	}{
-		{providerID: "openai", wantURL: "https://api.openai.com/v1/chat/completions", wantHeader: "Authorization", responseBody: `{"choices":[{"message":{"content":"ok"}}]}`},
-		{providerID: "anthropic", wantURL: "https://api.anthropic.com/v1/messages", wantHeader: "x-api-key", responseBody: `{"content":[{"type":"text","text":"ok"}]}`},
-		{providerID: "google", wantURL: "https://generativelanguage.googleapis.com/v1beta/models/model-test:generateContent", wantHeader: "x-goog-api-key", responseBody: `{"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}`},
-		{providerID: "deepseek", wantURL: "https://api.deepseek.com/chat/completions", wantHeader: "Authorization", responseBody: `{"choices":[{"message":{"content":"ok"}}]}`},
-		{providerID: "openrouter", wantURL: "https://openrouter.ai/api/v1/chat/completions", wantHeader: "Authorization", responseBody: `{"choices":[{"message":{"content":"ok"}}]}`},
-	}
-	for _, test := range tests {
-		t.Run(test.providerID, func(t *testing.T) {
-			client, err := ai.NewProviderClient(ai.ProviderClientConfig{
-				ProviderID: test.providerID,
-				Model:      "model-test",
-				Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
-					if request.URL.String() != test.wantURL {
-						t.Fatalf("url=%q", request.URL.String())
-					}
-					if got := request.Header.Get(test.wantHeader); got != aiKeyCanary && got != "Bearer "+aiKeyCanary {
-						t.Fatalf("credential header=%q", got)
-					}
-					if strings.Contains(request.URL.String(), aiKeyCanary) {
-						t.Fatal("credential leaked into URL")
-					}
-					return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(test.responseBody)), Request: request}, nil
-				}),
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			output, err := client.Generate(context.Background(), aiKeyCanary, ai.GenerationRequest{SystemPrompt: "system", UserPrompt: "user"})
-			if err != nil || string(output) != "ok" {
-				t.Fatalf("output=%q err=%v", output, err)
-			}
-		})
-	}
-}
-
-func TestProviderConnectionTestUsesTemporaryKeyWithoutPersistence(t *testing.T) {
+func TestProviderConnectionTestUsesFixedModelWithoutPersistence(t *testing.T) {
 	start := time.Date(2026, 8, 9, 12, 0, 0, 0, time.UTC)
 	clockCalls := 0
 	clock := func() time.Time {
@@ -246,11 +202,11 @@ func TestProviderConnectionTestUsesTemporaryKeyWithoutPersistence(t *testing.T) 
 		return start.Add(time.Duration(clockCalls-1) * 125 * time.Millisecond)
 	}
 	seenKey := ""
-	result, err := ai.TestConnection(context.Background(), ai.ProviderInput{ProviderID: "openai", Model: "model-test", APIKey: aiKeyCanary}, roundTripFunc(func(request *http.Request) (*http.Response, error) {
+	result, err := ai.TestConnection(context.Background(), aiKeyCanary, roundTripFunc(func(request *http.Request) (*http.Response, error) {
 		seenKey = strings.TrimPrefix(request.Header.Get("Authorization"), "Bearer ")
 		return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"choices":[{"message":{"content":"{\"ok\":true}"}}]}`)), Request: request}, nil
 	}), clock)
-	if err != nil || !result.OK || result.LatencyMS != 125 || result.Model != "model-test" || seenKey != aiKeyCanary {
+	if err != nil || !result.OK || result.LatencyMS != 125 || result.Model != ai.FixedModel || seenKey != aiKeyCanary {
 		t.Fatalf("result=%#v seenKey=%q err=%v", result, seenKey, err)
 	}
 }
@@ -265,17 +221,13 @@ func TestProviderRetryClassificationOnlyRetriesTransientFailures(t *testing.T) {
 		{status: http.StatusTooManyRequests, retryable: true},
 		{status: http.StatusInternalServerError, retryable: true},
 	} {
-		client, err := ai.NewProviderClient(ai.ProviderClientConfig{
-			ProviderID: "openai",
-			Model:      "model-test",
-			Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
-				return &http.Response{StatusCode: test.status, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("redacted")), Request: request}, nil
-			}),
-		})
+		client, err := ai.NewProviderClient(ai.ProviderClientConfig{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+			return &http.Response{StatusCode: test.status, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("redacted")), Request: request}, nil
+		})})
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, failure := client.Generate(context.Background(), aiKeyCanary, ai.GenerationRequest{SystemPrompt: "system", UserPrompt: "user"})
+		_, failure := client.Generate(context.Background(), aiKeyCanary, ai.GenerationRequest{SchemaName: ai.EnrichmentSchemaName, SystemPrompt: "system", UserPrompt: "user"})
 		if failure == nil || ai.ShouldRetryProvider(failure) != test.retryable {
 			t.Fatalf("status=%d retryable=%t err=%v", test.status, ai.ShouldRetryProvider(failure), failure)
 		}

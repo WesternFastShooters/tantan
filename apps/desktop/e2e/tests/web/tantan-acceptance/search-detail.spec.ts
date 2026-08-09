@@ -16,7 +16,7 @@ const entry = (entryId: string, title: string) => ({
 })
 
 const mockSession = async (page: Page) => {
-  await page.route("http://127.0.0.1:3000/readyz", (route) =>
+  await page.route("**/api/readyz", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -26,7 +26,7 @@ const mockSession = async (page: Page) => {
       }),
     }),
   )
-  await page.route("http://127.0.0.1:3000/tantan/v1/session", (route) =>
+  await page.route("**/api/tantan/v1/session", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -52,7 +52,7 @@ test.describe("Tantan acceptance Search and Detail", () => {
       "Topic 命中",
       "Tag 命中",
     ]
-    await page.route("http://127.0.0.1:3000/tantan/v1/search?**", (route) => {
+    await page.route("**/api/tantan/v1/search?**", (route) => {
       const cursor = new URL(route.request().url()).searchParams.get("cursor")
       const items = cursor
         ? [
@@ -96,9 +96,9 @@ test.describe("Tantan acceptance Search and Detail", () => {
     page,
   }) => {
     await mockSession(page)
-    const entryId = "41147805272532000"
+    const entryId = "309246809866240002"
     let collectionMethod = ""
-    await page.route("http://localhost:3000/entries?**", (route) =>
+    await page.route("**/api/folo/entries?**", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -128,14 +128,14 @@ test.describe("Tantan acceptance Search and Detail", () => {
         }),
       }),
     )
-    await page.route("http://localhost:3000/reads", (route) =>
+    await page.route("**/api/folo/reads", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({ data: true }),
       }),
     )
-    await page.route("http://localhost:3000/collections", (route) => {
+    await page.route("**/api/folo/collections", (route) => {
       collectionMethod = route.request().method()
       return route.fulfill({
         status: 200,
@@ -143,7 +143,7 @@ test.describe("Tantan acceptance Search and Detail", () => {
         body: JSON.stringify({ code: 0, data: null }),
       })
     })
-    await page.route(`http://127.0.0.1:3000/tantan/v1/entries/${entryId}/enrichment?**`, (route) =>
+    await page.route(`**/api/tantan/v1/entries/${entryId}/enrichment?**`, (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",

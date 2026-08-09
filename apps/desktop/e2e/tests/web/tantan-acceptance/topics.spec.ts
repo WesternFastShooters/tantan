@@ -5,7 +5,7 @@ import { buildWebAppURL, resolveDesktopE2EEnv } from "../../../support/env"
 test("FE:TC-020 Topic pin, hide/show and ordering are versioned while recommend remains immutable", async ({
   page,
 }) => {
-  await page.route("http://127.0.0.1:3000/readyz", (route) =>
+  await page.route("**/api/readyz", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -15,7 +15,7 @@ test("FE:TC-020 Topic pin, hide/show and ordering are versioned while recommend 
       }),
     }),
   )
-  await page.route("http://127.0.0.1:3000/tantan/v1/session", (route) =>
+  await page.route("**/api/tantan/v1/session", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -56,7 +56,7 @@ test("FE:TC-020 Topic pin, hide/show and ordering are versioned while recommend 
     },
   ]
   const requestVersions: number[] = []
-  await page.route("http://127.0.0.1:3000/tantan/v1/topics", async (route) => {
+  await page.route("**/api/tantan/v1/topics", async (route) => {
     if (route.request().method() === "GET") {
       return route.fulfill({
         status: 200,
@@ -94,7 +94,7 @@ test("FE:TC-020 Topic pin, hide/show and ordering are versioned while recommend 
       body: JSON.stringify({ version, activeFilterId: null, topics }),
     })
   })
-  await page.route("http://127.0.0.1:3000/tantan/v1/recommendation/blocks/sources", (route) =>
+  await page.route("**/api/tantan/v1/recommendation/blocks/sources", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",

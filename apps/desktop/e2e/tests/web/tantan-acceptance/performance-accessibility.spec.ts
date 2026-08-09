@@ -5,7 +5,7 @@ import { expect, test } from "@playwright/test"
 import { buildWebAppURL, resolveDesktopE2EEnv } from "../../../support/env"
 
 const mockHome = async (page: Page, count: number) => {
-  await page.route("http://127.0.0.1:3000/readyz", (route) =>
+  await page.route("**/api/readyz", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -15,7 +15,7 @@ const mockHome = async (page: Page, count: number) => {
       }),
     }),
   )
-  await page.route("http://127.0.0.1:3000/tantan/v1/session", (route) =>
+  await page.route("**/api/tantan/v1/session", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -25,7 +25,7 @@ const mockHome = async (page: Page, count: number) => {
       }),
     }),
   )
-  await page.route("http://127.0.0.1:3000/tantan/v1/topics", (route) =>
+  await page.route("**/api/tantan/v1/topics", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -46,7 +46,7 @@ const mockHome = async (page: Page, count: number) => {
       }),
     }),
   )
-  await page.route("http://127.0.0.1:3000/tantan/v1/home?**", (route) =>
+  await page.route("**/api/tantan/v1/home?**", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",

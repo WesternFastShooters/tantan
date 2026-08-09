@@ -4,60 +4,59 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"unicode"
 
 	"tantan.local/tantan-api/internal/ai"
-	"tantan.local/tantan-api/internal/keyring"
 )
 
-const liveGoogleModel = "gemini-3.5-flash-lite"
-
-// TestLiveGoogleTranslation is opt-in because it uses the user's real Provider
-// account. The credential is read directly from the OS Keychain and is never
-// accepted through an environment variable, fixture, URL, or test output.
+// TestLiveGoogleTranslation is opt-in. The credential is read from the same
+// private server-side file used by the Go service and is never printed.
 func TestLiveGoogleTranslation(t *testing.T) {
 	if os.Getenv("TANTAN_LIVE_AI") != "1" {
-		t.Skip("set TANTAN_LIVE_AI=1 after saving the Google key in the OS Keychain")
+		t.Skip("set TANTAN_LIVE_AI=1 after configuring a rotated server Gemini key file")
 	}
-
-	secrets, err := keyring.NewAIProviderStore()
+	path := os.Getenv("TANTAN_GEMINI_API_KEY_FILE")
+	if path == "" || !filepath.IsAbs(path) {
+		t.Fatal("TANTAN_GEMINI_API_KEY_FILE must name an absolute private file")
+	}
+	info, err := os.Stat(path)
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 {
+		t.Fatal("Gemini key file must be a private regular file")
+	}
+	contents, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("open AI Provider Keychain: %v", err)
+		t.Fatal("read Gemini key file failed")
 	}
-	apiKey, err := secrets.Get(context.Background(), "google")
-	if err != nil {
-		t.Fatalf("read Google key from Keychain: %v", err)
-	}
+	apiKey := strings.TrimSuffix(strings.TrimSuffix(string(contents), "\n"), "\r")
+	clear(contents)
 	t.Cleanup(func() {
 		apiKey = ""
 	})
 
-	client, err := ai.NewProviderClient(ai.ProviderClientConfig{
-		ProviderID: "google",
-		Model:      liveGoogleModel,
-	})
+	client, err := ai.NewProviderClient(ai.ProviderClientConfig{})
 	if err != nil {
 		t.Fatalf("create Google client: %v", err)
 	}
 
 	output, err := client.Generate(context.Background(), apiKey, ai.GenerationRequest{
-		SchemaName:   "live-translation-smoke-v1",
-		SystemPrompt: `Translate English into Simplified Chinese. Return only one JSON object matching {"translation":"string"}. Preserve product names.`,
-		UserPrompt:   `Translate: "The quick brown fox jumps over the lazy dog."`,
+		SchemaName:   ai.EnrichmentSchemaName,
+		SystemPrompt: "Translate the supplied English into Simplified Chinese and return the approved enrichment JSON object only.",
+		UserPrompt:   `{"title":"Fox","content":"The quick brown fox jumps over the lazy dog."}`,
 	})
 	if err != nil {
 		t.Fatalf("run live Google translation: %v", err)
 	}
 
 	var result struct {
-		Translation string `json:"translation"`
+		ContentZh string `json:"contentZh"`
 	}
 	if err := json.Unmarshal(output, &result); err != nil {
 		t.Fatalf("decode live translation JSON: %v", err)
 	}
-	translation := strings.TrimSpace(result.Translation)
+	translation := strings.TrimSpace(result.ContentZh)
 	if translation == "" || translation == "The quick brown fox jumps over the lazy dog." {
 		t.Fatal("live translation did not return translated text")
 	}

@@ -8,10 +8,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"tantan.local/tantan-api/internal/ai/schema"
 )
 
 const (
@@ -49,9 +50,7 @@ type Generator interface {
 }
 
 type ProviderClientConfig struct {
-	ProviderID string
-	Model      string
-	Transport  http.RoundTripper
+	Transport http.RoundTripper
 }
 
 type ProviderClient struct {
@@ -81,12 +80,11 @@ func (failure providerError) Temporary() bool {
 }
 
 func NewProviderClient(config ProviderClientConfig) (*ProviderClient, error) {
-	preset, err := ProviderPreset(strings.TrimSpace(config.ProviderID))
+	preset, err := ProviderPreset(FixedProviderID)
 	if err != nil {
 		return nil, err
 	}
-	model := strings.TrimSpace(config.Model)
-	if err := ValidateModel(model); err != nil {
+	if err := ValidateModel(FixedModel); err != nil {
 		return nil, err
 	}
 	transport := config.Transport
@@ -103,7 +101,7 @@ func NewProviderClient(config ProviderClientConfig) (*ProviderClient, error) {
 			return http.ErrUseLastResponse
 		},
 	}
-	return &ProviderClient{preset: preset, model: model, client: client}, nil
+	return &ProviderClient{preset: preset, model: FixedModel, client: client}, nil
 }
 
 func (client *ProviderClient) Generate(ctx context.Context, apiKey string, generation GenerationRequest) ([]byte, error) {
@@ -126,15 +124,7 @@ func (client *ProviderClient) Generate(ctx context.Context, apiKey string, gener
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "application/json")
-	switch client.preset.Kind {
-	case "anthropic":
-		request.Header.Set("x-api-key", apiKey)
-		request.Header.Set("anthropic-version", "2023-06-01")
-	case "google":
-		request.Header.Set("x-goog-api-key", apiKey)
-	default:
-		request.Header.Set("Authorization", "Bearer "+apiKey)
-	}
+	request.Header.Set("Authorization", "Bearer "+apiKey)
 	response, err := client.client.Do(request)
 	if err != nil {
 		return nil, providerError{temporary: true}
@@ -161,36 +151,18 @@ func (client *ProviderClient) Generate(ctx context.Context, apiKey string, gener
 func (client *ProviderClient) request(generation GenerationRequest) (string, []byte, error) {
 	systemPrompt := safePromptText(generation.SystemPrompt, 20_000)
 	userPrompt := safePromptText(generation.UserPrompt, 200_000)
-	var target string
-	var payload any
-	switch client.preset.Kind {
-	case "anthropic":
-		target = client.preset.BaseURL + "/v1/messages"
-		payload = map[string]any{
-			"model":       client.model,
-			"max_tokens":  8192,
-			"temperature": 0,
-			"system":      systemPrompt,
-			"messages":    []map[string]string{{"role": "user", "content": userPrompt}},
-		}
-	case "google":
-		target = client.preset.BaseURL + "/v1beta/models/" + url.PathEscape(client.model) + ":generateContent"
-		payload = map[string]any{
-			"systemInstruction": map[string]any{"parts": []map[string]string{{"text": systemPrompt}}},
-			"contents":          []map[string]any{{"role": "user", "parts": []map[string]string{{"text": userPrompt}}}},
-			"generationConfig":  map[string]any{"temperature": 0, "responseMimeType": "application/json"},
-		}
-	default:
-		target = strings.TrimSuffix(client.preset.BaseURL, "/") + "/chat/completions"
-		payload = map[string]any{
-			"model":           client.model,
-			"temperature":     0,
-			"response_format": map[string]string{"type": "json_object"},
-			"messages": []map[string]string{
-				{"role": "system", "content": systemPrompt},
-				{"role": "user", "content": userPrompt},
-			},
-		}
+	responseFormat, err := fixedResponseFormat(generation.SchemaName)
+	if err != nil {
+		return "", nil, err
+	}
+	target := strings.TrimSuffix(client.preset.BaseURL, "/") + "/chat/completions"
+	payload := map[string]any{
+		"model":           client.model,
+		"response_format": responseFormat,
+		"messages": []map[string]string{
+			{"role": "system", "content": systemPrompt},
+			{"role": "user", "content": userPrompt},
+		},
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -200,52 +172,49 @@ func (client *ProviderClient) request(generation GenerationRequest) (string, []b
 }
 
 func (client *ProviderClient) response(contents []byte) ([]byte, error) {
-	switch client.preset.Kind {
-	case "anthropic":
-		var payload struct {
-			Content []struct {
-				Type string `json:"type"`
-				Text string `json:"text"`
-			} `json:"content"`
-		}
-		if err := json.Unmarshal(contents, &payload); err != nil {
-			return nil, errors.New("AI provider returned invalid JSON")
-		}
-		for _, item := range payload.Content {
-			if item.Type == "text" && item.Text != "" {
-				return []byte(item.Text), nil
-			}
-		}
-	case "google":
-		var payload struct {
-			Candidates []struct {
-				Content struct {
-					Parts []struct {
-						Text string `json:"text"`
-					} `json:"parts"`
-				} `json:"content"`
-			} `json:"candidates"`
-		}
-		if err := json.Unmarshal(contents, &payload); err != nil {
-			return nil, errors.New("AI provider returned invalid JSON")
-		}
-		if len(payload.Candidates) > 0 && len(payload.Candidates[0].Content.Parts) > 0 {
-			return []byte(payload.Candidates[0].Content.Parts[0].Text), nil
-		}
-	default:
-		var payload struct {
-			Choices []struct {
-				Message struct {
-					Content string `json:"content"`
-				} `json:"message"`
-			} `json:"choices"`
-		}
-		if err := json.Unmarshal(contents, &payload); err != nil {
-			return nil, errors.New("AI provider returned invalid JSON")
-		}
-		if len(payload.Choices) > 0 {
-			return []byte(payload.Choices[0].Message.Content), nil
-		}
+	var payload struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.Unmarshal(contents, &payload); err != nil {
+		return nil, errors.New("AI provider returned invalid JSON")
+	}
+	if len(payload.Choices) > 0 {
+		return []byte(payload.Choices[0].Message.Content), nil
 	}
 	return nil, errors.New("AI provider returned no content")
+}
+
+func fixedResponseFormat(schemaName string) (map[string]any, error) {
+	if schemaName == ConnectionSchemaName {
+		return map[string]any{"type": "json_object"}, nil
+	}
+	approved := map[string]string{
+		EnrichmentSchemaName: EnrichmentSchemaName + ".schema.json",
+		TopicSchemaName:      TopicSchemaName + ".schema.json",
+		FilterSchemaName:     FilterSchemaName + ".schema.json",
+	}
+	filename, ok := approved[schemaName]
+	if !ok {
+		return nil, errors.New("AI output schema is not approved")
+	}
+	contents, err := schema.Read(filename)
+	if err != nil {
+		return nil, errors.New("read approved AI output schema failed")
+	}
+	var document map[string]any
+	if err := json.Unmarshal(contents, &document); err != nil {
+		return nil, errors.New("approved AI output schema is invalid")
+	}
+	return map[string]any{
+		"type": "json_schema",
+		"json_schema": map[string]any{
+			"name":   schemaName,
+			"strict": true,
+			"schema": document,
+		},
+	}, nil
 }

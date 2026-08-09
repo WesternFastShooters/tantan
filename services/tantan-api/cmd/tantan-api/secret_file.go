@@ -10,13 +10,14 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"tantan.local/tantan-api/internal/ai"
 	"tantan.local/tantan-api/internal/keyring"
 )
 
 const (
-	fixedGeminiProviderID = "google-gemini-openai"
-	fixedGeminiModel      = "gemini-3.5-flash-lite"
-	fixedGeminiEndpoint   = "https://generativelanguage.googleapis.com/v1beta/openai"
+	fixedGeminiProviderID = ai.FixedProviderID
+	fixedGeminiModel      = ai.FixedModel
+	fixedGeminiEndpoint   = ai.FixedBaseURL
 	maximumSecretBytes    = 8 * 1024
 )
 

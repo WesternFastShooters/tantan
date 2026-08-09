@@ -62,9 +62,11 @@ type State struct {
 }
 
 type Mutation struct {
-	Filter  *State       `json:"filter"`
-	Topics  []topic.Item `json:"topics"`
-	QueueID string       `json:"queueId"`
+	Filter          *State       `json:"filter"`
+	Topics          []topic.Item `json:"topics"`
+	TopicsRevision  int64        `json:"topicsRevision"`
+	QueueID         string       `json:"queueId"`
+	QueueGeneration string       `json:"queueGeneration"`
 }
 
 func NewService(config Config) (*Service, error) {
@@ -104,13 +106,13 @@ func (service *Service) Put(ctx context.Context, request Request) (Mutation, err
 	} else if found {
 		return existing, nil
 	}
-	active, apiKey, err := service.settings.Credential(ctx, ai.DefaultPromptVersion)
+	_, apiKey, err := service.settings.Credential(ctx, ai.DefaultPromptVersion)
 	if err != nil {
 		return Mutation{}, err
 	}
 	generator := service.generator
 	if generator == nil {
-		generator, err = ai.NewProviderClient(ai.ProviderClientConfig{ProviderID: active.ProviderID, Model: active.Model})
+		generator, err = ai.NewProviderClient(ai.ProviderClientConfig{})
 		if err != nil {
 			return Mutation{}, err
 		}
@@ -189,7 +191,7 @@ SELECT ?,e.entry_id,?,1,0,e.content_hash,? FROM entries e WHERE e.entry_id=?`, r
 	if err != nil {
 		return Mutation{}, err
 	}
-	return Mutation{Filter: &state, Topics: listed.Topics, QueueID: queue.ID}, nil
+	return Mutation{Filter: &state, Topics: listed.Topics, TopicsRevision: listed.TopicsRevision, QueueID: queue.ID, QueueGeneration: queue.Generation}, nil
 }
 
 func (service *Service) replay(ctx context.Context, request Request, filterID string) (Mutation, bool, error) {
@@ -208,11 +210,12 @@ WHERE filter_id=? AND user_id=?`, filterID, request.UserID).Scan(&state.ID, &sta
 		return Mutation{}, false, ErrIdempotencyConflict
 	}
 	var queueID string
+	var queueGeneration string
 	var timezone string
 	err = service.store.DB().QueryRowContext(ctx, `
-SELECT queue_id,timezone FROM daily_queues
+SELECT queue_id,generation,timezone FROM daily_queues
 WHERE user_id=? AND filter_key=? AND status='ready'
-ORDER BY local_date DESC,version DESC LIMIT 1`, request.UserID, filterID).Scan(&queueID, &timezone)
+ORDER BY local_date DESC,version DESC LIMIT 1`, request.UserID, filterID).Scan(&queueID, &queueGeneration, &timezone)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Mutation{}, false, ErrIdempotencyConflict
 	}
@@ -226,7 +229,7 @@ ORDER BY local_date DESC,version DESC LIMIT 1`, request.UserID, filterID).Scan(&
 	if err != nil {
 		return Mutation{}, false, err
 	}
-	return Mutation{Filter: &state, Topics: listed.Topics, QueueID: queueID}, true, nil
+	return Mutation{Filter: &state, Topics: listed.Topics, TopicsRevision: listed.TopicsRevision, QueueID: queueID, QueueGeneration: queueGeneration}, true, nil
 }
 
 func (service *Service) Delete(ctx context.Context, userID, timezone string) (Mutation, error) {
@@ -259,8 +262,16 @@ func (service *Service) Delete(ctx context.Context, userID, timezone string) (Mu
 		if _, err := transaction.ExecContext(ctx, "UPDATE home_filters SET status='inactive',updated_at=? WHERE user_id=? AND status='active'", now.Format(time.RFC3339Nano), userID); err != nil {
 			return err
 		}
-		if _, err := transaction.ExecContext(ctx, "DELETE FROM topics WHERE user_id=? AND kind='filter'", userID); err != nil {
+		deleted, err := transaction.ExecContext(ctx, "DELETE FROM topics WHERE user_id=? AND kind='filter'", userID)
+		if err != nil {
 			return err
+		}
+		if affected, err := deleted.RowsAffected(); err != nil {
+			return err
+		} else if affected > 0 {
+			if _, err := transaction.ExecContext(ctx, "UPDATE accounts SET topics_revision=topics_revision+1,updated_at=? WHERE user_id=?", now.Format(time.RFC3339Nano), userID); err != nil {
+				return err
+			}
 		}
 		return service.indexer.RefreshTx(ctx, transaction, userID, oldEntries)
 	})
@@ -271,7 +282,7 @@ func (service *Service) Delete(ctx context.Context, userID, timezone string) (Mu
 	if err != nil {
 		return Mutation{}, err
 	}
-	return Mutation{Filter: nil, Topics: listed.Topics, QueueID: queue.ID}, nil
+	return Mutation{Filter: nil, Topics: listed.Topics, TopicsRevision: listed.TopicsRevision, QueueID: queue.ID, QueueGeneration: queue.Generation}, nil
 }
 
 func (service *Service) filterPrompt(ctx context.Context, request Request) (ai.GenerationRequest, error) {
@@ -304,7 +315,7 @@ WHERE ae.user_id=? ORDER BY f.feed_id LIMIT 200`, request.UserID)
 	}
 	payload, _ := json.Marshal(map[string]any{"prompt": request.Prompt, "availableTopics": availableTopics, "availableSources": availableSources})
 	return ai.GenerationRequest{
-		SchemaName:   "filter-spec-v1",
+		SchemaName:   ai.FilterSchemaName,
 		SystemPrompt: "Tantan prompt-v1. Convert the preference to exactly one FilterSpecV1 JSON object. Use only provided topic/source IDs. No extra keys, Markdown, HTML, URLs, tools, or explanation.",
 		UserPrompt:   string(payload),
 	}, rows.Err()
@@ -315,7 +326,7 @@ func repairFilterPrompt(invalid []byte) ai.GenerationRequest {
 		invalid = invalid[:200_000]
 	}
 	payload, _ := json.Marshal(map[string]string{"schema": "filter-spec-v1", "invalidOutput": string(invalid)})
-	return ai.GenerationRequest{SchemaName: "filter-spec-v1", SystemPrompt: "Repair the supplied output once. Return only one valid FilterSpecV1 JSON object, with no Markdown or explanation.", UserPrompt: string(payload), Repair: true}
+	return ai.GenerationRequest{SchemaName: ai.FilterSchemaName, SystemPrompt: "Repair the supplied output once. Return only one valid FilterSpecV1 JSON object, with no Markdown or explanation.", UserPrompt: string(payload), Repair: true}
 }
 
 func (service *Service) validateReferences(ctx context.Context, userID string, spec recommendation.FilterSpecV1) error {

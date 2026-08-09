@@ -248,6 +248,14 @@ func TestApplicationAuthenticatedHomeTopicsSearchAndStrictAISettings(t *testing.
 	}
 
 	canary := "sk-tantan-api-contract-canary"
+	aiStatus := do(stdhttp.MethodGet, "/api/tantan/v1/settings/ai-provider", nil)
+	if aiStatus.Code != stdhttp.StatusOK || !strings.Contains(aiStatus.Body.String(), `"providerId":"google-gemini-openai"`) || !strings.Contains(aiStatus.Body.String(), `"model":"gemini-3.5-flash-lite"`) || !strings.Contains(aiStatus.Body.String(), `"baseUrl":"https://generativelanguage.googleapis.com/v1beta/openai"`) || strings.Contains(aiStatus.Body.String(), canary) {
+		t.Fatalf("fixed AI status=%d body=%s", aiStatus.Code, aiStatus.Body.String())
+	}
+	invalidTest := do(stdhttp.MethodPost, "/api/tantan/v1/settings/ai-provider/test", []byte(`{"apiKey":"`+canary+`","model":"attacker-model","baseUrl":"https://attacker.invalid"}`))
+	if invalidTest.Code != stdhttp.StatusBadRequest || strings.Contains(invalidTest.Body.String(), canary) {
+		t.Fatalf("AI test accepted browser configuration status=%d body=%s", invalidTest.Code, invalidTest.Body.String())
+	}
 	invalidSettings := do(stdhttp.MethodPut, "/api/tantan/v1/settings/ai-provider", []byte(`{"providerId":"openai","model":"gpt-5-mini","apiKey":"`+canary+`","baseUrl":"https://attacker.invalid"}`))
 	if invalidSettings.Code != stdhttp.StatusMethodNotAllowed && invalidSettings.Code != stdhttp.StatusNotFound || strings.Contains(invalidSettings.Body.String(), canary) {
 		t.Fatalf("strict AI settings status=%d body=%s", invalidSettings.Code, invalidSettings.Body.String())
