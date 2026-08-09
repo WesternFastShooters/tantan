@@ -329,6 +329,8 @@
         "apps/desktop/layer/renderer/src/modules/tantan-home/**",
         "apps/desktop/layer/renderer/src/modules/tantan-entry/**",
         "apps/desktop/layer/renderer/src/modules/tantan-shell/HomeRoute*.tsx",
+        "apps/desktop/layer/renderer/src/modules/tantan-shell/TantanAppShell.tsx",
+        "apps/desktop/layer/renderer/src/pages/(main)/(detail)/entries/**",
         "apps/desktop/e2e/tests/web/tantan-home*.spec.ts"
       ],
       "forbiddenWrites": [

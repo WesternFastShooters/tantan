@@ -73,6 +73,8 @@ const RouteContent = () => {
 
 export function TantanAppShell() {
   const mobile = useTantanMobile()
+  const location = useLocation()
+  const detailRoute = location.pathname.startsWith("/entries/")
 
   return (
     <div ref={handleRootRef} className="relative flex h-dvh min-h-0 bg-zinc-950 text-zinc-100">
@@ -81,12 +83,15 @@ export function TantanAppShell() {
         <main
           ref={setMainContainerElement}
           tabIndex={-1}
-          className="min-w-0 flex-1 overflow-auto bg-zinc-950 pb-[calc(4rem+env(safe-area-inset-bottom))] outline-none md:pb-0"
+          className={cn(
+            "min-w-0 flex-1 overflow-auto bg-zinc-950 outline-none md:pb-0",
+            !detailRoute && "pb-[calc(4rem+env(safe-area-inset-bottom))]",
+          )}
         >
           <RouteContent />
         </main>
       </LocalServiceGuard>
-      {mobile && <MobileNavigation />}
+      {mobile && !detailRoute && <MobileNavigation />}
     </div>
   )
 }
