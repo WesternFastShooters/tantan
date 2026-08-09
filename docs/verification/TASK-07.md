@@ -21,11 +21,20 @@ exit 127: security verifier did not exist
 
 The failures were limited to the missing TASK-07 behavior.
 
+A real second start later exposed an upgrade/restart failure not covered by the original fixture:
+the service had created the day's backup before migration 0004, then treated that older snapshot as
+if it had to satisfy the new migration set. Startup failed closed with `SERVICE_NOT_READY`.
+The filename also used the UTC date even though the runbook promised the local date. Focused Red
+tests reproduced both failures.
+
 ## Green and refactor
 
 - Database inspection now runs `PRAGMA foreign_key_check` in addition to checksum, integrity,
   migration, and audited row-count checks. Restore still validates the isolated copy before the
   atomic replacement.
+- Automatic backups use the local calendar date and include a zero-padded schema version in the
+  filename. An upgrade on the same day therefore preserves the pre-migration snapshot and creates
+  a new verified snapshot without overwriting either file; retention still keeps exactly seven.
 - The HTTP CSP now explicitly contains `connect-src 'self'`.
 - The production Service Worker remains static-asset-only: navigation denies `/api`, image caching
   rejects `/api`, and no `NetworkFirst` or `StaleWhileRevalidate` authenticated-response strategy
@@ -80,10 +89,22 @@ Capacity evidence:
 
 Real local doctor evidence:
 
-```text
+````text
 ok=true
 port=ok; data_directory=0700; sqlite=ok; migrations=ok;
 keychain set/get/delete=ok; Folo DNS=ok; Folo TLS=ok
+
+Real upgrade/restart evidence:
+
+```text
+legacy snapshot retained: tantan-2026-08-09.sqlite
+current snapshot created: tantan-2026-08-10-v000004.sqlite
+Go restart: PASS on 127.0.0.1:3000
+HTTPS /api/healthz: 200
+HTTPS /api/readyz: 200
+wrong direct Host: 403
+````
+
 ```
 
 ## Required-gate mapping
@@ -98,3 +119,4 @@ keychain set/get/delete=ok; Folo DNS=ok; Folo TLS=ok
 
 The operator-rotated real Gemini credential/live translation call remains TASK-05 evidence and was
 not replaced with the credential previously exposed in chat.
+```

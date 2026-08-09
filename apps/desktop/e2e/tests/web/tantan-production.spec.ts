@@ -289,6 +289,28 @@ test("production Mobile PWA covers login and every phase-one route across restar
   }
   expect((await page.request.get("/manifest.webmanifest")).status()).toBe(200)
   expect((await page.request.get("/sw.js")).status()).toBe(200)
+
+  const stylesheetHrefs = await page
+    .locator('link[rel="stylesheet"]')
+    .evaluateAll((links) => links.map((link) => (link as HTMLLinkElement).href))
+  let fontReference: string | undefined
+  let fontStylesheetURL: string | undefined
+  for (const stylesheetHref of stylesheetHrefs) {
+    const stylesheetResponse = await page.request.get(stylesheetHref)
+    expect(stylesheetResponse.status()).toBe(200)
+    fontReference = (await stylesheetResponse.text()).match(
+      /url\(((?:\.\/)?files\/sn-pro-latin-400-normal\.woff2)\)/u,
+    )?.[1]
+    if (fontReference) {
+      fontStylesheetURL = stylesheetResponse.url()
+      break
+    }
+  }
+  expect(fontReference).toBeTruthy()
+  const fontResponse = await page.request.get(new URL(fontReference!, fontStylesheetURL).href)
+  expect(fontResponse.status()).toBe(200)
+  expect(fontResponse.headers()["content-type"]).toContain("font/woff2")
+  expect((await fontResponse.body()).subarray(0, 4).toString("ascii")).toBe("wOF2")
 })
 
 test("production PWA registers its Service Worker without caching authenticated APIs", async ({

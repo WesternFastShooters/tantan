@@ -104,7 +104,7 @@ go run ./cmd/tantan-api backup \
   --output /绝对路径/tantan-backup.sqlite
 ```
 
-命令使用 SQLite `VACUUM INTO` 生成快照，发布前执行完整性、迁移、校验和及关键表行数检查，文件权限为 `0600`。服务每个本地日期启动时还会在数据目录的 `backups` 下生成一次备份，并只保留最近 7 份。
+命令使用 SQLite `VACUUM INTO` 生成快照，发布前执行完整性、迁移、校验和及关键表行数检查，文件权限为 `0600`。服务每个本地日期和 schema 版本生成一次 `tantan-YYYY-MM-DD-vNNNNNN.sqlite`；同日升级会保留升级前快照并生成新快照，绝不覆盖，目录只保留最近 7 份。
 
 备份不包含 OS Keychain 中的 Folo 会话、AI Provider Key 或游标签名密钥。
 

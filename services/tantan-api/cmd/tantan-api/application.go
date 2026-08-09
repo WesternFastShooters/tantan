@@ -86,7 +86,7 @@ func newApplication(ctx context.Context, config applicationConfig) (*application
 		_ = store.Close()
 		return nil, err
 	}
-	if _, err := ops.CreateDailyBackup(ctx, store, filepath.Join(config.DataDir, "backups"), config.Now().UTC()); err != nil {
+	if _, err := ops.CreateDailyBackup(ctx, store, filepath.Join(config.DataDir, "backups"), config.Now()); err != nil {
 		return fail(err)
 	}
 	foloSecrets := config.FoloSecrets

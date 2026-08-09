@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 
 import type { env as EnvType } from "@follow/shared/env.desktop"
@@ -45,6 +45,22 @@ const devPrint = (): PluginOption => ({
 const isWebBuild = process.env.WEB_BUILD === "1"
 
 console.log(green("Build type:"), isWebBuild ? "Web" : "Unknown")
+
+const snProFontAssetsPlugin = (): PluginOption => ({
+  name: "tantan-sn-pro-font-assets",
+  apply: "build",
+  buildStart() {
+    const fontDirectory = resolve(__dirname, "../../node_modules/@fontsource/sn-pro/files")
+    for (const filename of readdirSync(fontDirectory)) {
+      if (!filename.endsWith(".woff") && !filename.endsWith(".woff2")) continue
+      this.emitFile({
+        type: "asset",
+        fileName: `assets/files/${filename}`,
+        source: readFileSync(join(fontDirectory, filename)),
+      })
+    }
+  },
+})
 
 export default ({ mode }) => {
   const env = loadEnv(mode, process.cwd())
@@ -111,6 +127,7 @@ export default ({ mode }) => {
         enableInDev: true,
       }),
       localesPlugin(),
+      isWebBuild && snProFontAssetsPlugin(),
       isWebBuild &&
         VitePWA({
           strategies: "injectManifest",

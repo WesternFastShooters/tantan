@@ -7,6 +7,24 @@ Key in the server Secret file/manager, never the value posted in chat.
 Record device, OS/browser version, HTTPS URL, build commit and time. Then complete every row on a
 physical iPhone Safari or Android Chrome equivalent.
 
+## Local-LAN HTTPS path
+
+Use this only while the Mac and phone are on the same trusted Wi-Fi. It does not expose Tantan to
+the public Internet: Vite terminates local TLS and proxies same-origin `/api`; Go still binds only
+`127.0.0.1:3000`.
+
+1. Run `pnpm build:web`.
+2. Start Go with `TANTAN_PUBLIC_ORIGIN=https://<LAN-IP>:2443` and the production
+   `TANTAN_STATIC_DIR`.
+3. Start `SSL=1 WEB_BUILD=1 pnpm --dir apps/desktop exec vite preview --host 0.0.0.0 --port 2443 --strictPort`.
+4. Transfer only `$(mkcert -CAROOT)/rootCA.pem` to the phone. Never transfer
+   `rootCA-key.pem`. Install and explicitly trust the temporary CA, then open
+   `https://<LAN-IP>:2443`.
+5. After acceptance, stop both processes and remove the temporary CA profile/trust from the phone.
+
+The operator must not use a public tunnel for this checklist. If the LAN IP changes, restart both
+processes with the new origin and regenerate/retrust the certificate if necessary.
+
 | Step | Action                                              | Pass observation                                             | Status  |
 | ---- | --------------------------------------------------- | ------------------------------------------------------------ | ------- |
 | 1    | Open HTTPS URL and add to Home Screen               | Tantan icon/name; standalone launch works                    | PENDING |

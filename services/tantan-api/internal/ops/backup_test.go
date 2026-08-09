@@ -129,12 +129,60 @@ func TestDailyBackupIsIdempotentAndKeepsExactlySevenVerifiedFiles(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(entries) != 7 || entries[0].Name() != "tantan-2026-08-03.sqlite" || entries[6].Name() != "tantan-2026-08-09.sqlite" {
+	if len(entries) != 7 || entries[0].Name() != "tantan-2026-08-03-v000004.sqlite" || entries[6].Name() != "tantan-2026-08-09-v000004.sqlite" {
 		t.Fatalf("daily backups=%v", entries)
 	}
 	repeated, err := ops.CreateDailyBackup(ctx, store, directory, start.AddDate(0, 0, 8))
 	if err != nil || repeated.Created || repeated.Integrity != "ok" {
 		t.Fatalf("repeated=%#v err=%v", repeated, err)
+	}
+}
+
+func TestDailyBackupPreservesSameDayPreMigrationSnapshot(t *testing.T) {
+	ctx := context.Background()
+	store, err := storage.Open(ctx, storage.Config{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	directory := filepath.Join(t.TempDir(), "backups")
+	if err := os.MkdirAll(directory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 8, 9, 8, 0, 0, 0, time.UTC)
+	legacyPath := filepath.Join(directory, "tantan-2026-08-09.sqlite")
+	if _, err := ops.Backup(ctx, store, legacyPath); err != nil {
+		t.Fatal(err)
+	}
+	legacyDatabase, err := sql.Open("sqlite", "file:"+legacyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := legacyDatabase.ExecContext(ctx, "DELETE FROM schema_migrations WHERE version=(SELECT MAX(version) FROM schema_migrations)"); err != nil {
+		_ = legacyDatabase.Close()
+		t.Fatal(err)
+	}
+	if err := legacyDatabase.Close(); err != nil {
+		t.Fatal(err)
+	}
+	legacyContents, err := os.ReadFile(legacyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := ops.CreateDailyBackup(ctx, store, directory, now)
+	if err != nil {
+		t.Fatalf("create post-migration daily backup: %v", err)
+	}
+	if !result.Created || result.Path == legacyPath || !strings.Contains(filepath.Base(result.Path), "-v") {
+		t.Fatalf("daily backup did not create a versioned snapshot: %#v", result)
+	}
+	unchanged, err := os.ReadFile(legacyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(unchanged) != string(legacyContents) {
+		t.Fatal("pre-migration daily snapshot was modified")
 	}
 }
 

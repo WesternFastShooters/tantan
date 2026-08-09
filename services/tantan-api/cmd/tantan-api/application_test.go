@@ -11,6 +11,8 @@ import (
 	stdhttp "net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -57,8 +59,13 @@ func TestApplicationStartsMigratedReadyAndRoutesLocalAPI(t *testing.T) {
 	defer upstream.Close()
 	upstreamURL, _ := url.Parse(upstream.URL)
 	secrets := &applicationSecrets{values: map[string]string{}}
+	dataDirectory := t.TempDir()
+	shanghai, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		t.Fatal(err)
+	}
 	application, err := newApplication(context.Background(), applicationConfig{
-		DataDir:       t.TempDir(),
+		DataDir:       dataDirectory,
 		PublicOrigin:  "http://127.0.0.1:3000",
 		Upstream:      upstreamURL,
 		FoloWebURL:    upstreamURL,
@@ -68,7 +75,7 @@ func TestApplicationStartsMigratedReadyAndRoutesLocalAPI(t *testing.T) {
 		ProbeKeychain: secrets,
 		CursorSecrets: secrets,
 		Logger:        slog.New(slog.NewJSONHandler(io.Discard, nil)),
-		Now:           func() time.Time { return time.Date(2026, 8, 9, 12, 0, 0, 0, time.UTC) },
+		Now:           func() time.Time { return time.Date(2026, 8, 10, 0, 30, 0, 0, shanghai) },
 		Version:       "test-version",
 		StartWorkers:  false,
 	})
@@ -95,6 +102,9 @@ func TestApplicationStartsMigratedReadyAndRoutesLocalAPI(t *testing.T) {
 	var migrations int
 	if err := application.Store.DB().QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&migrations); err != nil || migrations != 4 {
 		t.Fatalf("migrations=%d err=%v", migrations, err)
+	}
+	if _, err := os.Stat(filepath.Join(dataDirectory, "backups", "tantan-2026-08-10-v000004.sqlite")); err != nil {
+		t.Fatalf("local-date daily backup was not created: %v", err)
 	}
 	if err := application.Close(); err != nil && !errors.Is(err, context.Canceled) {
 		t.Fatal(err)

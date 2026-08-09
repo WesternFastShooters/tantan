@@ -17,6 +17,10 @@ The first full development-suite rerun also proved the new production-only spec 
 by the broad development matcher and attempted to open port 4173. The regular Web project now
 explicitly ignores that file; the production configuration remains its only owner.
 
+The first real LAN HTTPS render produced 64 browser warnings because the bundled SN Pro CSS pointed
+at `assets/files/*.woff2`, but those files were absent and the SPA fallback returned HTML. The
+production test then failed on `Content-Type: text/html` instead of `font/woff2`.
+
 ## Green and refactor
 
 - Vite PWA now injects `registerSW.js` with a deferred production registration. The Mobile router
@@ -28,6 +32,9 @@ explicitly ignores that file; the production configuration remains its only owne
 - PWA tests separately allow Service Workers and prove the generated worker becomes active while
   authenticated `/api` responses remain absent from Cache Storage. Core API mocks run with Service
   Workers blocked because Playwright cannot route requests intercepted by a worker.
+- The Web build now emits every referenced SN Pro WOFF/WOFF2 asset at the exact same-origin path.
+  The production test verifies the response MIME type and WOFF2 magic bytes instead of accepting a
+  200 SPA fallback.
 
 ## Verify
 
@@ -44,17 +51,21 @@ pnpm --dir apps/desktop e2e:web:production
 
 pnpm --dir apps/desktop e2e:web
 31/31 PASS; production-only spec excluded
+
+real LAN HTTPS production render
+/, manifest.webmanifest, sw.js, /api/healthz, /api/readyz: 200
+five Folo login methods visible; browser font warnings: 0
 ```
 
 Frontend completion gate: PASS. The observable PWA registration/cache behavior maps directly to
-the new executable production tests and the focused build/production suite passed after the final
-Vite change.
+the executable production tests; font loading additionally maps to MIME and WOFF2-byte assertions.
+The focused build and Chromium/WebKit production suite passed after the final Vite change.
 
 ## Remaining external gates
 
 - Rotated-key live Gemini translation: PENDING. The exposed chat credential is not used.
-- Physical-phone HTTPS checklist: PENDING until an HTTPS URL reachable from the user's phone is
-  available. Deployment itself remains outside phase-one coding scope.
+- Physical-phone HTTPS checklist: PENDING. A LAN HTTPS URL is running and Mac rendering is proven;
+  the physical phone still has to trust the temporary local CA and complete the manual observations.
 
 TASK-08 and the Codex Goal must remain active until both observations are completed and final
 commands are rerun.

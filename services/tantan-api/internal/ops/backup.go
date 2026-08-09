@@ -47,7 +47,7 @@ var auditedTables = []string{
 	"entry_search",
 }
 
-var dailyBackupNamePattern = regexp.MustCompile(`^tantan-[0-9]{4}-[0-9]{2}-[0-9]{2}\.sqlite$`)
+var dailyBackupNamePattern = regexp.MustCompile(`^tantan-[0-9]{4}-[0-9]{2}-[0-9]{2}(?:-v[0-9]{6})?\.sqlite$`)
 
 type DatabaseInspection struct {
 	Integrity     string         `json:"integrity"`
@@ -91,7 +91,11 @@ func CreateDailyBackup(ctx context.Context, store *storage.Store, directory stri
 	if err := os.Chmod(absolute, 0o700); err != nil {
 		return DailyBackupResult{}, errors.New("secure daily backup directory failed")
 	}
-	path := filepath.Join(absolute, "tantan-"+now.Format(time.DateOnly)+".sqlite")
+	var schemaVersion int
+	if err := store.DB().QueryRowContext(ctx, "SELECT COALESCE(MAX(version),0) FROM schema_migrations").Scan(&schemaVersion); err != nil || schemaVersion < 1 {
+		return DailyBackupResult{}, errors.New("read daily backup schema version failed")
+	}
+	path := filepath.Join(absolute, fmt.Sprintf("tantan-%s-v%06d.sqlite", now.Format(time.DateOnly), schemaVersion))
 	if _, err := os.Lstat(path); err == nil {
 		inspection, inspectErr := InspectDatabase(ctx, path)
 		if inspectErr != nil {
