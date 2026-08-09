@@ -117,7 +117,7 @@ export default ({ mode }) => {
           srcDir: "src",
           filename: "sw.ts",
           registerType: "prompt",
-          injectRegister: false,
+          injectRegister: "script-defer",
 
           injectManifest: {
             globPatterns: [

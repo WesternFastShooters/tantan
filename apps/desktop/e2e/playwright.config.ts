@@ -36,6 +36,7 @@ export default defineConfig({
   projects: [
     {
       name: "web",
+      testIgnore: /tests\/web\/tantan-production\.spec\.ts/,
       testMatch: /tests\/web\/tantan-(?:[^/]+\.spec\.ts|acceptance\/.*\.spec\.ts)/,
       use: {
         ...devices["Desktop Chrome"],

@@ -23,8 +23,8 @@ Date: 2026-08-10
 ## Verify
 
 - Package validator: PASS, 0 errors, 0 warnings.
-- Web Vitest: 49 files / 140 tests PASS, 0 type errors.
-- Tantan Playwright: 24/24 PASS on PC/Mobile.
+- Web Vitest: 55 files / 157 tests PASS, 0 type errors.
+- Tantan Playwright: 31/31 Mobile Web regression tests PASS; production Chromium/WebKit 390/430 is 8/8 PASS.
 - Go ordinary and race suites: all packages PASS.
 - Typecheck, lint, web build, Go format/vet/build and module verification: PASS.
 - Frozen pnpm lockfile installation: PASS.
@@ -36,8 +36,8 @@ Date: 2026-08-10
 - Denied Folo route upstream calls: 0.
 - Critical Axe violations: 0.
 - Sensitive API/Auth Cache Storage entries: 0.
-- API Key/Token canary and real Provider Key in Git, SQLite, logs, HAR, browser storage and build outputs: 0.
+- Unique API Key/Token canary in Git, SQLite, logs, HAR, browser storage, backup and build outputs: 0. The exposed chat Key was not used; rotated-Key live translation remains pending.
 - AI Provider endpoint remains preset-only; explicit proxy is limited to a literal loopback IP and contains no credentials.
 - `apps/mobile/**` and `/Users/mingrui/Project/Folo`: no modifications.
 
-Remaining risks: none blocking local Phase 1. External Folo/Google availability and account credentials remain runtime dependencies.
+Remaining release gates: operator-rotated Gemini live translation and the physical-phone HTTPS checklist. External Folo/Google availability and account credentials remain runtime dependencies.
