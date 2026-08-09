@@ -25,6 +25,43 @@ type Job struct {
 	Attempts    int
 }
 
+type EnqueueRequest struct {
+	UserID    string
+	Kind      string
+	DedupeKey string
+	Payload   any
+	Now       time.Time
+}
+
+func EnqueueTx(ctx context.Context, transaction *sql.Tx, request EnqueueRequest) (Job, error) {
+	if transaction == nil || strings.TrimSpace(request.UserID) == "" || strings.TrimSpace(request.Kind) == "" || strings.TrimSpace(request.DedupeKey) == "" || request.Now.IsZero() {
+		return Job{}, errors.New("valid job enqueue request is required")
+	}
+	payload, err := json.Marshal(request.Payload)
+	if err != nil {
+		return Job{}, errors.New("encode job payload")
+	}
+	jobID, err := newJobID()
+	if err != nil {
+		return Job{}, err
+	}
+	timestamp := request.Now.UTC().Format(time.RFC3339Nano)
+	if _, err := transaction.ExecContext(ctx, `
+INSERT OR IGNORE INTO jobs(job_id,user_id,kind,dedupe_key,state,payload_json,attempts,next_run_at,created_at,updated_at)
+VALUES(?,?,?,?, 'queued',?,0,?,?,?)`, jobID, request.UserID, request.Kind, request.DedupeKey, string(payload), timestamp, timestamp, timestamp); err != nil {
+		return Job{}, fmt.Errorf("enqueue job: %w", err)
+	}
+	var job Job
+	if err := transaction.QueryRowContext(ctx, `
+SELECT job_id,user_id,kind,payload_json,attempts
+FROM jobs
+WHERE kind=? AND dedupe_key=? AND state IN ('queued','running')
+ORDER BY created_at,job_id LIMIT 1`, request.Kind, request.DedupeKey).Scan(&job.ID, &job.UserID, &job.Kind, &job.PayloadJSON, &job.Attempts); err != nil {
+		return Job{}, fmt.Errorf("read enqueued job: %w", err)
+	}
+	return job, nil
+}
+
 func EnqueueContentRetryTx(ctx context.Context, transaction *sql.Tx, userID string, entryIDs []string, now time.Time) error {
 	if transaction == nil || userID == "" || len(entryIDs) < 1 || len(entryIDs) > 50 {
 		return errors.New("content retry requires a user and 1 to 50 entry IDs")
@@ -142,9 +179,41 @@ WHERE job_id=? AND state='running'`, timestamp, timestamp, jobID)
 	})
 }
 
+func FinishTx(ctx context.Context, transaction *sql.Tx, jobID, state, errorCode string, now time.Time) error {
+	if transaction == nil || jobID == "" || (state != "succeeded" && state != "failed" && state != "cancelled") || now.IsZero() {
+		return errors.New("valid terminal job transition is required")
+	}
+	var code any
+	if errorCode != "" {
+		code = errorCode
+	}
+	timestamp := now.UTC().Format(time.RFC3339Nano)
+	result, err := transaction.ExecContext(ctx, `
+UPDATE jobs
+SET state=?,lease_until=NULL,error_code=?,updated_at=?,finished_at=?
+WHERE job_id=? AND state='running'`, state, code, timestamp, timestamp, jobID)
+	if err != nil {
+		return fmt.Errorf("finish job: %w", err)
+	}
+	return requireOneJob(result)
+}
+
 func Retry(ctx context.Context, store *storage.Store, job Job, payload any, errorCode string, now time.Time, maxAttempts int) (bool, error) {
 	if store == nil || job.ID == "" || strings.TrimSpace(errorCode) == "" || maxAttempts < 1 {
 		return false, errors.New("job retry requires storage, job, error code, and attempts")
+	}
+	var terminal bool
+	err := store.Write(ctx, func(transaction *sql.Tx) error {
+		var err error
+		terminal, err = RetryTx(ctx, transaction, job, payload, errorCode, now, maxAttempts)
+		return err
+	})
+	return terminal, err
+}
+
+func RetryTx(ctx context.Context, transaction *sql.Tx, job Job, payload any, errorCode string, now time.Time, maxAttempts int) (bool, error) {
+	if transaction == nil || job.ID == "" || strings.TrimSpace(errorCode) == "" || now.IsZero() || maxAttempts < 1 {
+		return false, errors.New("valid job retry transition is required")
 	}
 	encoded, err := json.Marshal(payload)
 	if err != nil {
@@ -160,17 +229,14 @@ func Retry(ctx context.Context, store *storage.Store, job Job, payload any, erro
 		nextRun = timestamp
 		finishedAt = timestamp
 	}
-	err = store.Write(ctx, func(transaction *sql.Tx) error {
-		result, err := transaction.ExecContext(ctx, `
+	result, err := transaction.ExecContext(ctx, `
 UPDATE jobs
 SET state=?,payload_json=?,next_run_at=?,lease_until=NULL,error_code=?,updated_at=?,finished_at=?
 WHERE job_id=? AND state='running'`, state, string(encoded), nextRun, errorCode, timestamp, finishedAt, job.ID)
-		if err != nil {
-			return fmt.Errorf("retry job: %w", err)
-		}
-		return requireOneJob(result)
-	})
-	return terminal, err
+	if err != nil {
+		return false, fmt.Errorf("retry job: %w", err)
+	}
+	return terminal, requireOneJob(result)
 }
 
 func requireOneJob(result sql.Result) error {
