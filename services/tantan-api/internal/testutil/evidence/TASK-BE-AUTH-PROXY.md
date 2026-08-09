@@ -1,66 +1,40 @@
-# TASK-BE-AUTH-PROXY evidence
+# TASK-02 验证证据：Go 边界、Folo 登录、密封会话与代理
 
-Date: 2026-08-09
+日期：2026-08-10
 
 ## Red
 
-Valid expected-failure command, run before production handlers existed:
+- `go test ./internal/http`：exit 1；旧 Router 仍调用已删除的 redirect callback，并暴露旧 `/auth`、`/tantan/v1` 边界。
+- 加入 migration 0004 后，`go test ./cmd/tantan-api`：exit 1；旧 readiness/backup 仍只认识 3 个 migration 和旧 AI 配置表。
+- 这些失败发生在实现之前，分别锁定同源 `/api` 路由、v2 session/CSRF、密封 secret 和迁移兼容问题。
 
-```text
-go test ./internal/session ./internal/folo ./internal/auth ./internal/http
-```
+## Green / Refactor
 
-Exit: `1`.
+- Router 只公开同源 `/api`：精确 public origin、可信反向代理 CIDR、Host/Origin、8KiB header 上限和 mutation CSRF 在 dispatch 前完成。
+- 登录支持 Google、GitHub、Apple、Email、授权令牌；社交登录只返回官方 Folo 登录页，Email 支持 TOTP，pending cookie、密码、one-time token 和 Folo session 不写浏览器或日志。
+- 本地 cookie 固定为 `__Host-tantan_session; Secure; HttpOnly; SameSite=Lax; Path=/`；SQLite 只保存 session/CSRF hash 和 secret ref，Folo session 使用 AES-256-GCM 密封。
+- Folo 代理只挂载 `/api/folo`，按 v2 route policy 精确 method+path 默认拒绝；Folo AI、会员、wallet、payment、referral、trending 在任何网络请求前返回 410/403。
+- 生产监听仍固定 `127.0.0.1:3000`；静态 PWA 目录启动时整包校验并载入内存，拒绝 symlink/traversal，支持 client-route fallback。
+- 服务端 Secret 配置只接受私有绝对文件路径；master key 必须 32 bytes；Gemini provider/endpoint/model 为只读常量，Key store 不支持 HTTP 风格的 Set/Delete。
 
-The four target packages failed because they contained contract tests but no non-test Go files. The Red tests already named and exercised the required seams: local session hashing/expiry, auth callback state and token secrecy, strict Origin/Host checks, exact Folo policy decisions, response compatibility, and zero upstream calls for denied/removed routes. An earlier syntax-error attempt was discarded and is not counted as Red evidence.
+## Required Gates
 
-## Green and refactor
+| Gate                                         | 自动证据                                                                                                                | 结果 |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ---- |
+| public origin / trusted proxy / CSRF         | `TestRouterValidatesHostOriginAndTrustedProxyBeforeDispatch`、`TestRouterLocalAPIRequiresSessionOriginAndCSRF`          | PASS |
+| Folo provider list / social handoff          | `TestProvidersAndSocialStartMatchFoloLoginMethods`                                                                      | PASS |
+| token replay / opaque local session          | `TestTokenLoginNormalizesFoloURLCreatesOpaqueSessionAndRejectsReplay`                                                   | PASS |
+| Email + TOTP                                 | `TestEmailTwoFactorFlowKeepsPendingCookieServerSide`、`TestAuthClientCompletesEmailAndTOTPWithoutExposingPendingCookie` | PASS |
+| sealed Folo session / SQLite plaintext zero  | `TestEncryptedStoreRoundTripsWithoutSQLitePlaintext`、application/session backend tests                                 | PASS |
+| deny before upstream                         | `TestRouterFoloPrefixDefaultDenyAndMutationCSRF`、`TestDeniedAndRemovedRoutesNeverReachUpstream`                        | PASS |
+| fixed listener / static fallback / readiness | listen, SPA, migrated application and backup tests                                                                      | PASS |
+| server-only Gemini Key source                | `TestServerSecretFilesRequireAbsolutePrivateRegularFiles`、`TestMasterKeyAndFixedGeminiServerStore`                     | PASS |
 
-- Implemented the loopback router, Folo login bridge, account-scoped Keychain token store, hashed local session store, fixed-host Folo auth client, exact policy matcher, and bounded proxy transport.
-- Kept route policy, proxy transport, auth provider, session backend, local API mount, and health handler as separate seams.
-- Added a session backend interface so the later SQLite task can persist `local_sessions` without changing this task's auth contract.
-- Added a generic authenticated local handler mount so later Home/Search/AI tasks do not need to edit the security middleware.
-- Added method+path-aware CORS preflight authorization; unknown routes and sensitive requested headers are rejected before dispatch.
-- Production Folo URLs accept only the built-in hosts; loopback URLs are accepted only as server-side test configuration. Browser input cannot set an upstream URL.
+## Verify
 
-Focused Green command:
+- `go test ./cmd/tantan-api ./internal/http ./internal/folo ./internal/auth ./internal/session ./internal/secrets ./internal/ops`：exit 0。
+- `go test -race ./internal/auth ./internal/session ./internal/secrets ./internal/folo ./internal/http`：exit 0。
+- `go test ./internal/api/gen`：exit 0。
+- `node docs/contracts/generate.mjs --check`：exit 0。
 
-```text
-go test ./internal/session ./internal/folo ./internal/auth ./internal/http ./cmd/tantan-api
-```
-
-Exit: `0`.
-
-## Required gate evidence
-
-| Gate | Automated evidence | Result |
-|---|---|---|
-| Listener is fixed to `127.0.0.1:3000` | `TestListenAddressRejectsNonLoopback` plus `TestResolveServerURLAllowsOnlyOfficialOrLoopback` | PASS |
-| Wrong flow and replay do not create sessions | `TestAuthCallbackRejectsWrongFlowBeforeUpstream`, `TestAuthCallbackStoresFoloTokenOnlyInSecretStore` | PASS |
-| Token remains Keychain-only and logout deletes it | auth callback, rollback, unsafe-cookie and logout tests; local session stores only SHA-256 hash | PASS |
-| Unknown and disabled routes fail before dial | deny/removal proxy tests and full-router policy-order test | PASS |
-| All enabled SDK routes preserve status/body/content-type | `TestProxyPreservesEveryEnabledMethodPathAndPerformanceBudget` covers all 54 enabled method+path fixtures; observed P95 was 111.084µs | PASS |
-| Host/Origin, DNS rebinding and header smuggling | router hostile Host/Origin test; hop-by-hop and CRLF proxy tests | PASS |
-| Logs and browser response contain no canary token | auth/proxy log scans plus production-binary canary scan | PASS |
-| Route policy equals the approved contract byte-for-byte | `TestEmbeddedRoutePolicyMatchesApprovedMachineContract` and `cmp` | PASS |
-| Path matcher is robust | seed corpus and 3-second fuzz run | PASS |
-
-The machine contract's public default-deny error is `FOLO_ROUTE_NOT_ALLOWED`; this is used instead of the task-manifest prose shorthand `FOLO_ROUTE_DENIED`.
-
-## Verify commands
-
-All exited `0`:
-
-```text
-bash spec-package/scripts/validate-package.sh
-go vet ./internal/session/... ./internal/auth/... ./internal/folo/... ./internal/http/... ./cmd/tantan-api
-go test ./...
-go test -race ./...
-go test ./internal/folo -run=^$ -fuzz=FuzzRoutePolicyNeverBypassesDecisionClasses -fuzztime=3s
-test -z "$(gofmt -l cmd internal)"
-cmp ../../spec-package/api/folo-route-policy.json internal/folo/route-policy.json
-go build -o <temporary-directory>/tantan-api ./cmd/tantan-api
-if rg -a 'CANARY|one-time-token-1234567890|folo-session-CANARY' <temporary-directory>/tantan-api; then exit 1; fi
-```
-
-The last scan returned no matches. The final fuzz run executed 101,183 inputs after loading its 102-input corpus, without failure. `go.mod` and `go.sum` were unchanged.
+`go test ./...` 当前仅剩 TASK-05 范围的旧 per-user AI settings/enrichment/filter 测试失败：migration 0004 已按合同把 `ai_provider_configs` 迁移为 legacy 表，后续固定服务端 Gemini 实现负责替换；TASK-02 包和 cmd gates 均通过。

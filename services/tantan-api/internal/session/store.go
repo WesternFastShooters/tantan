@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -12,7 +13,7 @@ import (
 	"time"
 )
 
-const LocalCookieName = "tantan_session"
+const LocalCookieName = "__Host-tantan_session"
 
 type User struct {
 	ID    string  `json:"id"`
@@ -23,6 +24,8 @@ type User struct {
 
 type Record struct {
 	IDHash    string
+	SecretRef string
+	CSRFHash  string
 	User      User
 	Timezone  string
 	ExpiresAt time.Time
@@ -69,24 +72,68 @@ func NewToken() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(buffer), nil
 }
 
+func NewCSRFToken() (string, error) {
+	return NewToken()
+}
+
 func HashToken(raw string) string {
 	digest := sha256.Sum256([]byte(raw))
 	return hex.EncodeToString(digest[:])
 }
 
+func HashCSRF(raw string) string {
+	return HashToken(raw)
+}
+
+func ValidCSRF(record Record, raw string) bool {
+	if len(record.CSRFHash) != sha256.Size*2 || len(raw) < 40 {
+		return false
+	}
+	return hmac.Equal([]byte(record.CSRFHash), []byte(HashCSRF(raw)))
+}
+
 func (store *Store) Create(ctx context.Context, raw string, user User, expiresAt time.Time) (Record, error) {
+	csrf, err := NewCSRFToken()
+	if err != nil {
+		return Record{}, err
+	}
+	return store.CreateWithCSRF(ctx, raw, csrf, user, expiresAt)
+}
+
+func (store *Store) CreateWithCSRF(ctx context.Context, raw, csrf string, user User, expiresAt time.Time) (Record, error) {
 	now := store.now().UTC()
-	if len(raw) < 40 || strings.TrimSpace(user.ID) == "" || strings.TrimSpace(user.Name) == "" || !expiresAt.After(now) {
+	if len(raw) < 40 || len(csrf) < 40 || strings.TrimSpace(user.ID) == "" || strings.TrimSpace(user.Name) == "" || !expiresAt.After(now) {
 		return Record{}, errors.New("invalid local session")
 	}
+	idHash := HashToken(raw)
 	record := Record{
-		IDHash:    HashToken(raw),
+		IDHash:    idHash,
+		SecretRef: idHash,
+		CSRFHash:  HashCSRF(csrf),
 		User:      user,
 		Timezone:  "Asia/Shanghai",
 		ExpiresAt: expiresAt.UTC(),
 		LastSeen:  now,
 		CreatedAt: now,
 	}
+	if err := store.backend.SaveSession(ctx, record); err != nil {
+		return Record{}, err
+	}
+	return record, nil
+}
+
+func (store *Store) RotateCSRF(ctx context.Context, idHash, csrf string) (Record, error) {
+	if len(idHash) != sha256.Size*2 || len(csrf) < 40 {
+		return Record{}, errors.New("invalid CSRF rotation")
+	}
+	record, ok, err := store.backend.FindSession(ctx, idHash)
+	if err != nil {
+		return Record{}, err
+	}
+	if !ok {
+		return Record{}, errors.New("local session not found")
+	}
+	record.CSRFHash = HashCSRF(csrf)
 	if err := store.backend.SaveSession(ctx, record); err != nil {
 		return Record{}, err
 	}

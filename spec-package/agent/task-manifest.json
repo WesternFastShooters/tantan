@@ -77,7 +77,7 @@
     {
       "id": "TASK-02",
       "title": "实现可部署 Go 边界、Folo 全登录桥、密封会话和 Folo 代理",
-      "status": "in_progress",
+      "status": "completed",
       "dependsOn": ["TASK-01"],
       "allowedWrites": [
         "services/tantan-api/cmd/tantan-api/**",
@@ -87,6 +87,7 @@
         "services/tantan-api/internal/secrets/**",
         "services/tantan-api/internal/keyring/**",
         "services/tantan-api/internal/folo/**",
+        "services/tantan-api/internal/ops/**",
         "services/tantan-api/internal/testutil/**",
         "docs/runbooks/**"
       ],
@@ -109,7 +110,7 @@
     {
       "id": "TASK-03",
       "title": "重建 Folo Mobile Web 壳、四 Tab、栈导航和登录边界",
-      "status": "pending",
+      "status": "in_progress",
       "dependsOn": ["TASK-02"],
       "allowedWrites": [
         "apps/desktop/layer/renderer/index.html",

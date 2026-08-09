@@ -28,6 +28,8 @@ var (
 var auditedTables = []string{
 	"accounts",
 	"local_sessions",
+	"secret_records",
+	"auth_token_replays",
 	"feeds",
 	"entries",
 	"account_entries",
@@ -39,7 +41,7 @@ var auditedTables = []string{
 	"daily_queue_items",
 	"recommendation_events",
 	"recommendation_blocks",
-	"ai_provider_configs",
+	"ai_provider_configs_v1",
 	"jobs",
 	"sync_state",
 	"entry_search",

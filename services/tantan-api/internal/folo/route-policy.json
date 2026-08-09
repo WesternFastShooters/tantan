@@ -1,9 +1,10 @@
 {
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "2.0.0",
   "sdkVersion": "0.3.95",
   "defaultAction": "deny",
   "defaultDenyStatus": 403,
-  "defaultDenyCode": "FOLO_ROUTE_NOT_ALLOWED",
+  "defaultDenyCode": "FOLO_ROUTE_DENIED",
+  "publicPrefix": "/api/folo",
   "routeMatch": "HTTP method plus anchored RE2 path pattern; raw path after one URL decode; query never participates in authorization",
   "upstream": {
     "baseUrlFromServerConfigOnly": true,
@@ -33,72 +34,281 @@
     "maxDefaultResponseBytes": 4194304,
     "maxEntryStreamResponseBytes": 52428800
   },
+  "internalAuthRoutes": [
+    {
+      "id": "auth-sign-in-email",
+      "methods": ["POST"],
+      "pathPattern": "^/better-auth/sign-in/email$"
+    },
+    {
+      "id": "auth-token-apply",
+      "methods": ["POST"],
+      "pathPattern": "^/better-auth/one-time-token/apply$"
+    },
+    {
+      "id": "auth-token-verify",
+      "methods": ["POST"],
+      "pathPattern": "^/better-auth/one-time-token/verify$"
+    },
+    {
+      "id": "auth-two-factor-verify-totp",
+      "methods": ["POST"],
+      "pathPattern": "^/better-auth/two-factor/verify-totp$"
+    },
+    { "id": "auth-session", "methods": ["GET"], "pathPattern": "^/better-auth/get-session$" },
+    { "id": "auth-sign-out", "methods": ["POST"], "pathPattern": "^/better-auth/sign-out$" }
+  ],
   "enabled": [
-    { "id": "auth-session", "methods": ["GET"], "pathPattern": "^/better-auth/get-session$", "mutation": false },
-    { "id": "auth-token-apply", "methods": ["POST"], "pathPattern": "^/better-auth/one-time-token/apply$", "mutation": true },
-    { "id": "auth-sign-out", "methods": ["POST"], "pathPattern": "^/better-auth/sign-out$", "mutation": true },
-
-    { "id": "categories", "methods": ["GET", "PATCH", "DELETE"], "pathPattern": "^/categories$", "mutationMethods": ["PATCH", "DELETE"] },
-    { "id": "collections", "methods": ["GET", "POST", "DELETE"], "pathPattern": "^/collections$", "mutationMethods": ["POST", "DELETE"] },
+    {
+      "id": "categories",
+      "methods": ["GET", "PATCH", "DELETE"],
+      "pathPattern": "^/categories$",
+      "mutationMethods": ["PATCH", "DELETE"]
+    },
+    {
+      "id": "collections",
+      "methods": ["GET", "POST", "DELETE"],
+      "pathPattern": "^/collections$",
+      "mutationMethods": ["POST", "DELETE"]
+    },
 
     { "id": "discover", "methods": ["POST"], "pathPattern": "^/discover$", "mutation": true },
-    { "id": "discover-rsshub", "methods": ["GET"], "pathPattern": "^/discover/rsshub$", "mutation": false },
-    { "id": "discover-rsshub-route", "methods": ["GET"], "pathPattern": "^/discover/rsshub/route$", "mutation": false },
+    {
+      "id": "discover-rsshub",
+      "methods": ["GET"],
+      "pathPattern": "^/discover/rsshub$",
+      "mutation": false
+    },
+    {
+      "id": "discover-rsshub-route",
+      "methods": ["GET"],
+      "pathPattern": "^/discover/rsshub/route$",
+      "mutation": false
+    },
 
-    { "id": "entries", "methods": ["GET", "POST"], "pathPattern": "^/entries$", "mutationMethods": ["POST"] },
-    { "id": "entries-preview", "methods": ["POST"], "pathPattern": "^/entries/preview$", "mutation": true },
-    { "id": "entries-readability", "methods": ["GET"], "pathPattern": "^/entries/readability$", "mutation": false },
-    { "id": "entries-stream", "methods": ["POST"], "pathPattern": "^/entries/stream$", "mutation": true, "maxResponseBytes": 52428800 },
-    { "id": "entries-check-new", "methods": ["GET"], "pathPattern": "^/entries/check-new$", "mutation": false },
-    { "id": "entries-tags-query", "methods": ["POST"], "pathPattern": "^/entries/tags/query$", "mutation": true },
-    { "id": "entries-read-history", "methods": ["GET"], "pathPattern": "^/entries/read-histories/[A-Za-z0-9._:-]{1,128}$", "mutation": false },
-    { "id": "entries-inbox", "methods": ["GET", "POST", "DELETE"], "pathPattern": "^/entries/inbox$", "mutationMethods": ["POST", "DELETE"] },
+    {
+      "id": "entries",
+      "methods": ["GET", "POST"],
+      "pathPattern": "^/entries$",
+      "mutationMethods": ["POST"]
+    },
+    {
+      "id": "entries-preview",
+      "methods": ["POST"],
+      "pathPattern": "^/entries/preview$",
+      "mutation": true
+    },
+    {
+      "id": "entries-readability",
+      "methods": ["GET"],
+      "pathPattern": "^/entries/readability$",
+      "mutation": false
+    },
+    {
+      "id": "entries-stream",
+      "methods": ["POST"],
+      "pathPattern": "^/entries/stream$",
+      "mutation": true,
+      "maxResponseBytes": 52428800
+    },
+    {
+      "id": "entries-check-new",
+      "methods": ["GET"],
+      "pathPattern": "^/entries/check-new$",
+      "mutation": false
+    },
+    {
+      "id": "entries-tags-query",
+      "methods": ["POST"],
+      "pathPattern": "^/entries/tags/query$",
+      "mutation": true
+    },
+    {
+      "id": "entries-read-history",
+      "methods": ["GET"],
+      "pathPattern": "^/entries/read-histories/[A-Za-z0-9._:-]{1,128}$",
+      "mutation": false
+    },
+    {
+      "id": "entries-inbox",
+      "methods": ["GET", "POST", "DELETE"],
+      "pathPattern": "^/entries/inbox$",
+      "mutationMethods": ["POST", "DELETE"]
+    },
 
     { "id": "feeds", "methods": ["GET"], "pathPattern": "^/feeds$", "mutation": false },
-    { "id": "feeds-refresh", "methods": ["GET"], "pathPattern": "^/feeds/refresh$", "mutation": false },
+    {
+      "id": "feeds-refresh",
+      "methods": ["GET"],
+      "pathPattern": "^/feeds/refresh$",
+      "mutation": false
+    },
 
-    { "id": "inboxes", "methods": ["GET", "POST", "PUT", "DELETE"], "pathPattern": "^/inboxes$", "mutationMethods": ["POST", "PUT", "DELETE"] },
-    { "id": "inboxes-list", "methods": ["GET"], "pathPattern": "^/inboxes/list$", "mutation": false },
+    {
+      "id": "inboxes",
+      "methods": ["GET", "POST", "PUT", "DELETE"],
+      "pathPattern": "^/inboxes$",
+      "mutationMethods": ["POST", "PUT", "DELETE"]
+    },
+    {
+      "id": "inboxes-list",
+      "methods": ["GET"],
+      "pathPattern": "^/inboxes/list$",
+      "mutation": false
+    },
 
-    { "id": "lists", "methods": ["GET", "POST", "PATCH", "DELETE"], "pathPattern": "^/lists$", "mutationMethods": ["POST", "PATCH", "DELETE"] },
+    {
+      "id": "lists",
+      "methods": ["GET", "POST", "PATCH", "DELETE"],
+      "pathPattern": "^/lists$",
+      "mutationMethods": ["POST", "PATCH", "DELETE"]
+    },
     { "id": "lists-list", "methods": ["GET"], "pathPattern": "^/lists/list$", "mutation": false },
-    { "id": "lists-feeds", "methods": ["POST", "DELETE"], "pathPattern": "^/lists/feeds$", "mutationMethods": ["POST", "DELETE"] },
+    {
+      "id": "lists-feeds",
+      "methods": ["POST", "DELETE"],
+      "pathPattern": "^/lists/feeds$",
+      "mutationMethods": ["POST", "DELETE"]
+    },
 
     { "id": "profiles", "methods": ["GET"], "pathPattern": "^/profiles$", "mutation": false },
-    { "id": "profiles-batch", "methods": ["POST"], "pathPattern": "^/profiles/batch$", "mutation": true },
+    {
+      "id": "profiles-batch",
+      "methods": ["POST"],
+      "pathPattern": "^/profiles/batch$",
+      "mutation": true
+    },
 
-    { "id": "reads", "methods": ["GET", "POST", "DELETE"], "pathPattern": "^/reads$", "mutationMethods": ["POST", "DELETE"] },
+    {
+      "id": "reads",
+      "methods": ["GET", "POST", "DELETE"],
+      "pathPattern": "^/reads$",
+      "mutationMethods": ["POST", "DELETE"]
+    },
     { "id": "reads-all", "methods": ["POST"], "pathPattern": "^/reads/all$", "mutation": true },
-    { "id": "reads-total-count", "methods": ["GET"], "pathPattern": "^/reads/total-count$", "mutation": false },
+    {
+      "id": "reads-total-count",
+      "methods": ["GET"],
+      "pathPattern": "^/reads/total-count$",
+      "mutation": false
+    },
 
-    { "id": "settings", "methods": ["GET"], "pathPattern": "^/settings$", "mutation": false },
-    { "id": "settings-tab", "methods": ["PATCH"], "pathPattern": "^/settings/(?:appearance|general)$", "mutation": true },
-
-    { "id": "subscriptions", "methods": ["GET", "POST", "PATCH", "DELETE"], "pathPattern": "^/subscriptions$", "mutationMethods": ["POST", "PATCH", "DELETE"] },
-    { "id": "subscriptions-batch", "methods": ["PATCH"], "pathPattern": "^/subscriptions/batch$", "mutation": true },
-    { "id": "subscriptions-import", "methods": ["POST"], "pathPattern": "^/subscriptions/import$", "mutation": true },
-    { "id": "subscriptions-export", "methods": ["GET"], "pathPattern": "^/subscriptions/export$", "mutation": false },
-    { "id": "subscriptions-parse-opml", "methods": ["POST"], "pathPattern": "^/subscriptions/parse-opml$", "mutation": true }
+    {
+      "id": "subscriptions",
+      "methods": ["GET", "POST", "PATCH", "DELETE"],
+      "pathPattern": "^/subscriptions$",
+      "mutationMethods": ["POST", "PATCH", "DELETE"]
+    },
+    {
+      "id": "subscriptions-batch",
+      "methods": ["PATCH"],
+      "pathPattern": "^/subscriptions/batch$",
+      "mutation": true
+    },
+    {
+      "id": "subscriptions-import",
+      "methods": ["POST"],
+      "pathPattern": "^/subscriptions/import$",
+      "mutation": true
+    },
+    {
+      "id": "subscriptions-export",
+      "methods": ["GET"],
+      "pathPattern": "^/subscriptions/export$",
+      "mutation": false
+    },
+    {
+      "id": "subscriptions-parse-opml",
+      "methods": ["POST"],
+      "pathPattern": "^/subscriptions/parse-opml$",
+      "mutation": true
+    }
   ],
   "disabledByDefault": [
-    { "id": "discover-rsshub-analytics", "methods": ["GET"], "pathPattern": "^/discover/rsshub-analytics$", "reason": "not required by phase-one product journeys" },
-    { "id": "entries-transcription", "methods": ["GET"], "pathPattern": "^/entries/transcription$", "reason": "could invoke paid upstream capability; local AI replacement required first" },
-    { "id": "feeds-reset", "methods": ["GET"], "pathPattern": "^/feeds/reset$", "reason": "state-reset operation is not required by phase one" },
-    { "id": "feeds-analytics", "methods": ["POST"], "pathPattern": "^/feeds/analytics$", "reason": "analytics is outside local-only privacy boundary" },
-    { "id": "feeds-claim-challenge", "methods": ["POST"], "pathPattern": "^/feeds/claim/challenge$", "reason": "feed ownership claim is outside phase one" },
-    { "id": "feeds-claim-list", "methods": ["GET"], "pathPattern": "^/feeds/claim/list$", "reason": "feed ownership claim is outside phase one" },
-    { "id": "feeds-claim-message", "methods": ["GET"], "pathPattern": "^/feeds/claim/message$", "reason": "feed ownership claim is outside phase one" },
-    { "id": "inboxes-email", "methods": ["POST"], "pathPattern": "^/inboxes/email$", "reason": "external email side effect is outside phase one" },
-    { "id": "inboxes-webhook", "methods": ["POST"], "pathPattern": "^/inboxes/webhook$", "reason": "external webhook is outside phase one" }
+    {
+      "id": "settings",
+      "methods": ["GET"],
+      "pathPattern": "^/settings$",
+      "reason": "Tantan keeps appearance and general settings locally and never syncs Folo AI settings"
+    },
+    {
+      "id": "settings-tab",
+      "methods": ["PATCH"],
+      "pathPattern": "^/settings/(?:appearance|general|ai)$",
+      "reason": "Tantan settings are local and AI configuration belongs to the Go server"
+    },
+    {
+      "id": "discover-rsshub-analytics",
+      "methods": ["GET"],
+      "pathPattern": "^/discover/rsshub-analytics$",
+      "reason": "not required by phase-one product journeys"
+    },
+    {
+      "id": "entries-transcription",
+      "methods": ["GET"],
+      "pathPattern": "^/entries/transcription$",
+      "reason": "could invoke paid upstream capability; local AI replacement required first"
+    },
+    {
+      "id": "feeds-reset",
+      "methods": ["GET"],
+      "pathPattern": "^/feeds/reset$",
+      "reason": "state-reset operation is not required by phase one"
+    },
+    {
+      "id": "feeds-analytics",
+      "methods": ["POST"],
+      "pathPattern": "^/feeds/analytics$",
+      "reason": "analytics is outside local-only privacy boundary"
+    },
+    {
+      "id": "feeds-claim-challenge",
+      "methods": ["POST"],
+      "pathPattern": "^/feeds/claim/challenge$",
+      "reason": "feed ownership claim is outside phase one"
+    },
+    {
+      "id": "feeds-claim-list",
+      "methods": ["GET"],
+      "pathPattern": "^/feeds/claim/list$",
+      "reason": "feed ownership claim is outside phase one"
+    },
+    {
+      "id": "feeds-claim-message",
+      "methods": ["GET"],
+      "pathPattern": "^/feeds/claim/message$",
+      "reason": "feed ownership claim is outside phase one"
+    },
+    {
+      "id": "inboxes-email",
+      "methods": ["POST"],
+      "pathPattern": "^/inboxes/email$",
+      "reason": "external email side effect is outside phase one"
+    },
+    {
+      "id": "inboxes-webhook",
+      "methods": ["POST"],
+      "pathPattern": "^/inboxes/webhook$",
+      "reason": "external webhook is outside phase one"
+    }
   ],
   "removed": [
     { "pathPattern": "^/ai(?:/|$)", "status": 410, "code": "FOLO_FEATURE_REMOVED" },
     { "pathPattern": "^/wallets(?:/|$)", "status": 410, "code": "FOLO_FEATURE_REMOVED" },
     { "pathPattern": "^/payments(?:/|$)", "status": 410, "code": "FOLO_FEATURE_REMOVED" },
-    { "pathPattern": "^/better-auth/(?:subscription|stripe)(?:/|$)", "status": 410, "code": "FOLO_FEATURE_REMOVED" },
+    {
+      "pathPattern": "^/better-auth/(?:subscription|stripe)(?:/|$)",
+      "status": 410,
+      "code": "FOLO_FEATURE_REMOVED"
+    },
     { "pathPattern": "^/referrals(?:/|$)", "status": 410, "code": "FOLO_FEATURE_REMOVED" },
     { "pathPattern": "^/trending(?:/|$)", "status": 410, "code": "FOLO_FEATURE_REMOVED" },
-    { "pathPattern": "^/rsshub/use$", "methods": ["POST"], "status": 410, "code": "FOLO_FEATURE_REMOVED" }
+    {
+      "pathPattern": "^/rsshub/use$",
+      "methods": ["POST"],
+      "status": 410,
+      "code": "FOLO_FEATURE_REMOVED"
+    }
   ],
   "mutationRequirements": {
     "localSession": true,

@@ -4,7 +4,7 @@ package gen
 
 import "encoding/json"
 
-const ContractSHA256 = "5a84281ae8b0870ab64bb3bcdde479ae91fdbcd33c2e2194fe80c24a3ed7bb4a"
+const ContractSHA256 = "1b3c4c80ce80c5a50504a609d97479c02fb8573551670a00dd875fbf0a756882"
 
 type Identifier string
 type EntryType string

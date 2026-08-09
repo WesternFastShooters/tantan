@@ -23,6 +23,7 @@ import (
 	"tantan.local/tantan-api/internal/ops"
 	"tantan.local/tantan-api/internal/recommendation"
 	"tantan.local/tantan-api/internal/search"
+	"tantan.local/tantan-api/internal/secrets"
 	"tantan.local/tantan-api/internal/session"
 	"tantan.local/tantan-api/internal/storage"
 	syncer "tantan.local/tantan-api/internal/sync"
@@ -32,18 +33,22 @@ import (
 const cursorKeyAccount = "cursor-v1"
 
 type applicationConfig struct {
-	DataDir       string
-	Upstream      *url.URL
-	FoloWebURL    *url.URL
-	Client        *stdhttp.Client
-	FoloSecrets   session.SecretStore
-	AISecrets     ai.SecretStore
-	ProbeKeychain ops.Keychain
-	CursorSecrets ops.Keychain
-	Logger        *slog.Logger
-	Now           func() time.Time
-	Version       string
-	StartWorkers  bool
+	DataDir           string
+	StaticDir         string
+	PublicOrigin      string
+	TrustedProxyCIDRs []string
+	Upstream          *url.URL
+	FoloWebURL        *url.URL
+	Client            *stdhttp.Client
+	FoloSecrets       session.SecretStore
+	FoloMasterKey     []byte
+	AISecrets         ai.SecretStore
+	ProbeKeychain     ops.Keychain
+	CursorSecrets     ops.Keychain
+	Logger            *slog.Logger
+	Now               func() time.Time
+	Version           string
+	StartWorkers      bool
 }
 
 type application struct {
@@ -57,7 +62,7 @@ type application struct {
 }
 
 func newApplication(ctx context.Context, config applicationConfig) (*application, error) {
-	if config.DataDir == "" || config.Upstream == nil || config.FoloWebURL == nil || config.FoloSecrets == nil || config.AISecrets == nil || config.ProbeKeychain == nil || config.CursorSecrets == nil {
+	if config.DataDir == "" || config.PublicOrigin == "" || config.Upstream == nil || config.FoloWebURL == nil || config.AISecrets == nil || config.ProbeKeychain == nil || config.CursorSecrets == nil || (config.FoloSecrets == nil && len(config.FoloMasterKey) != 32) {
 		return nil, errors.New("application data, Folo and Keychain dependencies are required")
 	}
 	if config.Now == nil {
@@ -84,11 +89,22 @@ func newApplication(ctx context.Context, config applicationConfig) (*application
 	if _, err := ops.CreateDailyBackup(ctx, store, filepath.Join(config.DataDir, "backups"), config.Now().UTC()); err != nil {
 		return fail(err)
 	}
+	foloSecrets := config.FoloSecrets
+	if foloSecrets == nil {
+		foloSecrets, err = secrets.NewStore(secrets.Config{Store: store, Key: config.FoloMasterKey, Now: config.Now})
+		if err != nil {
+			return fail(err)
+		}
+	}
 	sessionBackend, err := newSQLiteSessionBackend(store)
 	if err != nil {
 		return fail(err)
 	}
 	sessions, err := session.NewStoreWithBackend(config.Now, sessionBackend)
+	if err != nil {
+		return fail(err)
+	}
+	replays, err := newSQLiteTokenReplayStore(store)
 	if err != nil {
 		return fail(err)
 	}
@@ -125,7 +141,7 @@ func newApplication(ctx context.Context, config applicationConfig) (*application
 	if err != nil {
 		return fail(err)
 	}
-	bridge, err := auth.NewBridge(auth.Config{FoloWebURL: config.FoloWebURL.String(), CallbackURL: "http://127.0.0.1:3000/auth/folo/callback", Logger: config.Logger, Sessions: sessions, Secrets: config.FoloSecrets, Folo: foloAuth, Now: config.Now})
+	bridge, err := auth.NewBridge(auth.Config{PublicOrigin: config.PublicOrigin, FoloWebURL: config.FoloWebURL.String(), Logger: config.Logger, Sessions: sessions, Secrets: foloSecrets, Replays: replays, Folo: foloAuth, Now: config.Now})
 	if err != nil {
 		return fail(err)
 	}
@@ -133,7 +149,7 @@ func newApplication(ctx context.Context, config applicationConfig) (*application
 	if err != nil {
 		return fail(err)
 	}
-	proxy, err := folo.NewProxy(folo.ProxyConfig{Policy: policy, Upstream: config.Upstream, Client: client, Secrets: config.FoloSecrets, Logger: config.Logger})
+	proxy, err := folo.NewProxy(folo.ProxyConfig{Policy: policy, Upstream: config.Upstream, PublicOrigin: config.PublicOrigin, Client: client, Secrets: foloSecrets, Logger: config.Logger})
 	if err != nil {
 		return fail(err)
 	}
@@ -154,8 +170,12 @@ func newApplication(ctx context.Context, config applicationConfig) (*application
 		Search:     searchService,
 		Enrichment: enrichmentService,
 		AISettings: settings,
-		ProviderTester: func(providerContext context.Context, input ai.ProviderInput) (ai.ConnectionTestResult, error) {
-			return ai.TestConnection(providerContext, input, nil, time.Now)
+		ProviderTester: func(providerContext context.Context) (ai.ConnectionTestResult, error) {
+			active, apiKey, credentialErr := settings.Credential(providerContext, ai.DefaultPromptVersion)
+			if credentialErr != nil {
+				return ai.ConnectionTestResult{}, credentialErr
+			}
+			return ai.TestConnection(providerContext, ai.ProviderInput{ProviderID: active.ProviderID, Model: active.Model, APIKey: apiKey}, nil, time.Now)
 		},
 		Diagnostics: diagnostics,
 		Now:         config.Now,
@@ -163,14 +183,24 @@ func newApplication(ctx context.Context, config applicationConfig) (*application
 	if err != nil {
 		return fail(err)
 	}
+	var static stdhttp.Handler
+	if config.StaticDir != "" {
+		static, err = localhttp.NewSPAHandler(config.StaticDir)
+		if err != nil {
+			return fail(err)
+		}
+	}
 	health := localhttp.NewHealthHandler(config.Version, readiness)
-	handler := localhttp.NewRouter(localhttp.RouterConfig{Auth: bridge, Proxy: proxy, Sessions: sessions, Local: local, Health: health, Logger: config.Logger})
+	handler, err := localhttp.NewRouter(localhttp.RouterConfig{PublicOrigin: config.PublicOrigin, TrustedProxyCIDRs: config.TrustedProxyCIDRs, Auth: bridge, Proxy: proxy, Sessions: sessions, Local: local, Health: health, Static: static, Logger: config.Logger})
+	if err != nil {
+		return fail(err)
+	}
 	source, err := syncer.NewHTTPSource(syncer.HTTPSourceConfig{Upstream: config.Upstream, Client: client, Token: func(tokenContext context.Context, userID string) (string, error) {
 		var sessionHash string
-		if err := store.DB().QueryRowContext(tokenContext, "SELECT id_hash FROM local_sessions WHERE user_id=? ORDER BY last_seen_at DESC LIMIT 1", userID).Scan(&sessionHash); err != nil {
+		if err := store.DB().QueryRowContext(tokenContext, "SELECT secret_ref FROM local_sessions WHERE user_id=? ORDER BY last_seen_at DESC LIMIT 1", userID).Scan(&sessionHash); err != nil {
 			return "", errors.New("active Folo session was not found")
 		}
-		return config.FoloSecrets.Get(tokenContext, sessionHash)
+		return foloSecrets.Get(tokenContext, sessionHash)
 	}})
 	if err != nil {
 		return fail(err)

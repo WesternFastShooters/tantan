@@ -84,12 +84,12 @@ func (handler *diagnosticsHandler) ServeHTTP(writer stdhttp.ResponseWriter, requ
 	}
 	record, ok := session.FromContext(request.Context())
 	if !ok {
-		writeError(writer, request.Header.Get("X-Request-Id"), stdhttp.StatusUnauthorized, "AUTH_REQUIRED", "请先登录")
+		writeError(writer, request.Header.Get("X-Request-Id"), stdhttp.StatusUnauthorized, "AUTH_REQUIRED", "请先登录", false)
 		return
 	}
 	response, err := handler.snapshot(request.Context(), record.User.ID)
 	if err != nil {
-		writeError(writer, request.Header.Get("X-Request-Id"), stdhttp.StatusInternalServerError, "LOCAL_STORAGE_ERROR", "本地诊断数据暂不可用")
+		writeError(writer, request.Header.Get("X-Request-Id"), stdhttp.StatusInternalServerError, "LOCAL_STORAGE_ERROR", "本地诊断数据暂不可用", true)
 		return
 	}
 	writeJSON(writer, stdhttp.StatusOK, response)

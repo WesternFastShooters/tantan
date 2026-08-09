@@ -16,6 +16,7 @@ var approvedMigrationChecksums = map[int]string{
 	1: "spec-package-1.0.0-0001-core",
 	2: "spec-package-1.0.0-0002-search-fts",
 	3: "spec-package-1.0.0-0003-core-topic-templates",
+	4: "spec-package-2.0.0-0004-mobile-web-v2",
 }
 
 type Keychain interface {

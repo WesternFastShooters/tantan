@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -28,10 +29,15 @@ const defaultListenAddress = "127.0.0.1:3000"
 var buildVersion = "dev"
 
 type serveOptions struct {
-	DataDir       string
-	ListenAddress string
-	FoloAPIURL    string
-	FoloWebURL    string
+	DataDir           string
+	StaticDir         string
+	ListenAddress     string
+	PublicOrigin      string
+	TrustedProxyCIDRs []string
+	MasterKeyFile     string
+	GeminiAPIKeyFile  string
+	FoloAPIURL        string
+	FoloWebURL        string
 }
 
 func main() {
@@ -62,7 +68,17 @@ func main() {
 }
 
 func run(logger *slog.Logger) error {
-	return runWithOptions(logger, serveOptions{DataDir: configuredDataDirectory(), ListenAddress: configuredListenAddress(), FoloAPIURL: os.Getenv("TANTAN_FOLO_API_URL"), FoloWebURL: os.Getenv("TANTAN_FOLO_WEB_URL")})
+	return runWithOptions(logger, serveOptions{
+		DataDir:           configuredDataDirectory(),
+		StaticDir:         os.Getenv("TANTAN_STATIC_DIR"),
+		ListenAddress:     configuredListenAddress(),
+		PublicOrigin:      configuredPublicOrigin(),
+		TrustedProxyCIDRs: splitConfiguredList(os.Getenv("TANTAN_TRUSTED_PROXY_CIDRS")),
+		MasterKeyFile:     os.Getenv("TANTAN_MASTER_KEY_FILE"),
+		GeminiAPIKeyFile:  os.Getenv("TANTAN_GEMINI_API_KEY_FILE"),
+		FoloAPIURL:        os.Getenv("TANTAN_FOLO_API_URL"),
+		FoloWebURL:        os.Getenv("TANTAN_FOLO_WEB_URL"),
+	})
 }
 
 func runWithOptions(logger *slog.Logger, options serveOptions) error {
@@ -78,13 +94,36 @@ func runWithOptions(logger *slog.Logger, options serveOptions) error {
 		return err
 	}
 	client := &stdhttp.Client{Timeout: 60 * time.Second}
-	foloSecrets, err := session.NewKeyringSecretStore(session.FoloSessionService)
-	if err != nil {
-		return err
+	var foloSecrets session.SecretStore
+	var foloMasterKey []byte
+	if options.MasterKeyFile != "" {
+		foloMasterKey, err = loadMasterKeyFile(options.MasterKeyFile)
+		if err != nil {
+			return err
+		}
+		defer clear(foloMasterKey)
+	} else {
+		foloSecrets, err = session.NewKeyringSecretStore(session.FoloSessionService)
+		if err != nil {
+			return err
+		}
 	}
-	aiSecrets, err := keyring.NewAIProviderStore()
-	if err != nil {
-		return err
+	var aiSecrets keyring.Store
+	if options.GeminiAPIKeyFile != "" {
+		apiKey, keyErr := loadGeminiAPIKeyFile(options.GeminiAPIKeyFile)
+		if keyErr != nil {
+			return keyErr
+		}
+		defer clear(apiKey)
+		aiSecrets, err = newServerAISecretStore(apiKey)
+		if err != nil {
+			return err
+		}
+	} else {
+		aiSecrets, err = keyring.NewAIProviderStore()
+		if err != nil {
+			return err
+		}
 	}
 	probeSecrets, err := keyring.NewOSStore(readinessKeychainService)
 	if err != nil {
@@ -94,7 +133,7 @@ func runWithOptions(logger *slog.Logger, options serveOptions) error {
 	if err != nil {
 		return err
 	}
-	application, err := newApplication(context.Background(), applicationConfig{DataDir: options.DataDir, Upstream: upstream, FoloWebURL: foloWebURL, Client: client, FoloSecrets: foloSecrets, AISecrets: aiSecrets, ProbeKeychain: probeSecrets, CursorSecrets: cursorSecrets, Logger: logger, Now: time.Now, Version: buildVersion, StartWorkers: true})
+	application, err := newApplication(context.Background(), applicationConfig{DataDir: options.DataDir, StaticDir: options.StaticDir, PublicOrigin: options.PublicOrigin, TrustedProxyCIDRs: options.TrustedProxyCIDRs, Upstream: upstream, FoloWebURL: foloWebURL, Client: client, FoloSecrets: foloSecrets, FoloMasterKey: foloMasterKey, AISecrets: aiSecrets, ProbeKeychain: probeSecrets, CursorSecrets: cursorSecrets, Logger: logger, Now: time.Now, Version: buildVersion, StartWorkers: true})
 	if err != nil {
 		return err
 	}
@@ -136,14 +175,40 @@ func parseServeOptions(arguments []string) (serveOptions, error) {
 	flags := flag.NewFlagSet("serve", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	options := serveOptions{}
+	var trustedProxyCIDRs string
 	flags.StringVar(&options.DataDir, "data-dir", configuredDataDirectory(), "local Tantan data directory")
+	flags.StringVar(&options.StaticDir, "static-dir", os.Getenv("TANTAN_STATIC_DIR"), "absolute Mobile Web build directory")
 	flags.StringVar(&options.ListenAddress, "listen-address", configuredListenAddress(), "fixed loopback address")
+	flags.StringVar(&options.PublicOrigin, "public-origin", configuredPublicOrigin(), "public HTTPS origin")
+	flags.StringVar(&trustedProxyCIDRs, "trusted-proxy-cidrs", os.Getenv("TANTAN_TRUSTED_PROXY_CIDRS"), "comma-separated trusted reverse proxy CIDRs")
+	flags.StringVar(&options.MasterKeyFile, "master-key-file", os.Getenv("TANTAN_MASTER_KEY_FILE"), "path to the server session master key")
+	flags.StringVar(&options.GeminiAPIKeyFile, "gemini-api-key-file", os.Getenv("TANTAN_GEMINI_API_KEY_FILE"), "path to the server Gemini API key")
 	flags.StringVar(&options.FoloAPIURL, "folo-api-url", os.Getenv("TANTAN_FOLO_API_URL"), "built-in Folo API URL")
 	flags.StringVar(&options.FoloWebURL, "folo-web-url", os.Getenv("TANTAN_FOLO_WEB_URL"), "built-in Folo web URL")
 	if err := flags.Parse(arguments); err != nil || flags.NArg() != 0 || options.DataDir == "" {
 		return serveOptions{}, errors.New("invalid serve arguments")
 	}
+	options.TrustedProxyCIDRs = splitConfiguredList(trustedProxyCIDRs)
 	return options, nil
+}
+
+func configuredPublicOrigin() string {
+	if value := strings.TrimSpace(os.Getenv("TANTAN_PUBLIC_ORIGIN")); value != "" {
+		return value
+	}
+	return "http://127.0.0.1:3000"
+}
+
+func splitConfiguredList(raw string) []string {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		result = append(result, strings.TrimSpace(part))
+	}
+	return result
 }
 
 func runtimeLogger(dataDirectory string) (*slog.Logger, *observability.RotatingWriter, error) {

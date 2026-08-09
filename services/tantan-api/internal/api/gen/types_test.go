@@ -12,6 +12,7 @@ import (
 
 var contractInputs = []string{
 	"spec-package/api/openapi.json",
+	"spec-package/api/folo-route-policy.json",
 	"spec-package/schemas/ai-enrichment-v1.schema.json",
 	"spec-package/schemas/filter-spec-v1.schema.json",
 	"spec-package/schemas/home-response.schema.json",
@@ -19,6 +20,7 @@ var contractInputs = []string{
 	"spec-package/db/0001_core.sql",
 	"spec-package/db/0002_search_fts.sql",
 	"spec-package/db/0003_seed_core_topics.sql",
+	"spec-package/db/0004_mobile_web_v2.sql",
 }
 
 func repositoryRoot(t *testing.T) string {

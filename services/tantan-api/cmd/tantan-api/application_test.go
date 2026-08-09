@@ -59,6 +59,7 @@ func TestApplicationStartsMigratedReadyAndRoutesLocalAPI(t *testing.T) {
 	secrets := &applicationSecrets{values: map[string]string{}}
 	application, err := newApplication(context.Background(), applicationConfig{
 		DataDir:       t.TempDir(),
+		PublicOrigin:  "http://127.0.0.1:3000",
 		Upstream:      upstreamURL,
 		FoloWebURL:    upstreamURL,
 		Client:        upstream.Client(),
@@ -79,9 +80,9 @@ func TestApplicationStartsMigratedReadyAndRoutesLocalAPI(t *testing.T) {
 		path   string
 		status int
 	}{
-		{path: "/healthz", status: stdhttp.StatusOK},
-		{path: "/readyz", status: stdhttp.StatusOK},
-		{path: "/tantan/v1/home?topicId=recommend", status: stdhttp.StatusUnauthorized},
+		{path: "/api/healthz", status: stdhttp.StatusOK},
+		{path: "/api/readyz", status: stdhttp.StatusOK},
+		{path: "/api/tantan/v1/home?topicId=recommend", status: stdhttp.StatusUnauthorized},
 	} {
 		request := httptest.NewRequest(stdhttp.MethodGet, "http://127.0.0.1:3000"+test.path, nil)
 		request.Host = "127.0.0.1:3000"
@@ -92,7 +93,7 @@ func TestApplicationStartsMigratedReadyAndRoutesLocalAPI(t *testing.T) {
 		}
 	}
 	var migrations int
-	if err := application.Store.DB().QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&migrations); err != nil || migrations != 3 {
+	if err := application.Store.DB().QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&migrations); err != nil || migrations != 4 {
 		t.Fatalf("migrations=%d err=%v", migrations, err)
 	}
 	if err := application.Close(); err != nil && !errors.Is(err, context.Canceled) {
@@ -112,6 +113,7 @@ func TestApplicationAuthenticatedHomeTopicsSearchAndStrictAISettings(t *testing.
 	now := func() time.Time { return time.Date(2026, 8, 9, 12, 0, 0, 0, time.UTC) }
 	application, err := newApplication(ctx, applicationConfig{
 		DataDir:       t.TempDir(),
+		PublicOrigin:  "http://127.0.0.1:3000",
 		Upstream:      upstreamURL,
 		FoloWebURL:    upstreamURL,
 		Client:        upstream.Client(),
@@ -138,7 +140,8 @@ func TestApplicationAuthenticatedHomeTopicsSearchAndStrictAISettings(t *testing.
 		t.Fatal(err)
 	}
 	rawSession := strings.Repeat("s", 48)
-	if _, err := sessions.Create(ctx, rawSession, session.User{ID: "user_api", Name: "API User"}, now().Add(24*time.Hour)); err != nil {
+	csrfToken := strings.Repeat("c", 48)
+	if _, err := sessions.CreateWithCSRF(ctx, rawSession, csrfToken, session.User{ID: "user_api", Name: "API User"}, now().Add(24*time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	timestamp := now().Format(time.RFC3339Nano)
@@ -172,14 +175,15 @@ func TestApplicationAuthenticatedHomeTopicsSearchAndStrictAISettings(t *testing.
 			request.Header.Set("Content-Type", "application/json")
 		}
 		if method != stdhttp.MethodGet {
-			request.Header.Set("Origin", "http://127.0.0.1:5173")
+			request.Header.Set("Origin", "http://127.0.0.1:3000")
+			request.Header.Set("X-CSRF-Token", csrfToken)
 		}
 		response := httptest.NewRecorder()
 		application.Handler.ServeHTTP(response, request)
 		return response
 	}
 
-	homeResponse := do(stdhttp.MethodGet, "/tantan/v1/home?topicId=recommend&limit=20", nil)
+	homeResponse := do(stdhttp.MethodGet, "/api/tantan/v1/home?topicId=recommend&limit=20", nil)
 	if homeResponse.Code != stdhttp.StatusOK {
 		t.Fatalf("home status=%d body=%s", homeResponse.Code, homeResponse.Body.String())
 	}
@@ -196,13 +200,13 @@ func TestApplicationAuthenticatedHomeTopicsSearchAndStrictAISettings(t *testing.
 	}
 	queueID := homeBody.Queue.ID
 
-	for _, path := range []string{"/tantan/v1/topics", "/tantan/v1/search?q=Contract%20Needle&limit=20"} {
+	for _, path := range []string{"/api/tantan/v1/topics", "/api/tantan/v1/search?q=Contract%20Needle&limit=20"} {
 		response := do(stdhttp.MethodGet, path, nil)
 		if response.Code != stdhttp.StatusOK || !strings.Contains(response.Body.String(), "entry_api") && strings.Contains(path, "/search") {
 			t.Fatalf("%s status=%d body=%s", path, response.Code, response.Body.String())
 		}
 	}
-	afterSearch := do(stdhttp.MethodGet, "/tantan/v1/home?topicId=recommend&limit=20", nil)
+	afterSearch := do(stdhttp.MethodGet, "/api/tantan/v1/home?topicId=recommend&limit=20", nil)
 	if afterSearch.Code != stdhttp.StatusOK || !strings.Contains(afterSearch.Body.String(), `"id":"`+queueID+`"`) {
 		t.Fatalf("search mutated home queue: %s", afterSearch.Body.String())
 	}
@@ -211,7 +215,8 @@ func TestApplicationAuthenticatedHomeTopicsSearchAndStrictAISettings(t *testing.
 		request := httptest.NewRequest(method, "http://127.0.0.1:3000"+path, bytes.NewReader(body))
 		request.Host = "127.0.0.1:3000"
 		request.AddCookie(&stdhttp.Cookie{Name: session.LocalCookieName, Value: rawSession})
-		request.Header.Set("Origin", "http://127.0.0.1:5173")
+		request.Header.Set("Origin", "http://127.0.0.1:3000")
+		request.Header.Set("X-CSRF-Token", csrfToken)
 		request.Header.Set("Idempotency-Key", idempotencyKey)
 		if body != nil {
 			request.Header.Set("Content-Type", "application/json")
@@ -220,30 +225,30 @@ func TestApplicationAuthenticatedHomeTopicsSearchAndStrictAISettings(t *testing.
 		application.Handler.ServeHTTP(response, request)
 		return response
 	}
-	blocked := doWithKey(stdhttp.MethodPost, "/tantan/v1/recommendation/feedback", []byte(`{"entryId":"entry_api","action":"block_source"}`), "application-block-key-0001")
+	blocked := doWithKey(stdhttp.MethodPost, "/api/tantan/v1/recommendation/feedback", []byte(`{"entryId":"entry_api","action":"block_source"}`), "application-block-key-0001")
 	if blocked.Code != stdhttp.StatusOK {
 		t.Fatalf("block Source status=%d body=%s", blocked.Code, blocked.Body.String())
 	}
-	blocks := do(stdhttp.MethodGet, "/tantan/v1/recommendation/blocks/sources", nil)
+	blocks := do(stdhttp.MethodGet, "/api/tantan/v1/recommendation/blocks/sources", nil)
 	if blocks.Code != stdhttp.StatusOK || !strings.Contains(blocks.Body.String(), `"sourceId":"feed_api"`) || !strings.Contains(blocks.Body.String(), `"name":"API Source"`) {
 		t.Fatalf("list Source blocks status=%d body=%s", blocks.Code, blocks.Body.String())
 	}
-	restored := doWithKey(stdhttp.MethodDelete, "/tantan/v1/recommendation/blocks/sources/feed_api", nil, "application-restore-key-0001")
+	restored := doWithKey(stdhttp.MethodDelete, "/api/tantan/v1/recommendation/blocks/sources/feed_api", nil, "application-restore-key-0001")
 	if restored.Code != stdhttp.StatusOK {
 		t.Fatalf("restore Source status=%d body=%s", restored.Code, restored.Body.String())
 	}
-	blocks = do(stdhttp.MethodGet, "/tantan/v1/recommendation/blocks/sources", nil)
+	blocks = do(stdhttp.MethodGet, "/api/tantan/v1/recommendation/blocks/sources", nil)
 	if blocks.Code != stdhttp.StatusOK || !strings.Contains(blocks.Body.String(), `"items":[]`) {
 		t.Fatalf("Source block remained status=%d body=%s", blocks.Code, blocks.Body.String())
 	}
 
 	canary := "sk-tantan-api-contract-canary"
-	invalidSettings := do(stdhttp.MethodPut, "/tantan/v1/settings/ai-provider", []byte(`{"providerId":"openai","model":"gpt-5-mini","apiKey":"`+canary+`","baseUrl":"https://attacker.invalid"}`))
-	if invalidSettings.Code != stdhttp.StatusBadRequest || strings.Contains(invalidSettings.Body.String(), canary) {
+	invalidSettings := do(stdhttp.MethodPut, "/api/tantan/v1/settings/ai-provider", []byte(`{"providerId":"openai","model":"gpt-5-mini","apiKey":"`+canary+`","baseUrl":"https://attacker.invalid"}`))
+	if invalidSettings.Code != stdhttp.StatusMethodNotAllowed && invalidSettings.Code != stdhttp.StatusNotFound || strings.Contains(invalidSettings.Body.String(), canary) {
 		t.Fatalf("strict AI settings status=%d body=%s", invalidSettings.Code, invalidSettings.Body.String())
 	}
 	var databaseCanaryCount int
-	if err := application.Store.DB().QueryRowContext(ctx, `SELECT COUNT(*) FROM ai_provider_configs WHERE provider_id LIKE ? OR model LIKE ?`, "%"+canary+"%", "%"+canary+"%").Scan(&databaseCanaryCount); err != nil || databaseCanaryCount != 0 {
+	if err := application.Store.DB().QueryRowContext(ctx, `SELECT COUNT(*) FROM ai_provider_configs_v1 WHERE provider_id LIKE ? OR model LIKE ?`, "%"+canary+"%", "%"+canary+"%").Scan(&databaseCanaryCount); err != nil || databaseCanaryCount != 0 {
 		t.Fatalf("database canary count=%d err=%v", databaseCanaryCount, err)
 	}
 }

@@ -60,3 +60,26 @@ func TestLocalSessionRejectsWeakOrAlreadyExpiredInput(t *testing.T) {
 		})
 	}
 }
+
+func TestLocalSessionStoresOnlyCSRFHashAndValidatesInConstantTime(t *testing.T) {
+	now := time.Date(2026, 8, 10, 2, 0, 0, 0, time.UTC)
+	store := session.NewStore(func() time.Time { return now })
+	raw, err := session.NewToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	csrf, err := session.NewCSRFToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := store.CreateWithCSRF(context.Background(), raw, csrf, session.User{ID: "user_csrf", Name: "CSRF User"}, now.Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if record.CSRFHash != session.HashCSRF(csrf) || record.SecretRef != record.IDHash {
+		t.Fatalf("record did not persist v2 session metadata: %#v", record)
+	}
+	if strings.Contains(record.CSRFHash, csrf) || !session.ValidCSRF(record, csrf) || session.ValidCSRF(record, csrf+"wrong") {
+		t.Fatal("CSRF validation accepted the wrong value or retained plaintext")
+	}
+}

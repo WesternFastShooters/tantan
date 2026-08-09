@@ -14,13 +14,6 @@ import (
 	"tantan.local/tantan-api/internal/session"
 )
 
-var allowedOrigins = map[string]struct{}{
-	"http://127.0.0.1:3000": {},
-	"http://127.0.0.1:5173": {},
-	"http://localhost:3000": {},
-	"http://localhost:5173": {},
-}
-
 var strippedRequestHeaders = map[string]struct{}{
 	"Authorization":       {},
 	"Connection":          {},
@@ -58,20 +51,22 @@ var strippedResponseHeaders = map[string]struct{}{
 }
 
 type ProxyConfig struct {
-	Policy   *Policy
-	Upstream *url.URL
-	Client   *http.Client
-	Secrets  session.SecretStore
-	Logger   *slog.Logger
+	Policy       *Policy
+	Upstream     *url.URL
+	PublicOrigin string
+	Client       *http.Client
+	Secrets      session.SecretStore
+	Logger       *slog.Logger
 }
 
 type Proxy struct {
-	policy      *Policy
-	upstream    *url.URL
-	client      *http.Client
-	secrets     session.SecretStore
-	logger      *slog.Logger
-	deniedCount atomic.Uint64
+	policy       *Policy
+	upstream     *url.URL
+	client       *http.Client
+	secrets      session.SecretStore
+	publicOrigin string
+	logger       *slog.Logger
+	deniedCount  atomic.Uint64
 }
 
 func NewProxy(config ProxyConfig) (*Proxy, error) {
@@ -80,6 +75,10 @@ func NewProxy(config ProxyConfig) (*Proxy, error) {
 	}
 	if !isAllowedAPIUpstream(config.Upstream) {
 		return nil, errors.New("Folo upstream must be https://api.folo.is or a loopback test server")
+	}
+	publicOrigin, err := normalizePublicOrigin(config.PublicOrigin)
+	if err != nil {
+		return nil, err
 	}
 	client := config.Client
 	if client == nil {
@@ -95,11 +94,12 @@ func NewProxy(config ProxyConfig) (*Proxy, error) {
 	}
 	upstreamCopy := *config.Upstream
 	return &Proxy{
-		policy:   config.Policy,
-		upstream: &upstreamCopy,
-		client:   &clientCopy,
-		secrets:  config.Secrets,
-		logger:   logger,
+		policy:       config.Policy,
+		upstream:     &upstreamCopy,
+		client:       &clientCopy,
+		secrets:      config.Secrets,
+		publicOrigin: publicOrigin,
+		logger:       logger,
 	}, nil
 }
 
@@ -122,11 +122,15 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		writeAPIError(writer, request, http.StatusUnauthorized, "AUTH_REQUIRED", "请先登录")
 		return
 	}
-	if decision.Mutation && !isAllowedOrigin(request.Header.Get("Origin")) {
+	if decision.Mutation && request.Header.Get("Origin") != proxy.publicOrigin {
 		writeAPIError(writer, request, http.StatusForbidden, "ORIGIN_REJECTED", "请求来源不受信任")
 		return
 	}
-	upstreamToken, err := proxy.secrets.Get(request.Context(), record.IDHash)
+	secretRef := record.SecretRef
+	if secretRef == "" {
+		secretRef = record.IDHash
+	}
+	upstreamToken, err := proxy.secrets.Get(request.Context(), secretRef)
 	if err != nil || !validCookieValue(upstreamToken) {
 		writeAPIError(writer, request, http.StatusUnauthorized, "AUTH_REQUIRED", "登录已失效，请重新登录")
 		return
@@ -221,13 +225,24 @@ func copyAllowedHeaders(target, source http.Header, stripped map[string]struct{}
 	}
 }
 
-func isAllowedOrigin(origin string) bool {
-	_, ok := allowedOrigins[origin]
-	return ok
-}
-
 func isLoopbackTestURL(value *url.URL) bool {
 	return value.Scheme == "http" && (value.Hostname() == "127.0.0.1" || value.Hostname() == "localhost")
+}
+
+func normalizePublicOrigin(raw string) (string, error) {
+	if strings.TrimSpace(raw) == "" {
+		raw = "http://127.0.0.1:3000"
+	}
+	value, err := url.Parse(raw)
+	if err != nil || value.User != nil || value.Host == "" || value.RawQuery != "" || value.Fragment != "" || (value.Path != "" && value.Path != "/") {
+		return "", errors.New("Folo proxy public origin is invalid")
+	}
+	if value.Scheme != "https" && !isLoopbackTestURL(value) {
+		return "", errors.New("Folo proxy public origin must use HTTPS or loopback HTTP")
+	}
+	value.Path = ""
+	value.RawPath = ""
+	return value.String(), nil
 }
 
 func isAllowedAPIUpstream(value *url.URL) bool {
@@ -248,8 +263,9 @@ func writeAPIError(writer http.ResponseWriter, request *http.Request, status int
 	_ = json.NewEncoder(writer).Encode(map[string]any{
 		"requestId": requestID,
 		"error": map[string]any{
-			"code":    code,
-			"message": message,
+			"code":      code,
+			"message":   message,
+			"retryable": code == "FOLO_UNAVAILABLE" || code == "FOLO_RATE_LIMITED",
 		},
 	})
 }

@@ -30,6 +30,8 @@ CREATE INDEX idx_auth_token_replays_expires_at ON auth_token_replays(expires_at)
 
 ALTER TABLE accounts ADD COLUMN topics_revision INTEGER NOT NULL DEFAULT 1
   CHECK (topics_revision >= 1);
+ALTER TABLE accounts ADD COLUMN email TEXT
+  CHECK (email IS NULL OR length(email) BETWEEN 3 AND 320);
 
 ALTER TABLE home_filters ADD COLUMN revision INTEGER NOT NULL DEFAULT 1
   CHECK (revision >= 1);

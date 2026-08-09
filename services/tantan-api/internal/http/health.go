@@ -32,12 +32,12 @@ func NewHealthHandler(buildVersion string, readiness ReadinessChecker) stdhttp.H
 			writeJSON(writer, stdhttp.StatusOK, map[string]string{"status": "ok", "version": buildVersion})
 		case "/readyz":
 			if readiness == nil {
-				writeError(writer, request.Header.Get("X-Request-Id"), stdhttp.StatusServiceUnavailable, "SERVICE_NOT_READY", "服务尚未准备就绪")
+				writeError(writer, request.Header.Get("X-Request-Id"), stdhttp.StatusServiceUnavailable, "SERVICE_NOT_READY", "服务尚未准备就绪", true)
 				return
 			}
 			result := readiness.Check(request.Context())
 			if !result.Ready {
-				writeError(writer, request.Header.Get("X-Request-Id"), stdhttp.StatusServiceUnavailable, "SERVICE_NOT_READY", "本地存储或系统钥匙串不可用")
+				writeError(writer, request.Header.Get("X-Request-Id"), stdhttp.StatusServiceUnavailable, "SERVICE_NOT_READY", "本地存储或系统钥匙串不可用", true)
 				return
 			}
 			writeJSON(writer, stdhttp.StatusOK, result)

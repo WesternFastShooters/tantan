@@ -294,7 +294,7 @@ func FuzzRoutePolicyNeverBypassesDecisionClasses(fuzz *testing.F) {
 				t.Fatalf("invalid removed decision: %#v", decision)
 			}
 		case folo.DecisionDenied:
-			if decision.Status != http.StatusForbidden || decision.Code != "FOLO_ROUTE_NOT_ALLOWED" {
+			if decision.Status != http.StatusForbidden || decision.Code != "FOLO_ROUTE_DENIED" {
 				t.Fatalf("invalid deny decision: %#v", decision)
 			}
 		default:
@@ -335,8 +335,8 @@ func TestDeniedAndRemovedRoutesNeverReachUpstream(t *testing.T) {
 		{method: http.MethodGet, path: "/referrals/list", status: http.StatusGone, code: "FOLO_FEATURE_REMOVED"},
 		{method: http.MethodGet, path: "/trending/topics", status: http.StatusGone, code: "FOLO_FEATURE_REMOVED"},
 		{method: http.MethodPost, path: "/rsshub/use", status: http.StatusGone, code: "FOLO_FEATURE_REMOVED"},
-		{method: http.MethodPatch, path: "/settings/ai", status: http.StatusForbidden, code: "FOLO_ROUTE_NOT_ALLOWED"},
-		{method: http.MethodGet, path: "/not-in-policy", status: http.StatusForbidden, code: "FOLO_ROUTE_NOT_ALLOWED"},
+		{method: http.MethodPatch, path: "/settings/ai", status: http.StatusForbidden, code: "FOLO_ROUTE_DENIED"},
+		{method: http.MethodGet, path: "/not-in-policy", status: http.StatusForbidden, code: "FOLO_ROUTE_DENIED"},
 	}
 
 	for _, test := range tests {

@@ -11,6 +11,7 @@ const checkOnly = process.argv.includes("--check")
 
 const contractInputs = [
   "spec-package/api/openapi.json",
+  "spec-package/api/folo-route-policy.json",
   "spec-package/schemas/ai-enrichment-v1.schema.json",
   "spec-package/schemas/filter-spec-v1.schema.json",
   "spec-package/schemas/home-response.schema.json",
@@ -631,6 +632,10 @@ const outputs = new Map([
   ["apps/desktop/layer/renderer/src/lib/tantan-api/gen/types.ts", await formatTypeScript(tsTypes)],
   ["services/tantan-api/internal/ai/schema/embed.go", formatGo(embeddedSchemas)],
   ["docs/contracts/contract.sha256", Buffer.from(`${digest}\n`)],
+  [
+    "services/tantan-api/internal/folo/route-policy.json",
+    input("spec-package/api/folo-route-policy.json"),
+  ],
 ])
 
 for (const name of contractInputs.filter((name) => name.startsWith("spec-package/schemas/"))) {

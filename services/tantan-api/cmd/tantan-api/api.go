@@ -36,7 +36,7 @@ var (
 	idempotencyPattern   = regexp.MustCompile(`^[A-Za-z0-9._:-]+$`)
 )
 
-type providerTester func(context.Context, ai.ProviderInput) (ai.ConnectionTestResult, error)
+type providerTester func(context.Context) (ai.ConnectionTestResult, error)
 
 type localAPIConfig struct {
 	Store          *storage.Store
@@ -79,8 +79,6 @@ func newLocalAPI(config localAPIConfig) (*localhttp.LocalMux, error) {
 	mux.HandleFunc(stdhttp.MethodGet, "/tantan/v1/entries/{entryId}/enrichment", api.getEnrichment)
 	mux.HandleFunc(stdhttp.MethodPost, "/tantan/v1/entries/{entryId}/enrichment", api.ensureEnrichment)
 	mux.HandleFunc(stdhttp.MethodGet, "/tantan/v1/settings/ai-provider", api.getAISettings)
-	mux.HandleFunc(stdhttp.MethodPut, "/tantan/v1/settings/ai-provider", api.putAISettings)
-	mux.HandleFunc(stdhttp.MethodDelete, "/tantan/v1/settings/ai-provider", api.deleteAISettings)
 	mux.HandleFunc(stdhttp.MethodPost, "/tantan/v1/settings/ai-provider/test", api.testAISettings)
 	mux.HandleFunc(stdhttp.MethodGet, "/tantan/v1/sync/status", api.syncStatus)
 	mux.HandleFunc(stdhttp.MethodPost, "/tantan/v1/sync", api.triggerSync)
@@ -365,53 +363,16 @@ func (api *localAPI) getAISettings(writer stdhttp.ResponseWriter, request *stdht
 	writeLocalJSON(writer, stdhttp.StatusOK, aiSettingsResponse(settings))
 }
 
-func (api *localAPI) putAISettings(writer stdhttp.ResponseWriter, request *stdhttp.Request) {
-	if _, ok := api.record(writer, request); !ok {
-		return
-	}
-	var body gen.AIProviderPutRequest
-	if err := decodeLocalJSON(writer, request, &body); err != nil {
-		writeLocalError(writer, request, stdhttp.StatusBadRequest, gen.ErrorCodeValidationError, "AI Provider 配置无效", nil)
-		return
-	}
-	apiKey := ""
-	if body.APIKey != nil {
-		apiKey = *body.APIKey
-	}
-	settings, err := api.config.AISettings.Put(request.Context(), ai.ProviderInput{ProviderID: string(body.ProviderID), Model: body.Model, APIKey: apiKey})
-	if err != nil {
-		api.writeDomainError(writer, request, err)
-		return
-	}
-	writeLocalJSON(writer, stdhttp.StatusOK, aiSettingsResponse(settings))
-}
-
-func (api *localAPI) deleteAISettings(writer stdhttp.ResponseWriter, request *stdhttp.Request) {
-	if _, ok := api.record(writer, request); !ok {
-		return
-	}
-	if err := api.config.AISettings.Delete(request.Context()); err != nil {
-		api.writeDomainError(writer, request, err)
-		return
-	}
-	writer.WriteHeader(stdhttp.StatusNoContent)
-}
-
 func (api *localAPI) testAISettings(writer stdhttp.ResponseWriter, request *stdhttp.Request) {
 	record, ok := api.record(writer, request)
 	if !ok {
-		return
-	}
-	var body gen.AIProviderTestRequest
-	if err := decodeLocalJSON(writer, request, &body); err != nil {
-		writeLocalError(writer, request, stdhttp.StatusBadRequest, gen.ErrorCodeValidationError, "AI Provider 测试请求无效", nil)
 		return
 	}
 	if retryAfter, allowed := api.allowProviderTest(record.IDHash); !allowed {
 		writeLocalRateLimit(writer, request, retryAfter)
 		return
 	}
-	result, err := api.config.ProviderTester(request.Context(), ai.ProviderInput{ProviderID: string(body.ProviderID), Model: body.Model, APIKey: body.APIKey})
+	result, err := api.config.ProviderTester(request.Context())
 	if err != nil {
 		api.writeDomainError(writer, request, err)
 		return

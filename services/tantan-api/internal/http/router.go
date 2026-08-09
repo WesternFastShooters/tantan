@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"net"
 	stdhttp "net/http"
 	"net/url"
 	"strings"
@@ -17,39 +18,47 @@ import (
 	"tantan.local/tantan-api/internal/session"
 )
 
-const version = "dev"
-
-var allowedHosts = map[string]struct{}{
-	"127.0.0.1:3000": {},
-	"localhost:3000": {},
-}
-
-var allowedOrigins = map[string]struct{}{
-	"http://127.0.0.1:3000": {},
-	"http://127.0.0.1:5173": {},
-	"http://localhost:3000": {},
-	"http://localhost:5173": {},
-}
+const (
+	version           = "dev"
+	defaultOrigin     = "http://127.0.0.1:3000"
+	localAPIPrefix    = "/api/tantan/v1/"
+	foloAPIPrefix     = "/api/folo"
+	maximumHeaderSize = 8 * 1024
+)
 
 type RouterConfig struct {
-	Auth     *auth.Bridge
-	Proxy    *folo.Proxy
-	Sessions *session.Store
-	Local    stdhttp.Handler
-	Health   stdhttp.Handler
-	Logger   *slog.Logger
+	PublicOrigin      string
+	TrustedProxyCIDRs []string
+	Auth              *auth.Bridge
+	Proxy             *folo.Proxy
+	Sessions          *session.Store
+	Local             stdhttp.Handler
+	Health            stdhttp.Handler
+	Static            stdhttp.Handler
+	Logger            *slog.Logger
 }
 
 type router struct {
-	auth     *auth.Bridge
-	proxy    *folo.Proxy
-	sessions *session.Store
-	local    stdhttp.Handler
-	health   stdhttp.Handler
-	logger   *slog.Logger
+	publicOrigin   *url.URL
+	trustedProxies []*net.IPNet
+	auth           *auth.Bridge
+	proxy          *folo.Proxy
+	sessions       *session.Store
+	local          stdhttp.Handler
+	health         stdhttp.Handler
+	static         stdhttp.Handler
+	logger         *slog.Logger
 }
 
-func NewRouter(config RouterConfig) stdhttp.Handler {
+func NewRouter(config RouterConfig) (stdhttp.Handler, error) {
+	publicOrigin, err := parsePublicOrigin(config.PublicOrigin)
+	if err != nil {
+		return nil, err
+	}
+	trustedProxies, err := parseTrustedProxyCIDRs(config.TrustedProxyCIDRs)
+	if err != nil {
+		return nil, err
+	}
 	logger := config.Logger
 	if logger == nil {
 		logger = slog.New(slog.NewJSONHandler(io.Discard, nil))
@@ -59,13 +68,16 @@ func NewRouter(config RouterConfig) stdhttp.Handler {
 		health = defaultHealthHandler()
 	}
 	return &router{
-		auth:     config.Auth,
-		proxy:    config.Proxy,
-		sessions: config.Sessions,
-		local:    config.Local,
-		health:   health,
-		logger:   logger,
-	}
+		publicOrigin:   publicOrigin,
+		trustedProxies: trustedProxies,
+		auth:           config.Auth,
+		proxy:          config.Proxy,
+		sessions:       config.Sessions,
+		local:          config.Local,
+		health:         health,
+		static:         config.Static,
+		logger:         logger,
+	}, nil
 }
 
 func ValidateListenAddr(address string) error {
@@ -78,48 +90,23 @@ func ValidateListenAddr(address string) error {
 func (router *router) ServeHTTP(writer stdhttp.ResponseWriter, request *stdhttp.Request) {
 	requestID := newRequestID()
 	request.Header.Set("X-Request-Id", requestID)
+	setSecurityHeaders(writer.Header())
 	writer.Header().Set("X-Request-Id", requestID)
 	startedAt := time.Now()
 	recorder := &statusRecorder{ResponseWriter: writer, status: stdhttp.StatusOK}
 
-	if _, ok := allowedHosts[request.Host]; !ok {
-		writeError(recorder, requestID, stdhttp.StatusForbidden, "ORIGIN_REJECTED", "请求来源不受信任")
+	if !router.validAuthority(request) || !router.validOrigin(request.Header.Get("Origin")) {
+		writeError(recorder, requestID, stdhttp.StatusForbidden, "ORIGIN_REJECTED", "请求来源不受信任", false)
 		router.logRequest(request, recorder.status, startedAt, "ORIGIN_REJECTED")
 		return
 	}
-
-	origin := request.Header.Get("Origin")
-	if origin != "" {
-		if _, ok := allowedOrigins[origin]; !ok {
-			writeError(recorder, requestID, stdhttp.StatusForbidden, "ORIGIN_REJECTED", "请求来源不受信任")
-			router.logRequest(request, recorder.status, startedAt, "ORIGIN_REJECTED")
-			return
-		}
-		recorder.Header().Set("Access-Control-Allow-Origin", origin)
-		recorder.Header().Set("Access-Control-Allow-Credentials", "true")
-		recorder.Header().Set("Vary", "Origin")
-	}
 	if request.Method == stdhttp.MethodOptions {
-		if origin == "" {
-			writeError(recorder, requestID, stdhttp.StatusForbidden, "ORIGIN_REJECTED", "请求来源不受信任")
-			router.logRequest(request, recorder.status, startedAt, "ORIGIN_REJECTED")
-			return
-		}
-		requestedMethod := strings.ToUpper(strings.TrimSpace(request.Header.Get("Access-Control-Request-Method")))
-		if !router.allowsPreflight(requestedMethod, request.URL.EscapedPath()) || !allowedPreflightHeaders(request.Header.Get("Access-Control-Request-Headers")) {
-			writeError(recorder, requestID, stdhttp.StatusForbidden, "ORIGIN_REJECTED", "跨域预检请求未获允许")
-			router.logRequest(request, recorder.status, startedAt, "ORIGIN_REJECTED")
-			return
-		}
-		recorder.Header().Set("Vary", "Origin, Access-Control-Request-Method, Access-Control-Request-Headers")
-		recorder.Header().Set("Access-Control-Allow-Headers", "Content-Type, Idempotency-Key, X-Tantan-Timezone")
-		recorder.Header().Set("Access-Control-Allow-Methods", requestedMethod)
-		recorder.WriteHeader(stdhttp.StatusNoContent)
-		router.logRequest(request, recorder.status, startedAt, "")
+		writeError(recorder, requestID, stdhttp.StatusForbidden, "ORIGIN_REJECTED", "不接受跨域预检请求", false)
+		router.logRequest(request, recorder.status, startedAt, "ORIGIN_REJECTED")
 		return
 	}
-	if isLocalMutation(request.Method, request.URL.Path) && origin == "" {
-		writeError(recorder, requestID, stdhttp.StatusForbidden, "ORIGIN_REJECTED", "请求来源不受信任")
+	if isMutation(request.Method) && request.Header.Get("Origin") == "" {
+		writeError(recorder, requestID, stdhttp.StatusForbidden, "ORIGIN_REJECTED", "请求来源不受信任", false)
 		router.logRequest(request, recorder.status, startedAt, "ORIGIN_REJECTED")
 		return
 	}
@@ -129,98 +116,109 @@ func (router *router) ServeHTTP(writer stdhttp.ResponseWriter, request *stdhttp.
 		status := stdhttp.StatusInternalServerError
 		code := "LOCAL_STORAGE_ERROR"
 		message := "本地会话存储不可用"
+		retryable := true
 		if errors.Is(err, errInvalidTimezone) {
 			status = stdhttp.StatusBadRequest
 			code = "VALIDATION_ERROR"
 			message = "时区无效"
+			retryable = false
 		}
-		writeError(recorder, requestID, status, code, message)
+		writeError(recorder, requestID, status, code, message, retryable)
 		router.logRequest(request, recorder.status, startedAt, code)
 		return
 	}
-	if strings.HasPrefix(request.URL.Path, "/tantan/v1/") {
-		if _, ok := session.FromContext(request.Context()); !ok {
-			writeError(recorder, requestID, stdhttp.StatusUnauthorized, "AUTH_REQUIRED", "请先登录")
-			router.logRequest(request, recorder.status, startedAt, "AUTH_REQUIRED")
-			return
-		}
-	}
-	request = sanitizeBrowserCredentials(request)
 	errorCode := router.dispatch(recorder, request, requestID)
 	router.logRequest(request, recorder.status, startedAt, errorCode)
 }
 
-func (router *router) allowsPreflight(method, escapedPath string) bool {
-	if method == "" || strings.ContainsAny(method, " \t\r\n") {
-		return false
-	}
-	path, err := url.PathUnescape(escapedPath)
-	if err != nil {
-		return false
-	}
-	switch {
-	case method == stdhttp.MethodPost && path == "/auth/logout":
-		return true
-	case method == stdhttp.MethodGet && (path == "/tantan/v1/session" || path == "/healthz" || path == "/readyz"):
-		return true
-	case strings.HasPrefix(path, "/tantan/v1/"):
-		authorizer, ok := router.local.(PreflightAuthorizer)
-		return ok && authorizer.AllowsPreflight(method, path)
-	case router.proxy != nil:
-		return router.proxy.Decide(method, escapedPath).Kind == folo.DecisionAllow
-	default:
-		return false
-	}
-}
-
-func allowedPreflightHeaders(raw string) bool {
-	allowed := map[string]struct{}{
-		"content-type":      {},
-		"idempotency-key":   {},
-		"x-tantan-timezone": {},
-	}
-	for _, value := range strings.Split(raw, ",") {
-		name := strings.ToLower(strings.TrimSpace(value))
-		if name == "" {
-			continue
-		}
-		if _, ok := allowed[name]; !ok {
-			return false
-		}
-	}
-	return true
-}
-
 func (router *router) dispatch(writer stdhttp.ResponseWriter, request *stdhttp.Request, requestID string) string {
+	path := request.URL.Path
 	switch {
-	case request.URL.Path == "/healthz" || request.URL.Path == "/readyz":
-		router.health.ServeHTTP(writer, request)
+	case request.Method == stdhttp.MethodGet && (path == "/api/healthz" || path == "/api/readyz"):
+		router.health.ServeHTTP(writer, withPath(request, strings.TrimPrefix(path, "/api")))
 		return ""
-	case request.Method == stdhttp.MethodGet && request.URL.Path == "/auth/folo/start" && router.auth != nil:
-		router.auth.Start(writer, request)
+	case request.Method == stdhttp.MethodGet && path == "/api/auth/folo/providers" && router.auth != nil:
+		router.auth.Providers(writer, sanitizeBrowserCredentials(request))
 		return ""
-	case request.Method == stdhttp.MethodGet && request.URL.Path == "/auth/folo/callback" && router.auth != nil:
-		router.auth.Callback(writer, request)
+	case request.Method == stdhttp.MethodPost && path == "/api/auth/folo/social-start" && router.auth != nil:
+		router.auth.SocialStart(writer, sanitizeBrowserCredentials(request))
 		return ""
-	case request.Method == stdhttp.MethodPost && request.URL.Path == "/auth/logout" && router.auth != nil:
-		router.auth.Logout(writer, request)
+	case request.Method == stdhttp.MethodPost && path == "/api/auth/folo/token" && router.auth != nil:
+		router.auth.Token(writer, sanitizeBrowserCredentials(request))
 		return ""
-	case request.Method == stdhttp.MethodGet && request.URL.Path == "/tantan/v1/session" && router.auth != nil:
-		router.auth.CurrentSession(writer, request)
+	case request.Method == stdhttp.MethodPost && path == "/api/auth/folo/email" && router.auth != nil:
+		router.auth.Email(writer, sanitizeBrowserCredentials(request))
 		return ""
-	case strings.HasPrefix(request.URL.Path, "/tantan/v1/") && router.local != nil:
-		router.local.ServeHTTP(writer, request)
+	case request.Method == stdhttp.MethodPost && path == "/api/auth/folo/two-factor" && router.auth != nil:
+		router.auth.TwoFactor(writer, sanitizeBrowserCredentials(request))
 		return ""
-	case strings.HasPrefix(request.URL.Path, "/tantan/v1/"):
-		writeError(writer, requestID, stdhttp.StatusServiceUnavailable, "SERVICE_NOT_READY", "服务尚未准备就绪")
-		return "SERVICE_NOT_READY"
-	case router.proxy != nil:
-		router.proxy.ServeHTTP(writer, request)
+	case request.Method == stdhttp.MethodPost && path == "/api/auth/logout" && router.auth != nil:
+		if _, ok := session.FromContext(request.Context()); ok && !validCSRF(request) {
+			writeError(writer, requestID, stdhttp.StatusForbidden, "CSRF_INVALID", "安全令牌无效，请刷新后重试", false)
+			return "CSRF_INVALID"
+		}
+		router.auth.Logout(writer, sanitizeBrowserCredentials(request))
+		return ""
+	case request.Method == stdhttp.MethodGet && path == "/api/tantan/v1/session" && router.auth != nil:
+		router.auth.CurrentSession(writer, sanitizeBrowserCredentials(request))
+		return ""
+	case strings.HasPrefix(path, localAPIPrefix):
+		return router.dispatchLocal(writer, request, requestID)
+	case path == foloAPIPrefix || strings.HasPrefix(path, foloAPIPrefix+"/"):
+		return router.dispatchFolo(writer, request, requestID)
+	case strings.HasPrefix(path, "/api/") || path == "/api":
+		writeError(writer, requestID, stdhttp.StatusNotFound, "NOT_FOUND", "接口不存在", false)
+		return "NOT_FOUND"
+	case (request.Method == stdhttp.MethodGet || request.Method == stdhttp.MethodHead) && router.static != nil:
+		router.static.ServeHTTP(writer, sanitizeBrowserCredentials(request))
 		return ""
 	default:
-		writeError(writer, requestID, stdhttp.StatusServiceUnavailable, "SERVICE_NOT_READY", "服务尚未准备就绪")
+		writeError(writer, requestID, stdhttp.StatusNotFound, "NOT_FOUND", "页面不存在", false)
+		return "NOT_FOUND"
+	}
+}
+
+func (router *router) dispatchLocal(writer stdhttp.ResponseWriter, request *stdhttp.Request, requestID string) string {
+	if _, ok := session.FromContext(request.Context()); !ok {
+		writeError(writer, requestID, stdhttp.StatusUnauthorized, "AUTH_REQUIRED", "请先登录", false)
+		return "AUTH_REQUIRED"
+	}
+	if isMutation(request.Method) && !validCSRF(request) {
+		writeError(writer, requestID, stdhttp.StatusForbidden, "CSRF_INVALID", "安全令牌无效，请刷新后重试", false)
+		return "CSRF_INVALID"
+	}
+	if router.local == nil {
+		writeError(writer, requestID, stdhttp.StatusServiceUnavailable, "SERVICE_NOT_READY", "服务尚未准备就绪", true)
 		return "SERVICE_NOT_READY"
 	}
+	localRequest := withPath(sanitizeBrowserCredentials(request), strings.TrimPrefix(request.URL.Path, "/api"))
+	router.local.ServeHTTP(writer, localRequest)
+	return ""
+}
+
+func (router *router) dispatchFolo(writer stdhttp.ResponseWriter, request *stdhttp.Request, requestID string) string {
+	if router.proxy == nil {
+		writeError(writer, requestID, stdhttp.StatusServiceUnavailable, "SERVICE_NOT_READY", "服务尚未准备就绪", true)
+		return "SERVICE_NOT_READY"
+	}
+	upstreamPath := strings.TrimPrefix(request.URL.Path, foloAPIPrefix)
+	if upstreamPath == "" {
+		upstreamPath = "/"
+	}
+	proxyRequest := withPath(sanitizeBrowserCredentials(request), upstreamPath)
+	decision := router.proxy.Decide(request.Method, proxyRequest.URL.EscapedPath())
+	if decision.Kind == folo.DecisionAllow {
+		if _, ok := session.FromContext(request.Context()); !ok {
+			writeError(writer, requestID, stdhttp.StatusUnauthorized, "AUTH_REQUIRED", "请先登录", false)
+			return "AUTH_REQUIRED"
+		}
+		if decision.Mutation && !validCSRF(request) {
+			writeError(writer, requestID, stdhttp.StatusForbidden, "CSRF_INVALID", "安全令牌无效，请刷新后重试", false)
+			return "CSRF_INVALID"
+		}
+	}
+	router.proxy.ServeHTTP(writer, proxyRequest)
+	return ""
 }
 
 func (router *router) withOptionalSession(request *stdhttp.Request) (*stdhttp.Request, error) {
@@ -253,6 +251,50 @@ func (router *router) withOptionalSession(request *stdhttp.Request) (*stdhttp.Re
 	return request.WithContext(session.WithRecord(request.Context(), record)), nil
 }
 
+func (router *router) validAuthority(request *stdhttp.Request) bool {
+	if headerBytes(request.Header) > maximumHeaderSize {
+		return false
+	}
+	forwarded := hasForwardedHeaders(request.Header)
+	trusted := router.isTrustedProxy(request.RemoteAddr)
+	if forwarded && !trusted {
+		return false
+	}
+	if !forwarded {
+		return request.Host == router.publicOrigin.Host
+	}
+	if request.Header.Get("Forwarded") != "" || request.Header.Get("X-Forwarded-For") == "" {
+		return false
+	}
+	host, ok := oneHeaderValue(request.Header.Get("X-Forwarded-Host"))
+	if !ok || host != router.publicOrigin.Host {
+		return false
+	}
+	protocol, ok := oneHeaderValue(request.Header.Get("X-Forwarded-Proto"))
+	return ok && strings.EqualFold(protocol, router.publicOrigin.Scheme)
+}
+
+func (router *router) validOrigin(origin string) bool {
+	return origin == "" || origin == router.publicOrigin.String()
+}
+
+func (router *router) isTrustedProxy(remoteAddress string) bool {
+	host, _, err := net.SplitHostPort(remoteAddress)
+	if err != nil {
+		host = remoteAddress
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	for _, network := range router.trustedProxies {
+		if network.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
 var errInvalidTimezone = errors.New("invalid timezone")
 
 func sanitizeBrowserCredentials(request *stdhttp.Request) *stdhttp.Request {
@@ -270,23 +312,104 @@ func sanitizeBrowserCredentials(request *stdhttp.Request) *stdhttp.Request {
 	} {
 		sanitized.Header.Del(name)
 	}
-	if request.URL.Path == "/auth/folo/callback" {
-		if flowCookie, err := request.Cookie(auth.FlowCookieName); err == nil {
-			sanitized.AddCookie(flowCookie)
+	return sanitized
+}
+
+func withPath(request *stdhttp.Request, path string) *stdhttp.Request {
+	clone := request.Clone(request.Context())
+	urlCopy := *request.URL
+	urlCopy.Path = path
+	urlCopy.RawPath = ""
+	clone.URL = &urlCopy
+	return clone
+}
+
+func validCSRF(request *stdhttp.Request) bool {
+	record, ok := session.FromContext(request.Context())
+	return ok && session.ValidCSRF(record, request.Header.Get("X-CSRF-Token"))
+}
+
+func parsePublicOrigin(raw string) (*url.URL, error) {
+	if strings.TrimSpace(raw) == "" {
+		raw = defaultOrigin
+	}
+	value, err := url.Parse(raw)
+	if err != nil || value.User != nil || value.Host == "" || value.RawQuery != "" || value.Fragment != "" || (value.Path != "" && value.Path != "/") {
+		return nil, errors.New("public origin is invalid")
+	}
+	value.Scheme = strings.ToLower(value.Scheme)
+	if value.Scheme != "https" && !(value.Scheme == "http" && isLoopbackHost(value.Hostname())) {
+		return nil, errors.New("public origin must use HTTPS or loopback HTTP")
+	}
+	value.Path = ""
+	value.RawPath = ""
+	return value, nil
+}
+
+func parseTrustedProxyCIDRs(values []string) ([]*net.IPNet, error) {
+	result := make([]*net.IPNet, 0, len(values))
+	for _, raw := range values {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			return nil, errors.New("trusted proxy CIDR is invalid")
+		}
+		_, network, err := net.ParseCIDR(raw)
+		if err != nil {
+			return nil, errors.New("trusted proxy CIDR is invalid")
+		}
+		result = append(result, network)
+	}
+	return result, nil
+}
+
+func isLoopbackHost(host string) bool {
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+func hasForwardedHeaders(header stdhttp.Header) bool {
+	for _, name := range []string{"Forwarded", "X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto", "X-Real-Ip"} {
+		if header.Get(name) != "" {
+			return true
 		}
 	}
-	return sanitized
+	return false
+}
+
+func oneHeaderValue(value string) (string, bool) {
+	value = strings.TrimSpace(value)
+	return value, value != "" && !strings.ContainsAny(value, ",\r\n")
+}
+
+func headerBytes(header stdhttp.Header) int {
+	size := 0
+	for name, values := range header {
+		size += len(name)
+		for _, value := range values {
+			size += len(value)
+		}
+	}
+	return size
 }
 
 func routeLabel(path string) string {
 	switch path {
-	case "/healthz", "/readyz", "/auth/folo/start", "/auth/folo/callback", "/auth/logout", "/tantan/v1/session":
+	case "/api/healthz", "/api/readyz", "/api/auth/folo/providers", "/api/auth/folo/social-start", "/api/auth/folo/token", "/api/auth/folo/email", "/api/auth/folo/two-factor", "/api/auth/logout", "/api/tantan/v1/session":
 		return path
 	}
-	if strings.HasPrefix(path, "/tantan/v1/") {
-		return "/tantan/v1/*"
+	if strings.HasPrefix(path, localAPIPrefix) {
+		return "/api/tantan/v1/*"
 	}
-	return "folo-proxy"
+	if path == foloAPIPrefix || strings.HasPrefix(path, foloAPIPrefix+"/") {
+		return "/api/folo/*"
+	}
+	if strings.HasPrefix(path, "/api") {
+		return "/api/*"
+	}
+	return "static"
 }
 
 func (router *router) logRequest(request *stdhttp.Request, status int, startedAt time.Time, errorCode string) {
@@ -318,11 +441,8 @@ func (recorder *statusRecorder) Write(contents []byte) (int, error) {
 	return recorder.ResponseWriter.Write(contents)
 }
 
-func isLocalMutation(method, path string) bool {
-	if method != stdhttp.MethodPost && method != stdhttp.MethodPut && method != stdhttp.MethodPatch && method != stdhttp.MethodDelete {
-		return false
-	}
-	return path == "/auth/logout" || strings.HasPrefix(path, "/tantan/v1/")
+func isMutation(method string) bool {
+	return method == stdhttp.MethodPost || method == stdhttp.MethodPut || method == stdhttp.MethodPatch || method == stdhttp.MethodDelete
 }
 
 func newRequestID() string {
@@ -333,18 +453,27 @@ func newRequestID() string {
 	return "local-request-id"
 }
 
+func setSecurityHeaders(header stdhttp.Header) {
+	header.Set("Cache-Control", "no-store")
+	header.Set("Content-Security-Policy", "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
+	header.Set("Referrer-Policy", "no-referrer")
+	header.Set("X-Content-Type-Options", "nosniff")
+	header.Set("X-Frame-Options", "DENY")
+}
+
 func writeJSON(writer stdhttp.ResponseWriter, status int, value any) {
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(status)
 	_ = json.NewEncoder(writer).Encode(value)
 }
 
-func writeError(writer stdhttp.ResponseWriter, requestID string, status int, code, message string) {
+func writeError(writer stdhttp.ResponseWriter, requestID string, status int, code, message string, retryable bool) {
 	writeJSON(writer, status, map[string]any{
 		"requestId": requestID,
 		"error": map[string]any{
-			"code":    code,
-			"message": message,
+			"code":      code,
+			"message":   message,
+			"retryable": retryable,
 		},
 	})
 }

@@ -48,15 +48,17 @@ type routeDefinition struct {
 }
 
 type policyDocument struct {
-	SchemaVersion     string            `json:"schemaVersion"`
-	SDKVersion        string            `json:"sdkVersion"`
-	DefaultAction     string            `json:"defaultAction"`
-	DefaultDenyStatus int               `json:"defaultDenyStatus"`
-	DefaultDenyCode   string            `json:"defaultDenyCode"`
-	Enabled           []routeDefinition `json:"enabled"`
-	DisabledByDefault []routeDefinition `json:"disabledByDefault"`
-	Removed           []routeDefinition `json:"removed"`
-	Upstream          struct {
+	SchemaVersion      string            `json:"schemaVersion"`
+	SDKVersion         string            `json:"sdkVersion"`
+	DefaultAction      string            `json:"defaultAction"`
+	DefaultDenyStatus  int               `json:"defaultDenyStatus"`
+	DefaultDenyCode    string            `json:"defaultDenyCode"`
+	PublicPrefix       string            `json:"publicPrefix"`
+	InternalAuthRoutes []routeDefinition `json:"internalAuthRoutes"`
+	Enabled            []routeDefinition `json:"enabled"`
+	DisabledByDefault  []routeDefinition `json:"disabledByDefault"`
+	Removed            []routeDefinition `json:"removed"`
+	Upstream           struct {
 		MaxDefaultRequestBytes      int64 `json:"maxDefaultRequestBytes"`
 		MaxDefaultResponseBytes     int64 `json:"maxDefaultResponseBytes"`
 		MaxEntryStreamResponseBytes int64 `json:"maxEntryStreamResponseBytes"`
@@ -72,13 +74,13 @@ func LoadPolicy() (*Policy, error) {
 	if err := json.Unmarshal(routePolicyJSON, &document); err != nil {
 		return nil, fmt.Errorf("decode embedded Folo route policy: %w", err)
 	}
-	if document.SchemaVersion != "1.0.0" || document.SDKVersion != "0.3.95" {
+	if document.SchemaVersion != "2.0.0" || document.SDKVersion != "0.3.95" || document.PublicPrefix != "/api/folo" {
 		return nil, errors.New("unsupported embedded Folo route policy version")
 	}
-	if document.DefaultAction != "deny" || document.DefaultDenyStatus != http.StatusForbidden || document.DefaultDenyCode == "" {
+	if document.DefaultAction != "deny" || document.DefaultDenyStatus != http.StatusForbidden || document.DefaultDenyCode != "FOLO_ROUTE_DENIED" {
 		return nil, errors.New("embedded Folo route policy is not deny by default")
 	}
-	for _, routes := range [][]routeDefinition{document.Enabled, document.DisabledByDefault, document.Removed} {
+	for _, routes := range [][]routeDefinition{document.InternalAuthRoutes, document.Enabled, document.DisabledByDefault, document.Removed} {
 		for index := range routes {
 			if !strings.HasPrefix(routes[index].PathPattern, "^") {
 				return nil, fmt.Errorf("route pattern must be anchored at its start: %s", routes[index].PathPattern)
