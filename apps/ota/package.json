@@ -1,0 +1,26 @@
+{
+  "name": "@follow/ota",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "deploy:dev": "wrangler deploy --env dev",
+    "deploy:prod": "wrangler deploy",
+    "dev": "wrangler dev --env dev",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "fzstd": "0.1.1",
+    "hono": "4.12.28",
+    "ofetch": "1.5.1",
+    "tar-stream": "3.2.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260708.1",
+    "@types/tar-stream": "3.1.4",
+    "typescript": "catalog:",
+    "vitest": "4.1.10",
+    "wrangler": "4.107.1"
+  }
+}

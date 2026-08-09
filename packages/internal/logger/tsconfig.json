@@ -1,0 +1,12 @@
+{
+  "extends": "@follow/configs/tsconfig.extend.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "jsx": "preserve",
+    "declaration": true,
+    "paths": {
+      "@pkg": ["../../package.json"]
+    }
+  },
+  "include": ["**/*"]
+}

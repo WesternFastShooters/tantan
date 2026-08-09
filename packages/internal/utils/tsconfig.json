@@ -1,0 +1,10 @@
+{
+  "extends": "@follow/configs/tsconfig.extend.json",
+  "compilerOptions": {
+    "declaration": false,
+    "types": ["@follow/types/global", "@follow/types/vite"],
+    "paths": {
+      "@follow/utils/*": ["./src/*"]
+    }
+  }
+}

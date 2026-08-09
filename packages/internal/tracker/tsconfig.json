@@ -1,0 +1,6 @@
+{
+  "extends": "@follow/configs/tsconfig.extend.json",
+  "compilerOptions": {
+    "declaration": false
+  }
+}

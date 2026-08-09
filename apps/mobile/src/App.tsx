@@ -1,0 +1,82 @@
+import { usePrefetchActions } from "@follow/store/action/hooks"
+import { usePrefetchSessionUser } from "@follow/store/user/hooks"
+import { StatusBar } from "expo-status-bar"
+import type { FC, PropsWithChildren } from "react"
+import { useEffect, useRef } from "react"
+import { View } from "react-native"
+import Animated, { interpolate, useAnimatedStyle } from "react-native-reanimated"
+import { RootSiblingParent } from "react-native-root-siblings"
+import { useSheet } from "react-native-sheet-transitions"
+
+import { useBackHandler } from "./hooks/useBackHandler"
+import { useIntentHandler } from "./hooks/useIntentHandler"
+import { useMessaging, useUpdateMessagingToken } from "./hooks/useMessaging"
+import { useOnboarding } from "./hooks/useOnboarding"
+import { useUnreadCountBadge } from "./hooks/useUnreadCountBadge"
+import { useAuthSessionCookieRefresh } from "./lib/auth"
+import { destination } from "./lib/navigation/biz/Destination"
+import { DebugButton, EnvProfileIndicator } from "./modules/debug"
+import { ReviewPromptProvider } from "./modules/review-prompt/provider"
+
+export function App({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <StatusBar animated style="auto" />
+      <View className="flex-1 bg-system-background">
+        <SideEffect />
+
+        <ScaleableWrapper>
+          <RootSiblingParent>{children}</RootSiblingParent>
+        </ScaleableWrapper>
+
+        {__DEV__ && <DebugButton />}
+
+        <EnvProfileIndicator />
+      </View>
+    </>
+  )
+}
+
+const ScaleableWrapper: FC<PropsWithChildren> = ({ children }) => {
+  const { scale } = useSheet()
+
+  const style = useAnimatedStyle(() => ({
+    borderRadius: interpolate(scale.value, [0.8, 0.99, 1], [0, 50, 0]),
+    transform: [
+      {
+        scale: scale.value,
+      },
+    ],
+  }))
+  return (
+    <Animated.View className="flex-1 overflow-hidden" style={style}>
+      {children}
+    </Animated.View>
+  )
+}
+
+const SideEffect = () => {
+  useAuthSessionCookieRefresh()
+  const sessionQuery = usePrefetchSessionUser()
+  const hasHandledInitialSessionRef = useRef(false)
+  useEffect(() => {
+    if (hasHandledInitialSessionRef.current || !sessionQuery.isSuccess) {
+      return
+    }
+
+    hasHandledInitialSessionRef.current = true
+    if (!sessionQuery.data?.user) {
+      destination.Login()
+    }
+  }, [sessionQuery.data?.user, sessionQuery.isSuccess])
+  useUnreadCountBadge()
+  useBackHandler()
+  useIntentHandler()
+  useOnboarding()
+
+  // prefetch actions to detect if the user has any actions contains notifications
+  usePrefetchActions()
+  useUpdateMessagingToken()
+  useMessaging()
+  return <ReviewPromptProvider />
+}

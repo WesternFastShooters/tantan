@@ -1,0 +1,28 @@
+{
+  "name": "@follow/hooks",
+  "private": true,
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "import": "./src/index.ts",
+      "require": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@follow/shared": "workspace:*",
+    "@follow/types": "workspace:*",
+    "@follow/utils": "workspace:*",
+    "@tanstack/react-query": "5.101.2",
+    "es-toolkit": "1.49.0",
+    "foxact": "0.3.8",
+    "jotai": "2.20.1",
+    "sonner": "2.0.7",
+    "usehooks-ts": "3.1.1"
+  },
+  "devDependencies": {
+    "@follow/configs": "workspace:*"
+  }
+}
