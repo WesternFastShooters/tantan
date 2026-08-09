@@ -74,7 +74,8 @@ const RouteContent = () => {
 export function TantanAppShell() {
   const mobile = useTantanMobile()
   const location = useLocation()
-  const detailRoute = location.pathname.startsWith("/entries/")
+  const detailRoute =
+    location.pathname.startsWith("/entries/") || location.pathname.startsWith("/sources/")
 
   return (
     <div ref={handleRootRef} className="relative flex h-dvh min-h-0 bg-zinc-950 text-zinc-100">

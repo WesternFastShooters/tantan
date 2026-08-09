@@ -38,10 +38,16 @@ const removedProductSourceRoots = [
 ]
 
 describe("Tantan paid-feature policy", () => {
-  test("REQ:FE-01 generated routes omit Folo Plan, Power, Wallet, Upgrade and AI products", () => {
+  test("REQ:FE-01 generated routes omit Folo paid/AI products while retaining local AI settings", () => {
     const generatedRoutes = readFileSync(join(sourceRoot, "generated-routes.ts"), "utf8")
+    const localAISettingsRoute = readFileSync(
+      join(sourceRoot, "pages/settings/(settings)/ai.tsx"),
+      "utf8",
+    )
 
-    expect(generatedRoutes).not.toMatch(/pages\/settings\/\(settings\)\/(?:ai|plan)/)
+    expect(generatedRoutes).not.toMatch(/pages\/settings\/\(settings\)\/plan/)
+    expect(generatedRoutes).toMatch(/pages\/settings\/\(settings\)\/ai/)
+    expect(localAISettingsRoute).toContain("tantan-settings/AISettingsPage")
     expect(generatedRoutes).not.toMatch(/pages\/\(main\).*\/(?:ai|power)\//)
     expect(generatedRoutes).not.toMatch(/pages\/.*\/(?:wallet|upgrade)\//)
   })

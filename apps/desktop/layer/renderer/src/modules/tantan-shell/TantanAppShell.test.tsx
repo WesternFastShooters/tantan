@@ -87,4 +87,11 @@ describe("TantanAppShell", () => {
     expect(container.querySelector('nav[aria-label="Mobile navigation"]')).toBeNull()
     expect(container.querySelector('[data-testid="route-content"]')).not.toBeNull()
   })
+
+  test("REQ:FE-04 hides the mobile bottom navigation on Source detail routes", async () => {
+    useMobileMock.mockReturnValue(true)
+    ;({ container, root } = await renderShell("/sources/feed-1"))
+
+    expect(container.querySelector('nav[aria-label="Mobile navigation"]')).toBeNull()
+  })
 })

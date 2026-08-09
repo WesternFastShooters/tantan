@@ -361,8 +361,21 @@
         "apps/desktop/layer/renderer/src/modules/tantan-favorites/**",
         "apps/desktop/layer/renderer/src/modules/tantan-topics/**",
         "apps/desktop/layer/renderer/src/modules/tantan-settings/**",
+        "apps/desktop/layer/renderer/src/modules/tantan-entry/**",
+        "apps/desktop/layer/renderer/src/modules/tantan-home/FeedCard.tsx",
+        "apps/desktop/layer/renderer/src/modules/tantan-shell/SettingsRoute.tsx",
+        "apps/desktop/layer/renderer/src/modules/tantan-shell/SubscriptionsRoute.tsx",
+        "apps/desktop/layer/renderer/src/modules/tantan-shell/TantanAppShell.tsx",
+        "apps/desktop/layer/renderer/src/modules/tantan-shell/TantanAppShell.test.tsx",
+        "apps/desktop/layer/renderer/src/pages/(main)/(detail)/favorites/**",
+        "apps/desktop/layer/renderer/src/pages/(main)/(detail)/sources/**",
         "apps/desktop/layer/renderer/src/pages/search/**",
-        "apps/desktop/e2e/tests/web/tantan-flows*.spec.ts"
+        "apps/desktop/layer/renderer/src/pages/settings/(settings)/ai.tsx",
+        "apps/desktop/layer/renderer/src/pages/settings/(settings)/topics.tsx",
+        "apps/desktop/e2e/tests/web/tantan-no-paid.spec.ts",
+        "apps/desktop/e2e/tests/web/tantan-flows*.spec.ts",
+        "apps/desktop/layer/renderer/src/modules/settings/settings-glob.test.ts",
+        "apps/desktop/layer/renderer/src/modules/tantan-policy/paid-feature-removal.test.ts"
       ],
       "forbiddenWrites": [
         "apps/desktop/layer/renderer/src/router.ts",

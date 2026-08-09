@@ -1,3 +1,6 @@
+import { FeedViewType } from "@follow/constants"
+import { useIsEntryStarred } from "@follow/store/collection/hooks"
+import { collectionSyncService } from "@follow/store/collection/store"
 import { useEntry, usePrefetchEntryDetail } from "@follow/store/entry/hooks"
 import { unreadSyncService } from "@follow/store/unread/store"
 import { useQueryClient } from "@tanstack/react-query"
@@ -6,6 +9,8 @@ import { useLocation, useNavigate, useParams } from "react-router"
 
 import type { HomeCard } from "~/lib/tantan-api/gen/types"
 import { removeEntryFromAllHomeQueries } from "~/modules/tantan-home/home-cache"
+
+import { useEntryEnrichment } from "./useEntryEnrichment"
 
 const safeURL = (value: string | null | undefined) => {
   if (!value) return null
@@ -33,7 +38,12 @@ export function EntryDetailPage() {
     read: value.read,
   }))
   const detailQuery = usePrefetchEntryDetail(entryId)
+  const enrichment = useEntryEnrichment(entryId)
+  const starred = useIsEntryStarred(entryId)
   const [readError, setReadError] = useState<string | null>(null)
+  const [collectionError, setCollectionError] = useState<string | null>(null)
+  const [collectionPending, setCollectionPending] = useState(false)
+  const [showTranslation, setShowTranslation] = useState(false)
   const attemptedEntryIdRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -58,6 +68,30 @@ export function EntryDetailPage() {
     [card?.excerpt, entry?.content, entry?.description],
   )
   const title = entry?.title || card?.title || "内容详情"
+  const enrichmentData = enrichment.data?.data
+  const translatedContent = enrichmentData?.contentZh || enrichmentData?.titleZh
+  const collectionView =
+    card?.type === "image"
+      ? FeedViewType.Pictures
+      : card?.type === "video"
+        ? FeedViewType.Videos
+        : card?.type === "post"
+          ? FeedViewType.SocialMedia
+          : FeedViewType.Articles
+
+  const toggleCollection = async () => {
+    if (!entry) return
+    setCollectionPending(true)
+    setCollectionError(null)
+    try {
+      if (starred) await collectionSyncService.unstarEntry({ entryId })
+      else await collectionSyncService.starEntry({ entryId, view: collectionView })
+    } catch (error) {
+      setCollectionError(error instanceof Error ? error.message : "收藏同步失败")
+    } finally {
+      setCollectionPending(false)
+    }
+  }
 
   return (
     <article className="mx-auto min-h-full w-full max-w-3xl bg-[#08090b] px-4 pb-12 text-zinc-100 sm:px-8">
@@ -71,6 +105,18 @@ export function EntryDetailPage() {
           <i className="i-mgc-left-cute-re size-5" aria-hidden />
         </button>
         <span className="min-w-0 flex-1 truncate text-sm text-zinc-400">{card?.source.name}</span>
+        <button
+          type="button"
+          aria-label={starred ? "取消收藏" : "收藏"}
+          disabled={!entry || collectionPending}
+          onClick={toggleCollection}
+          className="flex size-11 items-center justify-center rounded-full text-orange-400 outline-none hover:bg-orange-500/10 focus-visible:ring-2 focus-visible:ring-orange-500 disabled:opacity-40"
+        >
+          <i
+            className={starred ? "i-mgc-star-cute-fi size-5" : "i-mgc-star-cute-re size-5"}
+            aria-hidden
+          />
+        </button>
         {sourceURL && (
           <a
             href={sourceURL}
@@ -104,6 +150,14 @@ export function EntryDetailPage() {
             已读同步失败，卡片已保留：{readError}
           </p>
         )}
+        {collectionError && (
+          <p
+            role="alert"
+            className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300"
+          >
+            {collectionError}
+          </p>
+        )}
         {detailQuery.isError && !entry && (
           <p
             role="alert"
@@ -112,8 +166,59 @@ export function EntryDetailPage() {
             正文加载失败，正在显示首页摘要。
           </p>
         )}
+        <section className="mt-5 rounded-xl border border-white/[0.06] bg-[#17181b] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-semibold text-zinc-100">本地 AI</h2>
+            {translatedContent && (
+              <button
+                type="button"
+                onClick={() => setShowTranslation((value) => !value)}
+                className="min-h-9 rounded-lg bg-white/10 px-3 text-xs outline-none hover:bg-white/15 focus-visible:ring-2 focus-visible:ring-orange-500"
+              >
+                {showTranslation ? "显示原文" : "显示中文"}
+              </button>
+            )}
+          </div>
+          {(enrichment.data?.state === "queued" || enrichment.data?.state === "processing") && (
+            <p role="status" className="mt-2 text-sm text-amber-200">
+              AI 处理中…原文仍可正常阅读。
+            </p>
+          )}
+          {enrichment.data?.state === "failed" && (
+            <p role="status" className="mt-2 text-sm text-red-300">
+              AI 处理失败，已显示原文。
+            </p>
+          )}
+          {(enrichment.data?.state === "missing" || enrichment.isError) && (
+            <button
+              type="button"
+              disabled={enrichment.ensuring}
+              onClick={enrichment.ensure}
+              className="mt-2 min-h-11 rounded-xl bg-orange-500 px-4 text-sm font-semibold text-white outline-none hover:bg-orange-400 focus-visible:ring-2 focus-visible:ring-orange-300 disabled:opacity-50"
+            >
+              {enrichment.ensuring ? "正在启动…" : "生成翻译与摘要"}
+            </button>
+          )}
+          {enrichment.ensureError && (
+            <p role="alert" className="mt-2 text-sm text-red-300">
+              {enrichment.ensureError.message}
+            </p>
+          )}
+          {enrichmentData?.summaryZh && (
+            <div className="mt-3">
+              <p className="text-sm leading-6 text-zinc-300">{enrichmentData.summaryZh}</p>
+              {enrichmentData.keyPoints.length > 0 && (
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-zinc-400">
+                  {enrichmentData.keyPoints.map((point) => (
+                    <li key={point}>{point}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </section>
         <div className="mt-7 whitespace-pre-wrap break-words text-[15px] leading-8 text-zinc-200">
-          {content}
+          {showTranslation && translatedContent ? translatedContent : content}
         </div>
       </div>
     </article>

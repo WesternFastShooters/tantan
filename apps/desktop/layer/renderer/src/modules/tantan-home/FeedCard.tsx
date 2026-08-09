@@ -1,7 +1,7 @@
 import { useState } from "react"
-import { Link } from "react-router"
 
 import type { HomeCard } from "~/lib/tantan-api/gen/types"
+import { EntryLink } from "~/modules/tantan-entry/EntryLink"
 
 import { resolveCardPresentation } from "./card-presentation"
 
@@ -30,9 +30,8 @@ export function FeedCard({ card, onOpen, onNotInterested }: FeedCardProps) {
       data-entry-type={card.type}
       className="group relative overflow-hidden rounded-xl bg-[#17181b] shadow-sm ring-1 ring-white/[0.06] transition-transform duration-200 hover:-translate-y-0.5 hover:ring-white/15"
     >
-      <Link
-        to={`/entries/${encodeURIComponent(card.entryId)}`}
-        state={{ card }}
+      <EntryLink
+        card={card}
         onClick={onOpen}
         className="block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange-500"
         aria-label={`阅读：${card.title}`}
@@ -79,7 +78,7 @@ export function FeedCard({ card, onOpen, onNotInterested }: FeedCardProps) {
             <time dateTime={card.publishedAt}>{publishedLabel(card.publishedAt)}</time>
           </footer>
         </div>
-      </Link>
+      </EntryLink>
       <button
         type="button"
         aria-label={`更多操作：${card.title}`}

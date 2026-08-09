@@ -35,7 +35,12 @@ test.describe("Tantan no-paid policy", () => {
     const productPageModules: string[] = []
     page.on("request", (request) => {
       const path = decodeURIComponent(new URL(request.url()).pathname)
-      if (/\/pages\/.*\/(?:ai|power|plan)(?:\/|\.)/.test(path)) productPageModules.push(path)
+      if (
+        /\/pages\/(?:ai|power)(?:\/|\.)/.test(path) ||
+        /\/pages\/settings\/.*\/plan(?:\/|\.)/.test(path)
+      ) {
+        productPageModules.push(path)
+      }
     })
 
     await page.goto(buildWebAppURL(env), { waitUntil: "domcontentloaded" })
