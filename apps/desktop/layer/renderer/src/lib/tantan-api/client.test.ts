@@ -1,16 +1,22 @@
 import { afterEach, describe, expect, test, vi } from "vitest"
 
-import { getLocalSession, getReadiness, TANTAN_API_ORIGIN } from "./client"
+import { getLocalSession, getReadiness, tantanRequest } from "./client"
 
-describe("Tantan local API client", () => {
+describe("Tantan same-origin API client", () => {
   afterEach(() => vi.unstubAllGlobals())
 
-  test("REQ:FE-02 sends readiness only to loopback with private request headers", async () => {
+  test("FR-08 sends readiness through the relative same-origin /api boundary", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
           ready: true,
-          checks: { sqlite: "ok", migrations: "ok", keychain: "ok" },
+          checks: {
+            sqlite: "ok",
+            migrations: "ok",
+            secretStore: "ok",
+            routePolicy: "ok",
+            staticAssets: "ok",
+          },
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       ),
@@ -18,33 +24,46 @@ describe("Tantan local API client", () => {
     vi.stubGlobal("fetch", fetchMock)
 
     await expect(getReadiness()).resolves.toMatchObject({ ready: true })
-    const [input, init] = fetchMock.mock.calls[0] as [URL, RequestInit]
+    const [input, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     const headers = new Headers(init.headers)
-    expect(input.origin).toBe(TANTAN_API_ORIGIN)
-    expect(input.pathname).toBe("/readyz")
+    expect(input).toBe("/api/readyz")
     expect(init.credentials).toBe("include")
     expect(init.cache).toBe("no-store")
     expect(headers.get("X-Request-Id")).toBeTruthy()
     expect(headers.get("X-Tantan-Timezone")).toBeTruthy()
+    expect(headers.has("Authorization")).toBe(false)
   })
 
-  test("REQ:FE-02 exposes a stable typed 401 for the session gate", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(
+  test("FR-08 stores session CSRF only in memory and attaches it to mutations", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
-            requestId: "req-401",
-            error: { code: "AUTH_REQUIRED", message: "Authentication required" },
+            user: { id: "user-1", name: "Test", email: null, image: null },
+            timezone: "Asia/Shanghai",
+            csrfToken: "csrf-memory-only-1234567890",
           }),
-          { status: 401, headers: { "Content-Type": "application/json" } },
+          { status: 200, headers: { "Content-Type": "application/json" } },
         ),
-      ),
-    )
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+    vi.stubGlobal("fetch", fetchMock)
 
-    await expect(getLocalSession()).rejects.toMatchObject({
-      status: 401,
-      code: "AUTH_REQUIRED",
-    })
+    await getLocalSession()
+    await tantanRequest<void>("/api/tantan/v1/filter", { method: "DELETE" })
+
+    const [input, init] = fetchMock.mock.calls[1] as [string, RequestInit]
+    expect(input).toBe("/api/tantan/v1/filter")
+    expect(new Headers(init.headers).get("X-CSRF-Token")).toBe("csrf-memory-only-1234567890")
+  })
+
+  test("FR-08 rejects absolute or non-api browser destinations before fetch", async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal("fetch", fetchMock)
+
+    await expect(tantanRequest("https://api.folo.is/entries")).rejects.toThrow("relative /api path")
+    await expect(tantanRequest("/better-auth/get-session")).rejects.toThrow("relative /api path")
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })

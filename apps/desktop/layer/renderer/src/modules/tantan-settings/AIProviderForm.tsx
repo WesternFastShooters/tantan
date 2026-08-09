@@ -1,174 +1,79 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useEffect, useState } from "react"
+import { useMutation, useQuery } from "@tanstack/react-query"
+import { useState } from "react"
 
-import type { AIProviderId, AIProviderTestRequest } from "~/lib/tantan-api/gen/types"
+import { getAIProvider, testAIProvider } from "./api"
 
-import { deleteAIProvider, getAIProvider, saveAIProvider, testAIProvider } from "./api"
-import type { ProviderDraft } from "./provider-form"
-import { buildProviderSaveRequest, PROVIDER_PRESETS, validateProviderDraft } from "./provider-form"
-
-const initialDraft: ProviderDraft = { providerId: "openai", model: "", apiKey: "" }
+const fixedProvider = "Google Gemini"
+const fixedModel = "gemini-3.5-flash-lite"
+const fixedEndpoint = "https://generativelanguage.googleapis.com/v1beta/openai"
 
 export function AIProviderForm() {
-  const queryClient = useQueryClient()
-  const [draft, setDraft] = useState<ProviderDraft>(initialDraft)
-  const [formError, setFormError] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const providerQuery = useQuery({
     queryKey: ["settings", "ai-provider"],
     queryFn: ({ signal }) => getAIProvider(signal),
   })
-
-  useEffect(() => {
-    const data = providerQuery.data
-    if (!data) return
-    setDraft((current) => ({
-      providerId: data.providerId ?? current.providerId,
-      model: data.model ?? current.model,
-      apiKey: "",
-    }))
-  }, [providerQuery.data])
-
-  const saveMutation = useMutation({
-    mutationFn: saveAIProvider,
-    onSuccess: (data) => {
-      queryClient.setQueryData(["settings", "ai-provider"], data)
-      setDraft((current) => ({ ...current, apiKey: "" }))
-      setStatus("配置已保存到本机 Keychain")
-    },
-  })
   const testMutation = useMutation({
     mutationFn: testAIProvider,
-    onSuccess: (data) => setStatus(`连接成功 · ${data.latencyMs}ms`),
+    onMutate: () => setStatus(null),
+    onSuccess: (data) => setStatus(`连接成功 · ${data.latencyMs}ms · ${data.model}`),
   })
-  const deleteMutation = useMutation({
-    mutationFn: deleteAIProvider,
-    onSuccess: () => {
-      queryClient.setQueryData(["settings", "ai-provider"], {
-        configured: false,
-        providerId: null,
-        model: null,
-        baseUrl: null,
-        hasApiKey: false,
-        keyFingerprint: null,
-      })
-      setDraft(initialDraft)
-      setStatus("本机 AI 配置已删除")
-    },
-  })
-  const pending = saveMutation.isPending || testMutation.isPending || deleteMutation.isPending
-  const requestError = saveMutation.error || testMutation.error || deleteMutation.error
 
-  const validate = (forTest: boolean) => {
-    const error = validateProviderDraft(
-      draft,
-      forTest ? false : Boolean(providerQuery.data?.hasApiKey),
-    )
-    setFormError(error)
-    setStatus(null)
-    return !error
-  }
-
-  const save = () => {
-    if (!validate(false)) return
-    saveMutation.mutate(buildProviderSaveRequest(draft))
-  }
-
-  const testConnection = () => {
-    if (!validate(true)) return
-    testMutation.mutate({
-      providerId: draft.providerId,
-      model: draft.model.trim(),
-      apiKey: draft.apiKey,
-    } satisfies AIProviderTestRequest)
-  }
-
-  if (providerQuery.isPending)
+  if (providerQuery.isPending) {
     return <div aria-busy="true" className="h-56 animate-pulse rounded-xl bg-[#17181b]" />
+  }
+
+  const configuration = providerQuery.data
+  const requestError = providerQuery.error || testMutation.error
 
   return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault()
-        save()
-      }}
-      autoComplete="off"
-      className="space-y-5 rounded-2xl border border-white/[0.06] bg-[#17181b] p-4 sm:p-6"
-    >
-      <div>
-        <label htmlFor="ai-provider" className="mb-1.5 block text-sm font-medium text-zinc-200">
-          Provider
-        </label>
-        <select
-          id="ai-provider"
-          value={draft.providerId}
-          disabled={pending}
-          onChange={(event) =>
-            setDraft((current) => ({ ...current, providerId: event.target.value as AIProviderId }))
-          }
-          className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-sm text-zinc-100 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
-        >
-          {Object.entries(PROVIDER_PRESETS).map(([id, preset]) => (
-            <option key={id} value={id}>
-              {preset.label}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label htmlFor="ai-endpoint" className="mb-1.5 block text-sm font-medium text-zinc-200">
-          内置 Endpoint
-        </label>
-        <input
-          id="ai-endpoint"
-          readOnly
-          value={PROVIDER_PRESETS[draft.providerId].baseUrl}
-          className="h-11 w-full rounded-xl border border-white/5 bg-black/20 px-3 text-sm text-zinc-500 outline-none"
-        />
-        <p className="mt-1 text-xs text-zinc-500">为防止密钥被转发到未知地址，此项不可编辑。</p>
-      </div>
-      <div>
-        <label htmlFor="ai-model" className="mb-1.5 block text-sm font-medium text-zinc-200">
-          模型
-        </label>
-        <input
-          id="ai-model"
-          value={draft.model}
-          disabled={pending}
-          maxLength={100}
-          onChange={(event) => setDraft((current) => ({ ...current, model: event.target.value }))}
-          placeholder="例如 gpt-5-mini"
-          className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-sm text-zinc-100 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
-        />
-      </div>
-      <div>
-        <label htmlFor="ai-api-key" className="mb-1.5 block text-sm font-medium text-zinc-200">
-          API Key
-        </label>
-        <input
-          id="ai-api-key"
-          name="tantan-provider-key"
-          type="password"
-          value={draft.apiKey}
-          disabled={pending}
-          autoComplete="new-password"
-          maxLength={4096}
-          onChange={(event) => setDraft((current) => ({ ...current, apiKey: event.target.value }))}
-          placeholder={
-            providerQuery.data?.hasApiKey ? "已保存；留空表示保留" : "只会发送给本机 Go 服务"
-          }
-          className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-sm text-zinc-100 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
-        />
-        {providerQuery.data?.keyFingerprint && (
-          <p className="mt-1 text-xs text-zinc-500">
-            已保存密钥指纹：{providerQuery.data.keyFingerprint}
+    <section className="space-y-5 rounded-2xl border border-white/[0.06] bg-[#17181b] p-4 sm:p-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="font-semibold text-zinc-100">服务端 AI</h2>
+          <p className="mt-1 text-sm leading-6 text-zinc-400">
+            Provider、Endpoint、模型和 API Key 均由 Go 服务端私密配置。
           </p>
-        )}
+        </div>
+        <span
+          className={
+            configuration?.configured
+              ? "shrink-0 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-300"
+              : "shrink-0 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs text-amber-200"
+          }
+        >
+          {configuration?.configured ? "已配置" : "未配置"}
+        </span>
       </div>
 
-      {(formError || requestError) && (
+      <dl className="divide-y divide-white/[0.06] rounded-xl border border-white/[0.06] bg-black/15 px-4">
+        <div className="flex min-h-12 items-center justify-between gap-4 py-2">
+          <dt className="text-sm text-zinc-500">Provider</dt>
+          <dd className="text-right text-sm text-zinc-200">{fixedProvider}</dd>
+        </div>
+        <div className="flex min-h-12 items-center justify-between gap-4 py-2">
+          <dt className="text-sm text-zinc-500">模型</dt>
+          <dd className="break-all text-right text-sm text-zinc-200">
+            {configuration?.model || fixedModel}
+          </dd>
+        </div>
+        <div className="flex min-h-12 items-center justify-between gap-4 py-2">
+          <dt className="text-sm text-zinc-500">Endpoint</dt>
+          <dd className="max-w-[70%] break-all text-right text-xs text-zinc-400">
+            {configuration?.baseUrl || fixedEndpoint}
+          </dd>
+        </div>
+        <div className="flex min-h-12 items-center justify-between gap-4 py-2">
+          <dt className="text-sm text-zinc-500">API Key</dt>
+          <dd className="text-right text-sm text-zinc-300">
+            {configuration?.hasApiKey ? "已在服务端安全加载" : "尚未加载"}
+          </dd>
+        </div>
+      </dl>
+
+      {requestError && (
         <p role="alert" className="text-sm text-red-300">
-          {formError ?? (requestError instanceof Error ? requestError.message : "请求失败")}
+          {requestError instanceof Error ? requestError.message : "请求失败"}
         </p>
       )}
       {status && (
@@ -176,33 +81,17 @@ export function AIProviderForm() {
           {status}
         </p>
       )}
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          disabled={pending}
-          onClick={testConnection}
-          className="min-h-11 rounded-xl bg-white/10 px-4 text-sm font-medium outline-none hover:bg-white/15 focus-visible:ring-2 focus-visible:ring-orange-500 disabled:opacity-50"
-        >
-          {testMutation.isPending ? "测试中…" : "测试连接"}
-        </button>
-        <button
-          type="submit"
-          disabled={pending}
-          className="min-h-11 rounded-xl bg-orange-500 px-4 text-sm font-semibold text-white outline-none hover:bg-orange-400 focus-visible:ring-2 focus-visible:ring-orange-300 disabled:opacity-50"
-        >
-          {saveMutation.isPending ? "保存中…" : "保存配置"}
-        </button>
-        {providerQuery.data?.configured && (
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => deleteMutation.mutate()}
-            className="min-h-11 rounded-xl px-4 text-sm text-red-300 outline-none hover:bg-red-500/10 focus-visible:ring-2 focus-visible:ring-red-400 disabled:opacity-50"
-          >
-            删除配置
-          </button>
-        )}
-      </div>
-    </form>
+      <button
+        type="button"
+        disabled={!configuration?.configured || testMutation.isPending}
+        onClick={() => testMutation.mutate()}
+        className="min-h-11 rounded-xl bg-orange-500 px-4 text-sm font-semibold text-white outline-none hover:bg-orange-400 focus-visible:ring-2 focus-visible:ring-orange-300 disabled:opacity-50"
+      >
+        {testMutation.isPending ? "测试中…" : "测试连接"}
+      </button>
+      <p className="text-xs leading-5 text-zinc-500">
+        浏览器不能查看、提交、修改或删除 API Key；更换密钥请更新 Go 服务的私密配置后重启。
+      </p>
+    </section>
   )
 }

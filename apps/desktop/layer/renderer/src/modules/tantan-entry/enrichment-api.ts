@@ -7,13 +7,13 @@ const idempotencyKey = () =>
 
 export const getEntryEnrichment = (entryId: string, signal?: AbortSignal) =>
   tantanRequest<EnrichmentResponse>(
-    `/tantan/v1/entries/${encodeURIComponent(entryId)}/enrichment?language=zh-CN`,
+    `/api/tantan/v1/entries/${encodeURIComponent(entryId)}/enrichment?language=zh-CN`,
     { signal },
   )
 
 export const ensureEntryEnrichment = (entryId: string) =>
   tantanRequest<JobAcceptedResponse>(
-    `/tantan/v1/entries/${encodeURIComponent(entryId)}/enrichment`,
+    `/api/tantan/v1/entries/${encodeURIComponent(entryId)}/enrichment`,
     {
       method: "POST",
       headers: { "Idempotency-Key": idempotencyKey() },

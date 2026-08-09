@@ -8,10 +8,17 @@ import PKG from "@pkg"
 import { getAuthSessionToken } from "./client-session"
 
 const headers = createDesktopAPIHeaders({ version: PKG.version })
+const electronRuntime = IN_ELECTRON || (typeof window !== "undefined" && !!window.electron)
+const browserOrigin =
+  typeof window === "undefined" ? "http://127.0.0.1:3000" : window.location.origin
+const authAPIURL = electronRuntime
+  ? env.VITE_API_URL
+  : new URL("/api/folo/", browserOrigin).toString()
+const authWebURL = electronRuntime ? env.VITE_WEB_URL : browserOrigin
 
 const auth = new Auth({
-  apiURL: env.VITE_API_URL,
-  webURL: env.VITE_WEB_URL,
+  apiURL: authAPIURL,
+  webURL: authWebURL,
   fetchOptions: {
     headers,
     onRequest: (context) => {

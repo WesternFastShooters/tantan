@@ -7,59 +7,49 @@ import { EntriesProvider } from "~/modules/entry-column/context/EntriesContext"
 import { LocalServiceGuard } from "~/modules/tantan-service-status/LocalServiceGuard"
 
 import { primaryRoutes } from "./primary-routes"
-import { useTantanMobile } from "./useTantanMobile"
 
 const handleRootRef = (element: HTMLDivElement | null) => setRootContainerElement(element)
 
-const PrimaryLink = ({
+const MobileTab = ({
   route,
-  compact,
+  active,
 }: {
   route: (typeof primaryRoutes)[number]
-  compact: boolean
+  active: boolean
 }) => (
   <NavLink
     to={route.path}
     end={route.end}
-    className={({ isActive }) =>
-      cn(
-        "flex min-h-11 items-center rounded-xl text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-red-400",
-        compact ? "min-w-16 flex-1 flex-col justify-center gap-0.5 px-2 py-1" : "gap-3 px-3",
-        isActive
-          ? "bg-red-500/15 text-red-400"
-          : "text-zinc-400 hover:bg-white/5 hover:text-zinc-100",
-      )
-    }
+    role="tab"
+    aria-selected={active}
+    className="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 text-[10px] font-medium text-zinc-500 outline-none transition-transform focus-visible:ring-2 focus-visible:ring-orange-500 active:scale-90 aria-selected:text-orange-500"
   >
-    <i className={cn(route.icon, "size-5 shrink-0")} aria-hidden />
-    <span>{route.label}</span>
+    {({ isActive }) => (
+      <>
+        <i className={cn(route.icon, "size-[25px]", isActive && "text-orange-500")} aria-hidden />
+        <span>{route.label}</span>
+        <span className="sr-only" aria-live="polite">
+          {isActive ? "当前页面" : ""}
+        </span>
+      </>
+    )}
   </NavLink>
 )
 
-const DesktopNavigation = () => (
-  <aside className="hidden h-full w-[72px] shrink-0 border-r border-white/10 bg-zinc-950 md:flex md:flex-col lg:w-60">
-    <div className="flex h-16 items-center px-4 text-lg font-bold text-zinc-50 lg:px-6">
-      <span className="text-red-500">T</span>
-      <span className="hidden lg:inline">antan</span>
-    </div>
-    <nav aria-label="Primary navigation" className="flex flex-1 flex-col gap-1 px-2 lg:px-3">
+const MobileTabBar = () => {
+  const location = useLocation()
+  return (
+    <nav
+      role="tablist"
+      aria-label="主导航"
+      className="fixed inset-x-0 bottom-0 z-40 mx-auto grid min-h-16 max-w-[560px] grid-cols-4 gap-1 border-t border-zinc-200/70 bg-white/90 px-[max(0.5rem,env(safe-area-inset-left))] pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1 shadow-[0_-6px_24px_rgba(0,0,0,0.04)] backdrop-blur-xl dark:border-white/10 dark:bg-zinc-950/90"
+    >
       {primaryRoutes.map((route) => (
-        <PrimaryLink key={route.path} route={route} compact={false} />
+        <MobileTab key={route.path} route={route} active={route.path === location.pathname} />
       ))}
     </nav>
-  </aside>
-)
-
-const MobileNavigation = () => (
-  <nav
-    aria-label="Mobile navigation"
-    className="fixed inset-x-0 bottom-0 z-40 flex min-h-16 border-t border-white/10 bg-zinc-950/95 px-[max(0.5rem,env(safe-area-inset-left))] pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
-  >
-    {primaryRoutes.map((route) => (
-      <PrimaryLink key={route.path} route={route} compact />
-    ))}
-  </nav>
-)
+  )
+}
 
 const RouteContent = () => {
   const location = useLocation()
@@ -71,34 +61,37 @@ const RouteContent = () => {
   )
 }
 
+const primaryPaths = new Set(primaryRoutes.map((route) => route.path))
+
 export function TantanAppShell() {
-  const mobile = useTantanMobile()
   const location = useLocation()
-  const detailRoute =
-    location.pathname.startsWith("/entries/") || location.pathname.startsWith("/sources/")
+  const showTabs = primaryPaths.has(location.pathname as (typeof primaryRoutes)[number]["path"])
 
   return (
-    <div ref={handleRootRef} className="relative flex h-dvh min-h-0 bg-zinc-950 text-zinc-100">
-      {!mobile && <DesktopNavigation />}
+    <div
+      ref={handleRootRef}
+      data-testid="tantan-mobile-shell"
+      className="relative mx-auto flex h-dvh min-h-0 w-full max-w-[560px] overflow-hidden bg-zinc-50 text-zinc-950 shadow-2xl dark:bg-[#08090b] dark:text-zinc-100"
+    >
       <LocalServiceGuard>
         <main
           ref={setMainContainerElement}
           tabIndex={-1}
           className={cn(
-            "min-w-0 flex-1 overflow-auto bg-zinc-950 outline-none md:pb-0",
-            !detailRoute && "pb-[calc(4rem+env(safe-area-inset-bottom))]",
+            "min-w-0 flex-1 overflow-auto bg-zinc-50 outline-none dark:bg-[#08090b]",
+            showTabs && "pb-[calc(4rem+max(0.5rem,env(safe-area-inset-bottom)))]",
           )}
         >
           <RouteContent />
         </main>
       </LocalServiceGuard>
-      {mobile && !detailRoute && <MobileNavigation />}
+      {showTabs && <MobileTabBar />}
     </div>
   )
 }
 
 export const TantanShellPage = ({ children }: PropsWithChildren) => (
-  <section className="mx-auto min-h-full w-full max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+  <section className="mx-auto min-h-full w-full px-4 pb-6 pt-[max(1.25rem,env(safe-area-inset-top))]">
     {children}
   </section>
 )

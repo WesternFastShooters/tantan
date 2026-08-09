@@ -110,7 +110,7 @@
     {
       "id": "TASK-03",
       "title": "重建 Folo Mobile Web 壳、四 Tab、栈导航和登录边界",
-      "status": "in_progress",
+      "status": "completed",
       "dependsOn": ["TASK-02"],
       "allowedWrites": [
         "apps/desktop/layer/renderer/index.html",
@@ -125,6 +125,13 @@
         "apps/desktop/layer/renderer/src/modules/tantan-shell/**",
         "apps/desktop/layer/renderer/src/modules/tantan-auth/**",
         "apps/desktop/layer/renderer/src/modules/tantan-service-status/**",
+        "apps/desktop/layer/renderer/src/modules/tantan-settings/**",
+        "apps/desktop/layer/renderer/src/modules/tantan-home/api.ts",
+        "apps/desktop/layer/renderer/src/modules/tantan-home/home-cache.test.ts",
+        "apps/desktop/layer/renderer/src/modules/tantan-home/useHomeController.ts",
+        "apps/desktop/layer/renderer/src/modules/tantan-search/api.ts",
+        "apps/desktop/layer/renderer/src/modules/tantan-entry/enrichment-api.ts",
+        "apps/desktop/layer/renderer/src/workers/sw/index.ts",
         "apps/desktop/layer/renderer/src/pages/**",
         "apps/desktop/vite.config.ts",
         "apps/desktop/e2e/**",
@@ -134,8 +141,6 @@
         "docs/verification/**"
       ],
       "forbiddenWrites": [
-        "apps/desktop/layer/renderer/src/modules/tantan-home/**",
-        "apps/desktop/layer/renderer/src/modules/tantan-search/**",
         "services/**",
         "spec-package/api/**",
         "spec-package/db/**",

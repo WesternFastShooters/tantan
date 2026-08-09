@@ -5,7 +5,6 @@ import type { env as EnvType } from "@follow/shared/env.desktop"
 import legacy from "@vitejs/plugin-legacy"
 import { minify as htmlMinify } from "html-minifier-terser"
 import { cyan, dim, green } from "kolorist"
-import { parseHTML } from "linkedom/worker"
 import { join, resolve } from "pathe"
 import type { PluginOption, ResolvedConfig, ViteDevServer } from "vite"
 import { defineConfig, loadEnv } from "vite"
@@ -47,43 +46,6 @@ const isWebBuild = process.env.WEB_BUILD === "1"
 
 console.log(green("Build type:"), isWebBuild ? "Web" : "Unknown")
 
-const proxyConfig = {
-  target: "http://localhost:2234",
-  changeOrigin: true,
-  selfHandleResponse: true,
-  configure: (proxy, _options) => {
-    proxy.on("proxyRes", (proxyRes, req, res) => {
-      const body = [] as any[]
-      proxyRes.on("data", (chunk: any) => body.push(chunk))
-      proxyRes.on("end", () => {
-        const html = parseHTML(Buffer.concat(body).toString())
-        const doc = html.document
-
-        const $scripts = doc.querySelectorAll("script")
-        $scripts.forEach((script) => {
-          const src = script.getAttribute("src")
-          if (src) {
-            script.setAttribute("src", `http://localhost:2234${src}`)
-          }
-        })
-
-        const $links = doc.querySelectorAll("link")
-        $links.forEach((link) => {
-          const href = link.getAttribute("href")
-          if (href) {
-            link.setAttribute("href", `http://localhost:2234${href}`)
-          }
-        })
-
-        res.setHeader("Content-Type", "text/html; charset=utf-8")
-
-        const modifiedHtml = doc.toString()
-        res.end(modifiedHtml)
-      })
-    })
-  },
-}
-
 export default ({ mode }) => {
   const env = loadEnv(mode, process.cwd())
   const typedEnv = env as typeof EnvType
@@ -118,11 +80,10 @@ export default ({ mode }) => {
         "Access-Control-Allow-Private-Network": "true",
       },
       proxy: {
-        "/login": proxyConfig,
-        "/forget-password": proxyConfig,
-        "/reset-password": proxyConfig,
-        "/register": proxyConfig,
-        "/share": proxyConfig,
+        "/api": {
+          target: "http://127.0.0.1:3000",
+          changeOrigin: false,
+        },
 
         ...(env.VITE_DEV_PROXY
           ? {

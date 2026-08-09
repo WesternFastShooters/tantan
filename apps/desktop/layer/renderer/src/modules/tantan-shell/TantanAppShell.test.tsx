@@ -7,10 +7,6 @@ import { afterEach, beforeAll, describe, expect, test, vi } from "vitest"
 
 import { TantanAppShell } from "./TantanAppShell"
 
-const { useMobileMock } = vi.hoisted(() => ({ useMobileMock: vi.fn() }))
-
-vi.mock("./useTantanMobile", () => ({ useTantanMobile: useMobileMock }))
-
 vi.mock("~/modules/tantan-service-status/LocalServiceGuard", () => ({
   LocalServiceGuard: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
@@ -55,43 +51,44 @@ describe("TantanAppShell", () => {
     vi.clearAllMocks()
   })
 
-  test("REQ:FE-02 renders the shared three routes in desktop navigation", async () => {
-    useMobileMock.mockReturnValue(false)
+  test("FR-01 renders exactly four Folo Mobile tabs and never a desktop sidebar", async () => {
     ;({ container, root } = await renderShell("/"))
 
-    const navigation = container.querySelector('nav[aria-label="Primary navigation"]')
+    const navigation = container.querySelector('nav[role="tablist"][aria-label="主导航"]')
     expect(navigation).not.toBeNull()
-    expect(navigation?.querySelectorAll("a")).toHaveLength(3)
+    expect(navigation?.querySelectorAll('[role="tab"]')).toHaveLength(4)
     expect(navigation?.textContent).toContain("首页")
     expect(navigation?.textContent).toContain("订阅")
+    expect(navigation?.textContent).toContain("发现")
     expect(navigation?.textContent).toContain("设置")
-    expect(container.querySelector('nav[aria-label="Mobile navigation"]')).toBeNull()
+    expect(container.querySelector('nav[aria-label="Primary navigation"]')).toBeNull()
+    expect(container.querySelector("aside")).toBeNull()
     expect(container.querySelector('[data-testid="route-content"]')).not.toBeNull()
   })
 
-  test("REQ:FE-02 renders the same three routes in mobile bottom navigation", async () => {
-    useMobileMock.mockReturnValue(true)
+  test("FR-01 marks the selected bottom tab and keeps all targets at least 44px", async () => {
     ;({ container, root } = await renderShell("/subscriptions"))
 
-    const navigation = container.querySelector('nav[aria-label="Mobile navigation"]')
+    const navigation = container.querySelector('nav[role="tablist"][aria-label="主导航"]')
     expect(navigation).not.toBeNull()
-    expect(navigation?.querySelectorAll("a")).toHaveLength(3)
-    expect(navigation?.querySelector('a[aria-current="page"]')?.textContent).toContain("订阅")
-    expect(container.querySelector('nav[aria-label="Primary navigation"]')).toBeNull()
+    expect(navigation?.querySelectorAll('[role="tab"]')).toHaveLength(4)
+    const selected = navigation?.querySelector('[role="tab"][aria-selected="true"]')
+    expect(selected?.textContent).toContain("订阅")
+    expect(selected?.className).toContain("min-h-11")
+    expect(navigation?.className).toContain("safe-area-inset-bottom")
+    expect(navigation?.className).toContain("safe-area-inset-left")
   })
 
-  test("REQ:FE-03 hides the mobile bottom navigation on Entry detail routes", async () => {
-    useMobileMock.mockReturnValue(true)
+  test("FR-01 hides the bottom tabs on Entry detail stack routes", async () => {
     ;({ container, root } = await renderShell("/entries/41147805272531997"))
 
-    expect(container.querySelector('nav[aria-label="Mobile navigation"]')).toBeNull()
+    expect(container.querySelector('nav[role="tablist"][aria-label="主导航"]')).toBeNull()
     expect(container.querySelector('[data-testid="route-content"]')).not.toBeNull()
   })
 
-  test("REQ:FE-04 hides the mobile bottom navigation on Source detail routes", async () => {
-    useMobileMock.mockReturnValue(true)
+  test("FR-01 hides the bottom tabs on Source detail stack routes", async () => {
     ;({ container, root } = await renderShell("/sources/feed-1"))
 
-    expect(container.querySelector('nav[aria-label="Mobile navigation"]')).toBeNull()
+    expect(container.querySelector('nav[role="tablist"][aria-label="主导航"]')).toBeNull()
   })
 })

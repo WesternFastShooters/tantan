@@ -25,24 +25,24 @@ export const getHome = ({
   const search = new URLSearchParams({ topicId, limit: String(limit) })
   if (filterId) search.set("filterId", filterId)
   if (cursor) search.set("cursor", cursor)
-  return tantanRequest<HomeResponse>(`/tantan/v1/home?${search.toString()}`, { signal })
+  return tantanRequest<HomeResponse>(`/api/tantan/v1/home?${search.toString()}`, { signal })
 }
 
 export const getTopics = (signal?: AbortSignal) =>
-  tantanRequest<TopicsResponse>("/tantan/v1/topics", { signal })
+  tantanRequest<TopicsResponse>("/api/tantan/v1/topics", { signal })
 
 export const putActiveFilter = (prompt: string) =>
-  tantanRequest<FilterMutationResponse>("/tantan/v1/filter", {
+  tantanRequest<FilterMutationResponse>("/api/tantan/v1/filter", {
     method: "PUT",
     headers: { "Idempotency-Key": idempotencyKey() },
     body: JSON.stringify({ prompt }),
   })
 
 export const deleteActiveFilter = () =>
-  tantanRequest<FilterMutationResponse>("/tantan/v1/filter", { method: "DELETE" })
+  tantanRequest<FilterMutationResponse>("/api/tantan/v1/filter", { method: "DELETE" })
 
 export const postRecommendationFeedback = (body: FeedbackRequest) =>
-  tantanRequest<{ applied: true }>("/tantan/v1/recommendation/feedback", {
+  tantanRequest<{ applied: true }>("/api/tantan/v1/recommendation/feedback", {
     method: "POST",
     headers: { "Idempotency-Key": idempotencyKey() },
     body: JSON.stringify(body),

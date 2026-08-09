@@ -1,25 +1,38 @@
-import { IN_ELECTRON } from "@follow/shared/constants"
-import { createBrowserRouter, createHashRouter } from "react-router"
+import { createBrowserRouter } from "react-router"
 
-import { ErrorElement } from "./components/common/ErrorElement"
 import { NotFound } from "./components/common/NotFound"
-// @ts-ignore
-import { routes as tree } from "./generated-routes"
+import { EntryDetailPage } from "./modules/tantan-entry/EntryDetailPage"
+import { FavoritesPage } from "./modules/tantan-favorites/FavoritesPage"
+import { SearchPage } from "./modules/tantan-search/SearchPage"
+import { DiscoverRoute } from "./modules/tantan-shell/DiscoverRoute"
+import { HomeRoute } from "./modules/tantan-shell/HomeRoute"
+import { LoginRoute } from "./modules/tantan-shell/LoginRoute"
+import { SettingsRoute } from "./modules/tantan-shell/SettingsRoute"
+import { SubscriptionsRoute } from "./modules/tantan-shell/SubscriptionsRoute"
+import { TantanAppShell } from "./modules/tantan-shell/TantanAppShell"
+import { TantanWebRoot } from "./modules/tantan-shell/TantanWebRoot"
+import { SourceDetailPage } from "./modules/tantan-subscriptions/SourceDetailPage"
 
-const isDebugProxyRuntime =
-  !!globalThis["__DEBUG_PROXY__"] || globalThis.location?.pathname?.startsWith("/__debug_proxy")
-
-const routerCreator = IN_ELECTRON || isDebugProxyRuntime ? createHashRouter : createBrowserRouter
-
-export const router = routerCreator([
+export const router = createBrowserRouter([
   {
     path: "/",
-    lazy: () => import("./App"),
-    children: tree,
-    errorElement: <ErrorElement />,
-  },
-  {
-    path: "*",
-    element: <NotFound />,
+    Component: TantanWebRoot,
+    children: [
+      { path: "login", Component: LoginRoute },
+      {
+        Component: TantanAppShell,
+        children: [
+          { index: true, Component: HomeRoute },
+          { path: "subscriptions", Component: SubscriptionsRoute },
+          { path: "discover", Component: DiscoverRoute },
+          { path: "settings", Component: SettingsRoute },
+          { path: "search", Component: SearchPage },
+          { path: "favorites", Component: FavoritesPage },
+          { path: "entries/:entryId", Component: EntryDetailPage },
+          { path: "sources/:sourceId", Component: SourceDetailPage },
+        ],
+      },
+      { path: "*", element: <NotFound /> },
+    ],
   },
 ])

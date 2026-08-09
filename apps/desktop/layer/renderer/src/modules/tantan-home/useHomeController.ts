@@ -137,6 +137,7 @@ export function useHomeController(scrollRef: React.RefObject<HTMLDivElement | nu
     onSuccess: (result, prompt) => {
       queryClient.setQueryData<TopicsResponse>(homeQueryKeys.topics, (current) => ({
         version: current?.version ?? 1,
+        topicsRevision: result.topicsRevision,
         activeFilterId: result.filter?.id ?? null,
         topics: result.topics,
       }))
@@ -159,6 +160,7 @@ export function useHomeController(scrollRef: React.RefObject<HTMLDivElement | nu
     onSuccess: (result) => {
       queryClient.setQueryData<TopicsResponse>(homeQueryKeys.topics, (current) => ({
         version: current?.version ?? 1,
+        topicsRevision: result.topicsRevision,
         activeFilterId: null,
         topics: result.topics,
       }))

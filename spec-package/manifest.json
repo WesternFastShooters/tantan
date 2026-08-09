@@ -104,7 +104,7 @@
     {
       "path": "agent/task-manifest.json",
       "role": "task-dag-and-write-boundaries",
-      "sha256": "ea0263fb09e76de4e3e91813323d9ecd7fffc230bebaf58f97917326fe182fe0"
+      "sha256": "1faadb0d99edd3bf6d1b800ead61d715624141cb908c7e40f1f85bee51e4547a"
     },
     {
       "path": "api/folo-route-policy.json",

@@ -15,5 +15,5 @@ export const searchEntries = ({
   const request = buildSearchRequest(q, cursor)
   const search = new URLSearchParams({ q: request.q, limit: String(request.limit) })
   if (request.cursor) search.set("cursor", request.cursor)
-  return tantanRequest<SearchResponse>(`/tantan/v1/search?${search.toString()}`, { signal })
+  return tantanRequest<SearchResponse>(`/api/tantan/v1/search?${search.toString()}`, { signal })
 }

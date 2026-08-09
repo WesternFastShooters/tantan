@@ -11,15 +11,11 @@ declare let self: ServiceWorkerGlobalScope & {
 
 precacheAndRoute(self.__WB_MANIFEST)
 
-const isSensitiveRequest = (url: URL) =>
-  url.pathname === "/auth" ||
-  url.pathname.startsWith("/auth/") ||
-  url.pathname === "/tantan/v1" ||
-  url.pathname.startsWith("/tantan/v1/")
+const isSensitiveRequest = (url: URL) => url.pathname === "/api" || url.pathname.startsWith("/api/")
 
 registerRoute(
   new NavigationRoute(createHandlerBoundToURL("index.html"), {
-    denylist: [/^\/auth(?:\/|$)/, /^\/tantan\/v1(?:\/|$)/],
+    denylist: [/^\/api(?:\/|$)/],
   }),
 )
 

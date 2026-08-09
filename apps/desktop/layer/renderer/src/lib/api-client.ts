@@ -15,15 +15,40 @@ import {
 
 import { ipcServices } from "./client"
 import { getAuthSessionToken, getClientId, getSessionId } from "./client-session"
+import { getSessionCSRFToken } from "./tantan-api/client"
 
 const isElectronRuntime = () => {
   return IN_ELECTRON || (typeof window !== "undefined" && !!window.electron)
 }
 
+const browserFoloAPIURL = () => {
+  if (typeof window === "undefined") return "http://127.0.0.1:3000/api/folo"
+  return new URL("/api/folo/", window.location.origin).toString()
+}
+
+const foloAPIURL = isElectronRuntime() ? env.VITE_API_URL : browserFoloAPIURL()
+
 const fetchWithElectronAuth = async (request: Request) => {
   const requestURL = new URL(request.url)
-  const apiURL = new URL(env.VITE_API_URL)
-  if (isRemovedFoloRoute(requestURL, apiURL.origin)) {
+  const electronRuntime = isElectronRuntime()
+  const apiURL = new URL(foloAPIURL)
+  if (!electronRuntime) {
+    const publicPrefix = apiURL.pathname.endsWith("/") ? apiURL.pathname : `${apiURL.pathname}/`
+    if (requestURL.origin !== apiURL.origin || !requestURL.pathname.startsWith(publicPrefix)) {
+      return new Response(
+        JSON.stringify({
+          requestId: "browser-policy",
+          error: {
+            code: "FOLO_ROUTE_DENIED",
+            message: "浏览器只允许同源 /api/folo 请求",
+            retryable: false,
+          },
+        }),
+        { status: 403, headers: { "Content-Type": "application/json" } },
+      )
+    }
+  }
+  if (electronRuntime && isRemovedFoloRoute(requestURL, apiURL.origin)) {
     return removedFoloResponse()
   }
   const authService = ipcServices?.auth as
@@ -42,7 +67,7 @@ const fetchWithElectronAuth = async (request: Request) => {
       })
     | undefined
 
-  if (!isElectronRuntime() || requestURL.origin !== apiURL.origin || !authService?.fetchWithAuth) {
+  if (!electronRuntime || requestURL.origin !== apiURL.origin || !authService?.fetchWithAuth) {
     return fetch(request)
   }
 
@@ -65,7 +90,7 @@ const fetchWithElectronAuth = async (request: Request) => {
 export const followClient = new FollowClient({
   credentials: "include",
   timeout: 60_000,
-  baseURL: env.VITE_API_URL,
+  baseURL: foloAPIURL,
   fetch: async (input, options = {}) => {
     const request = new Request(input.toString(), {
       ...options,
@@ -90,6 +115,14 @@ followClient.addRequestInterceptor(async (ctx) => {
     )
   }
 
+  if (!isElectronRuntime()) {
+    const method = String(options.method ?? "GET").toUpperCase()
+    const csrfToken = getSessionCSRFToken()
+    if (csrfToken && ["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+      headers.set("X-CSRF-Token", csrfToken)
+    }
+  }
+
   const apiHeader = createDesktopAPIHeaders({ version: PKG.version })
   Object.entries(apiHeader).forEach(([key, value]) => {
     headers.set(key, value)
@@ -109,11 +142,11 @@ followClient.addResponseInterceptor(async ({ response }) => {
       return response
     }
 
-    // Or we can present LoginModal here.
-    // router.navigate("/login")
-    // If any response status is 401, we can set auth fail. Maybe some bug, but if navigate to login page, had same issues
-    setLoginModalShow(true)
     userActions.removeCurrentUser()
+    if (isElectronRuntime()) setLoginModalShow(true)
+    else if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+      window.location.assign(`/login?returnTo=${encodeURIComponent(window.location.pathname)}`)
+    }
   }
   try {
     const isJSON = response.headers.get("content-type")?.includes("application/json")

@@ -22,12 +22,14 @@ const page = (ids: string[]): HomeResponse => ({
   queue: {
     id: "queue",
     version: 1,
+    generation: "generation-1",
     total: ids.length,
     unread: ids.length,
     finished: false,
     candidateWindowDays: 7,
     generatedAt: "2026-08-09T12:00:00Z",
   },
+  queueGeneration: "generation-1",
 })
 
 describe("Tantan Home cache", () => {

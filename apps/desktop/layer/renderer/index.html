@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="referrer" content="no-referrer" />
@@ -75,6 +75,9 @@
       <style>
         [data-build-type]:not([data-build-type="electron"]) #root {
           background-color: hsl(var(--background));
+        }
+        [data-build-type="web"] #app-skeleton .sidebar {
+          display: none;
         }
         html,
         body {

@@ -20,8 +20,8 @@ describe("Tantan PWA policy", () => {
     const worker = readFileSync(join(rendererRoot, "src/workers/sw/index.ts"), "utf8")
 
     expect(worker).toMatch(/isSensitiveRequest/)
-    expect(worker).toMatch(/\/tantan\/v1/)
-    expect(worker).toMatch(/\/auth\//)
+    expect(worker).toMatch(/url\.pathname\.startsWith\(["']\/api\//)
+    expect(worker).toMatch(/denylist:\s*\[\/\^\\\/api/)
     expect(worker).toMatch(/!isSensitiveRequest\(url\)/)
   })
 
