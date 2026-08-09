@@ -189,14 +189,20 @@ export function EntryDetailPage() {
               AI 处理失败，已显示原文。
             </p>
           )}
-          {(enrichment.data?.state === "missing" || enrichment.isError) && (
+          {(enrichment.data?.state === "missing" ||
+            enrichment.data?.state === "failed" ||
+            enrichment.isError) && (
             <button
               type="button"
               disabled={enrichment.ensuring}
               onClick={enrichment.ensure}
               className="mt-2 min-h-11 rounded-xl bg-orange-500 px-4 text-sm font-semibold text-white outline-none hover:bg-orange-400 focus-visible:ring-2 focus-visible:ring-orange-300 disabled:opacity-50"
             >
-              {enrichment.ensuring ? "正在启动…" : "生成翻译与摘要"}
+              {enrichment.ensuring
+                ? "正在启动…"
+                : enrichment.data?.state === "failed"
+                  ? "重试翻译与摘要"
+                  : "生成翻译与摘要"}
             </button>
           )}
           {enrichment.ensureError && (

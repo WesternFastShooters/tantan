@@ -1,3 +1,4 @@
+import { BlockedSources } from "~/modules/tantan-settings/BlockedSources"
 import { SettingsPageHeader } from "~/modules/tantan-settings/SettingsPageHeader"
 
 import { TopicManager } from "./TopicManager"
@@ -10,6 +11,7 @@ export function TopicSettingsPage() {
         调整首页 Topic 的顺序、固定与显示状态。“推荐”始终保留在首位。
       </p>
       <TopicManager />
+      <BlockedSources />
     </section>
   )
 }

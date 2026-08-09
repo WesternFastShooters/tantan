@@ -1,7 +1,7 @@
 import { Masonry } from "@follow/components/ui/masonry/index.js"
 import { useEffect, useRef } from "react"
 
-import type { HomeCard, QueueState } from "~/lib/tantan-api/gen/types"
+import type { FeedbackRequest, HomeCard, QueueState } from "~/lib/tantan-api/gen/types"
 
 import { FeedCard } from "./FeedCard"
 
@@ -14,7 +14,7 @@ interface MasonryFeedProps {
   hasNextPage: boolean
   onFetchNext: () => void
   onOpenCard: () => void
-  onNotInterested: (card: HomeCard) => void
+  onFeedback: (card: HomeCard, action: FeedbackRequest["action"], topicId?: string) => void
 }
 
 export function MasonryFeed({
@@ -26,7 +26,7 @@ export function MasonryFeed({
   hasNextPage,
   onFetchNext,
   onOpenCard,
-  onNotInterested,
+  onFeedback,
 }: MasonryFeedProps) {
   const sentinelRef = useRef<HTMLDivElement>(null)
 
@@ -71,15 +71,14 @@ export function MasonryFeed({
     <div data-testid="masonry-feed" data-columns={columns} className="p-2 sm:p-3">
       <Masonry
         items={cards}
+        role="list"
         columnCount={columns}
         columnGutter={columns === 2 ? 8 : 12}
         rowGutter={columns === 2 ? 8 : 12}
         itemKey={(card) => card.entryId}
         itemHeightEstimate={280}
         overscanBy={2}
-        render={({ data }) => (
-          <FeedCard card={data} onOpen={onOpenCard} onNotInterested={onNotInterested} />
-        )}
+        render={({ data }) => <FeedCard card={data} onOpen={onOpenCard} onFeedback={onFeedback} />}
       />
       <div ref={sentinelRef} data-testid="home-pagination-sentinel" className="h-1" />
       {(fetchingNext || (!hasNextPage && (queue?.finished || cards.length > 0))) && (

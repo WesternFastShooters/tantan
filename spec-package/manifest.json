@@ -76,7 +76,7 @@
     {
       "path": "agent/task-manifest.json",
       "role": "task-dag-and-write-boundaries",
-      "sha256": "a307964a23e9673b5148d0c30f8e726eeadfe5a5c685721ef72a7f46c9cbb300"
+      "sha256": "9f4ff0705354b46cb27b56f55ff35926bbf948cb3fa7768250bbd36f64f8f306"
     },
     {
       "path": "api/folo-route-policy.json",
@@ -86,7 +86,7 @@
     {
       "path": "api/openapi.json",
       "role": "public-http-contract",
-      "sha256": "f10bc459a6e7a81fc62cfbc738609579088c7251c5964c8d96a0cc7cad80391d"
+      "sha256": "4296305bfbdc5046f8de5db646d7a7aa748a963266d14e27293e2d339368d23b"
     },
     {
       "path": "db/0001_core.sql",
@@ -146,7 +146,7 @@
     {
       "path": "scripts/validate-package.rb",
       "role": "offline-contract-validator",
-      "sha256": "3a7d271c45993856277b0e3e405d5a77f16192569c8929ec6b5781d29a3f84ac"
+      "sha256": "073d4552082072eb4d289138ebaaa09a93c3434786e15356fceee13b1dd1b3d8"
     },
     {
       "path": "scripts/validate-package.sh",

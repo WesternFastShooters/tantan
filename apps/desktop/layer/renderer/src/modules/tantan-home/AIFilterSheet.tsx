@@ -2,23 +2,32 @@ import { useEffect, useRef, useState } from "react"
 
 interface AIFilterSheetProps {
   open: boolean
+  initialPrompt?: string
   pending: boolean
   error: string | null
   onClose: () => void
   onSubmit: (prompt: string) => void
 }
 
-export function AIFilterSheet({ open, pending, error, onClose, onSubmit }: AIFilterSheetProps) {
+export function AIFilterSheet({
+  open,
+  initialPrompt = "",
+  pending,
+  error,
+  onClose,
+  onSubmit,
+}: AIFilterSheetProps) {
   const [prompt, setPrompt] = useState("")
   const [validation, setValidation] = useState<string | null>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     if (!open) return
+    setPrompt(initialPrompt)
     setValidation(null)
     const frame = requestAnimationFrame(() => inputRef.current?.focus())
     return () => cancelAnimationFrame(frame)
-  }, [open])
+  }, [initialPrompt, open])
 
   useEffect(() => {
     if (!open) return

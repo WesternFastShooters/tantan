@@ -13,6 +13,36 @@ curl --fail http://127.0.0.1:3000/readyz
 
 `healthz` 只表示进程可响应。`readyz` 还会验证 SQLite、迁移版本/校验和及一次随机的 OS Keychain 写入、读取和删除；任何一项失败都会返回 503，后台任务也会停止领取新作业。
 
+另开一个终端启动 PC/Mobile Web：
+
+```bash
+cd /Users/mingrui/Project/tantan
+pnpm dev:web
+```
+
+浏览器访问 Vite 输出的 loopback 地址。将窗口调为 `390x844` 可验收 Mobile Web；`1440x900` 可验收 PC Web。
+
+## 本地 AI Provider
+
+在“设置 → AI 服务”选择 Google，模型填写 `gemini-3.5-flash-lite`，并在密码输入框中保存 Key。Endpoint 由程序锁定，不能输入自定义 URL；Key 只进入 OS Keychain，不进入 SQLite 或浏览器存储。
+
+若本机网络必须经过代理，只允许显式的 loopback HTTP(S) 代理，并让 API 进程继承环境变量：
+
+```bash
+cd services/tantan-api
+HTTPS_PROXY=http://127.0.0.1:7897 go run ./cmd/tantan-api serve
+```
+
+端口按本机代理实际监听端口替换。远程代理、带账号密码的代理、SOCKS、自定义路径/查询参数都会被拒绝。
+
+真实 Google 翻译冒烟测试只从 Keychain 读取 Key，不接收环境变量或命令行 Key：
+
+```bash
+cd services/tantan-api
+HTTPS_PROXY=http://127.0.0.1:7897 TANTAN_LIVE_AI=1 \
+  go test ./internal/ai -run TestLiveGoogleTranslation -count=1 -v
+```
+
 ## doctor
 
 先停止 Tantan 服务，再运行：

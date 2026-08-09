@@ -1,6 +1,6 @@
 import { useState } from "react"
 
-import type { HomeCard } from "~/lib/tantan-api/gen/types"
+import type { FeedbackRequest, HomeCard } from "~/lib/tantan-api/gen/types"
 import { EntryLink } from "~/modules/tantan-entry/EntryLink"
 
 import { resolveCardPresentation } from "./card-presentation"
@@ -8,7 +8,7 @@ import { resolveCardPresentation } from "./card-presentation"
 interface FeedCardProps {
   card: HomeCard
   onOpen: () => void
-  onNotInterested: (card: HomeCard) => void
+  onFeedback: (card: HomeCard, action: FeedbackRequest["action"], topicId?: string) => void
 }
 
 const publishedLabel = (value: string) => {
@@ -17,7 +17,7 @@ const publishedLabel = (value: string) => {
   return new Intl.DateTimeFormat("zh-CN", { month: "numeric", day: "numeric" }).format(date)
 }
 
-export function FeedCard({ card, onOpen, onNotInterested }: FeedCardProps) {
+export function FeedCard({ card, onOpen, onFeedback }: FeedCardProps) {
   const presentation = resolveCardPresentation(card)
   const [coverFailed, setCoverFailed] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -94,12 +94,34 @@ export function FeedCard({ card, onOpen, onNotInterested }: FeedCardProps) {
             type="button"
             onClick={() => {
               setMenuOpen(false)
-              onNotInterested(card)
+              onFeedback(card, "not_interested")
             }}
             className="min-h-10 w-full rounded-lg px-3 text-left text-xs text-zinc-200 outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-orange-500"
           >
             不感兴趣
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMenuOpen(false)
+              onFeedback(card, "block_source")
+            }}
+            className="min-h-10 w-full rounded-lg px-3 text-left text-xs text-zinc-200 outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-orange-500"
+          >
+            屏蔽 Source：{card.source.name}
+          </button>
+          {card.topics[0] && (
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false)
+                onFeedback(card, "block_topic", card.topics[0]?.id)
+              }}
+              className="min-h-10 w-full rounded-lg px-3 text-left text-xs text-zinc-200 outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-orange-500"
+            >
+              少看 Topic：{card.topics[0].name}
+            </button>
+          )}
         </div>
       )}
     </article>

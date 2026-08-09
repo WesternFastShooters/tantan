@@ -113,3 +113,23 @@
     rgba(142, 142, 147, 0.05)
   );
 }
+
+html[data-motion-reduce="true"] *,
+html[data-motion-reduce="true"] *::before,
+html[data-motion-reduce="true"] *::after {
+  scroll-behavior: auto !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

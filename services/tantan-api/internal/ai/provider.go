@@ -91,16 +91,9 @@ func NewProviderClient(config ProviderClientConfig) (*ProviderClient, error) {
 	}
 	transport := config.Transport
 	if transport == nil {
-		safe := newSafeDialer()
-		transport = &http.Transport{
-			Proxy:                 nil,
-			DialContext:           safe.DialContext,
-			ForceAttemptHTTP2:     true,
-			MaxIdleConns:          4,
-			MaxIdleConnsPerHost:   2,
-			IdleConnTimeout:       30 * time.Second,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ResponseHeaderTimeout: providerTimeout,
+		transport, err = newProviderTransport()
+		if err != nil {
+			return nil, err
 		}
 	}
 	client := &http.Client{

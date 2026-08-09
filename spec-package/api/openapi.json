@@ -5,9 +5,7 @@
     "version": "1.0.0",
     "description": "Phase-one loopback-only API. The implementation must bind 127.0.0.1:3000 and must not expose this API to LAN or public networks."
   },
-  "servers": [
-    { "url": "http://127.0.0.1:3000", "description": "Local loopback" }
-  ],
+  "servers": [{ "url": "http://127.0.0.1:3000", "description": "Local loopback" }],
   "tags": [
     { "name": "Health" },
     { "name": "Auth" },
@@ -26,7 +24,9 @@
         "responses": {
           "200": {
             "description": "Process is alive",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HealthResponse" } } }
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/HealthResponse" } }
+            }
           }
         }
       }
@@ -39,7 +39,9 @@
         "responses": {
           "200": {
             "description": "SQLite migrations and Keychain capability are ready",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReadinessResponse" } } }
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ReadinessResponse" } }
+            }
           },
           "503": { "$ref": "#/components/responses/ServiceUnavailable" }
         }
@@ -50,9 +52,7 @@
         "tags": ["Auth"],
         "operationId": "startFoloAuth",
         "security": [],
-        "parameters": [
-          { "$ref": "#/components/parameters/Host" }
-        ],
+        "parameters": [{ "$ref": "#/components/parameters/Host" }],
         "responses": {
           "302": {
             "description": "Redirect to Folo login and set an HttpOnly SameSite=Lax flow cookie",
@@ -99,11 +99,11 @@
       "post": {
         "tags": ["Auth"],
         "operationId": "logout",
-        "parameters": [
-          { "$ref": "#/components/parameters/Origin" }
-        ],
+        "parameters": [{ "$ref": "#/components/parameters/Origin" }],
         "responses": {
-          "204": { "description": "Local session and account-scoped Folo token are revoked; repeated calls are successful" },
+          "204": {
+            "description": "Local session and account-scoped Folo token are revoked; repeated calls are successful"
+          },
           "403": { "$ref": "#/components/responses/OriginRejected" }
         }
       }
@@ -112,13 +112,13 @@
       "get": {
         "tags": ["Auth"],
         "operationId": "getSession",
-        "parameters": [
-          { "$ref": "#/components/parameters/Timezone" }
-        ],
+        "parameters": [{ "$ref": "#/components/parameters/Timezone" }],
         "responses": {
           "200": {
             "description": "Current local session",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SessionResponse" } } }
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SessionResponse" } }
+            }
           },
           "401": { "$ref": "#/components/responses/AuthRequired" }
         }
@@ -158,7 +158,9 @@
           "401": { "$ref": "#/components/responses/AuthRequired" },
           "409": {
             "description": "Queue version changed; restart from the first page",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
           }
         }
       }
@@ -170,7 +172,9 @@
         "responses": {
           "200": {
             "description": "Ordered visible topics with recommend as immutable first item",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TopicsResponse" } } }
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TopicsResponse" } }
+            }
           },
           "401": { "$ref": "#/components/responses/AuthRequired" }
         }
@@ -178,17 +182,19 @@
       "patch": {
         "tags": ["Home"],
         "operationId": "patchTopics",
-        "parameters": [
-          { "$ref": "#/components/parameters/Origin" }
-        ],
+        "parameters": [{ "$ref": "#/components/parameters/Origin" }],
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TopicPatchRequest" } } }
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/TopicPatchRequest" } }
+          }
         },
         "responses": {
           "200": {
             "description": "Updated ordered topics",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TopicsResponse" } } }
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TopicsResponse" } }
+            }
           },
           "400": { "$ref": "#/components/responses/ValidationError" },
           "401": { "$ref": "#/components/responses/AuthRequired" },
@@ -209,12 +215,18 @@
         ],
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FilterPutRequest" } } }
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/FilterPutRequest" } }
+          }
         },
         "responses": {
           "200": {
             "description": "Filter, topics and ready queue are active",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FilterMutationResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FilterMutationResponse" }
+              }
+            }
           },
           "400": { "$ref": "#/components/responses/ValidationError" },
           "401": { "$ref": "#/components/responses/AuthRequired" },
@@ -234,7 +246,11 @@
         "responses": {
           "200": {
             "description": "Default topics and default daily queue are active; repeated reset is successful",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FilterMutationResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FilterMutationResponse" }
+              }
+            }
           },
           "401": { "$ref": "#/components/responses/AuthRequired" },
           "403": { "$ref": "#/components/responses/OriginRejected" }
@@ -251,7 +267,9 @@
         ],
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FeedbackRequest" } } }
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/FeedbackRequest" } }
+          }
         },
         "responses": {
           "200": {
@@ -273,6 +291,58 @@
         }
       }
     },
+    "/tantan/v1/recommendation/blocks/sources": {
+      "get": {
+        "tags": ["Home"],
+        "operationId": "listBlockedSources",
+        "responses": {
+          "200": {
+            "description": "Currently blocked RSS Sources",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SourceBlocksResponse" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/AuthRequired" }
+        }
+      }
+    },
+    "/tantan/v1/recommendation/blocks/sources/{sourceId}": {
+      "delete": {
+        "tags": ["Home"],
+        "operationId": "restoreBlockedSource",
+        "parameters": [
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/IdempotencyKey" },
+          {
+            "name": "sourceId",
+            "in": "path",
+            "required": true,
+            "schema": { "$ref": "#/components/schemas/Identifier" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Source block was removed exactly once",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["applied"],
+                  "properties": { "applied": { "const": true } }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/AuthRequired" },
+          "403": { "$ref": "#/components/responses/OriginRejected" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
     "/tantan/v1/search": {
       "get": {
         "tags": ["Search"],
@@ -290,7 +360,9 @@
         "responses": {
           "200": {
             "description": "Searches read and unread original/translated title, content, source, topic and tag fields without changing home state",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SearchResponse" } } }
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SearchResponse" } }
+            }
           },
           "400": { "$ref": "#/components/responses/ValidationError" },
           "401": { "$ref": "#/components/responses/AuthRequired" }
@@ -314,13 +386,21 @@
             "name": "language",
             "in": "query",
             "required": false,
-            "schema": { "type": "string", "default": "zh-CN", "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$" }
+            "schema": {
+              "type": "string",
+              "default": "zh-CN",
+              "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$"
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "Current enrichment state",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EnrichmentResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EnrichmentResponse" }
+              }
+            }
           },
           "401": { "$ref": "#/components/responses/AuthRequired" },
           "404": { "$ref": "#/components/responses/NotFound" }
@@ -335,12 +415,20 @@
         ],
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EnrichmentEnsureRequest" } } }
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EnrichmentEnsureRequest" }
+            }
+          }
         },
         "responses": {
           "202": {
             "description": "New or existing deduplicated enrichment job",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobAcceptedResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/JobAcceptedResponse" }
+              }
+            }
           },
           "400": { "$ref": "#/components/responses/ValidationError" },
           "401": { "$ref": "#/components/responses/AuthRequired" },
@@ -357,7 +445,11 @@
         "responses": {
           "200": {
             "description": "Non-secret provider settings; API key is never returned",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AIProviderResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AIProviderResponse" }
+              }
+            }
           },
           "401": { "$ref": "#/components/responses/AuthRequired" }
         }
@@ -365,17 +457,23 @@
       "put": {
         "tags": ["AI"],
         "operationId": "putAIProviderSettings",
-        "parameters": [
-          { "$ref": "#/components/parameters/Origin" }
-        ],
+        "parameters": [{ "$ref": "#/components/parameters/Origin" }],
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AIProviderPutRequest" } } }
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AIProviderPutRequest" }
+            }
+          }
         },
         "responses": {
           "200": {
             "description": "Settings and optional Keychain secret were atomically saved",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AIProviderResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AIProviderResponse" }
+              }
+            }
           },
           "400": { "$ref": "#/components/responses/ValidationError" },
           "401": { "$ref": "#/components/responses/AuthRequired" },
@@ -386,11 +484,11 @@
       "delete": {
         "tags": ["AI"],
         "operationId": "deleteAIProviderSettings",
-        "parameters": [
-          { "$ref": "#/components/parameters/Origin" }
-        ],
+        "parameters": [{ "$ref": "#/components/parameters/Origin" }],
         "responses": {
-          "204": { "description": "Keychain key is deleted before non-secret config; repeated calls are successful" },
+          "204": {
+            "description": "Keychain key is deleted before non-secret config; repeated calls are successful"
+          },
           "401": { "$ref": "#/components/responses/AuthRequired" },
           "403": { "$ref": "#/components/responses/OriginRejected" },
           "500": { "$ref": "#/components/responses/LocalStorageError" }
@@ -402,17 +500,23 @@
         "tags": ["AI"],
         "operationId": "testAIProviderSettings",
         "description": "Tests a temporary preset provider configuration without persisting the key. Limited to three requests per minute per local session.",
-        "parameters": [
-          { "$ref": "#/components/parameters/Origin" }
-        ],
+        "parameters": [{ "$ref": "#/components/parameters/Origin" }],
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AIProviderTestRequest" } } }
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AIProviderTestRequest" }
+            }
+          }
         },
         "responses": {
           "200": {
             "description": "Provider responded successfully",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AIProviderTestResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AIProviderTestResponse" }
+              }
+            }
           },
           "400": { "$ref": "#/components/responses/ValidationError" },
           "401": { "$ref": "#/components/responses/AuthRequired" },
@@ -429,7 +533,11 @@
         "responses": {
           "200": {
             "description": "Current or most recent sync state",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SyncStatusResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SyncStatusResponse" }
+              }
+            }
           },
           "401": { "$ref": "#/components/responses/AuthRequired" }
         }
@@ -439,17 +547,21 @@
       "post": {
         "tags": ["Sync"],
         "operationId": "triggerSync",
-        "parameters": [
-          { "$ref": "#/components/parameters/Origin" }
-        ],
+        "parameters": [{ "$ref": "#/components/parameters/Origin" }],
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SyncTriggerRequest" } } }
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/SyncTriggerRequest" } }
+          }
         },
         "responses": {
           "202": {
             "description": "New or existing non-terminal job for the same scope",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobAcceptedResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/JobAcceptedResponse" }
+              }
+            }
           },
           "400": { "$ref": "#/components/responses/ValidationError" },
           "401": { "$ref": "#/components/responses/AuthRequired" },
@@ -465,7 +577,11 @@
         "responses": {
           "200": {
             "description": "Redacted local diagnostics",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DiagnosticsResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DiagnosticsResponse" }
+              }
+            }
           },
           "401": { "$ref": "#/components/responses/AuthRequired" }
         }
@@ -676,8 +792,33 @@
         "required": ["entryId", "action"],
         "properties": {
           "entryId": { "$ref": "#/components/schemas/Identifier" },
-          "action": { "type": "string", "enum": ["not_interested", "block_source", "block_topic", "undo"] },
+          "action": {
+            "type": "string",
+            "enum": ["not_interested", "block_source", "block_topic", "undo"]
+          },
           "topicId": { "type": ["string", "null"], "maxLength": 128 }
+        }
+      },
+      "SourceBlock": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sourceId", "name", "createdAt"],
+        "properties": {
+          "sourceId": { "$ref": "#/components/schemas/Identifier" },
+          "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "SourceBlocksResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["items"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 500,
+            "items": { "$ref": "#/components/schemas/SourceBlock" }
+          }
         }
       },
       "SearchResponse": {
@@ -706,7 +847,11 @@
             "uniqueItems": true,
             "items": { "type": "string", "enum": ["translation", "summary", "keyPoints", "topics"] }
           },
-          "language": { "type": "string", "default": "zh-CN", "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$" }
+          "language": {
+            "type": "string",
+            "default": "zh-CN",
+            "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$"
+          }
         }
       },
       "EnrichmentResponse": {
@@ -714,18 +859,15 @@
         "additionalProperties": false,
         "required": ["state", "data", "error"],
         "properties": {
-          "state": { "type": "string", "enum": ["missing", "queued", "processing", "ready", "failed"] },
+          "state": {
+            "type": "string",
+            "enum": ["missing", "queued", "processing", "ready", "failed"]
+          },
           "data": {
-            "oneOf": [
-              { "$ref": "../schemas/ai-enrichment-v1.schema.json" },
-              { "type": "null" }
-            ]
+            "oneOf": [{ "$ref": "../schemas/ai-enrichment-v1.schema.json" }, { "type": "null" }]
           },
           "error": {
-            "oneOf": [
-              { "$ref": "#/components/schemas/ErrorObject" },
-              { "type": "null" }
-            ]
+            "oneOf": [{ "$ref": "#/components/schemas/ErrorObject" }, { "type": "null" }]
           }
         }
       },
@@ -759,7 +901,9 @@
         "required": ["configured", "providerId", "model", "baseUrl", "hasApiKey", "keyFingerprint"],
         "properties": {
           "configured": { "type": "boolean" },
-          "providerId": { "oneOf": [{ "$ref": "#/components/schemas/AIProviderId" }, { "type": "null" }] },
+          "providerId": {
+            "oneOf": [{ "$ref": "#/components/schemas/AIProviderId" }, { "type": "null" }]
+          },
           "model": { "type": ["string", "null"], "maxLength": 100 },
           "baseUrl": { "type": ["string", "null"], "format": "uri", "readOnly": true },
           "hasApiKey": { "type": "boolean" },
@@ -781,7 +925,10 @@
         "additionalProperties": false,
         "required": ["scope"],
         "properties": {
-          "scope": { "type": "string", "enum": ["all", "subscriptions", "entries", "reads", "collections"] }
+          "scope": {
+            "type": "string",
+            "enum": ["all", "subscriptions", "entries", "reads", "collections"]
+          }
         }
       },
       "JobAcceptedResponse": {
@@ -798,8 +945,14 @@
         "additionalProperties": false,
         "required": ["state", "scope", "counts", "error", "updatedAt"],
         "properties": {
-          "state": { "type": "string", "enum": ["idle", "queued", "running", "succeeded", "failed"] },
-          "scope": { "type": ["string", "null"], "enum": ["all", "subscriptions", "entries", "reads", "collections", null] },
+          "state": {
+            "type": "string",
+            "enum": ["idle", "queued", "running", "succeeded", "failed"]
+          },
+          "scope": {
+            "type": ["string", "null"],
+            "enum": ["all", "subscriptions", "entries", "reads", "collections", null]
+          },
           "counts": {
             "type": "object",
             "additionalProperties": false,
@@ -810,7 +963,9 @@
               "failed": { "type": "integer", "minimum": 0 }
             }
           },
-          "error": { "oneOf": [{ "$ref": "#/components/schemas/ErrorObject" }, { "type": "null" }] },
+          "error": {
+            "oneOf": [{ "$ref": "#/components/schemas/ErrorObject" }, { "type": "null" }]
+          },
           "updatedAt": { "type": "string", "format": "date-time" }
         }
       },
@@ -897,59 +1052,83 @@
     "responses": {
       "AuthRequired": {
         "description": "AUTH_REQUIRED",
-        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+        }
       },
       "AuthFlowInvalid": {
         "description": "AUTH_FLOW_INVALID",
-        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+        }
       },
       "OriginRejected": {
         "description": "ORIGIN_REJECTED",
-        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+        }
       },
       "ValidationError": {
         "description": "VALIDATION_ERROR or CURSOR_MISMATCH",
-        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+        }
       },
       "VersionConflict": {
         "description": "VERSION_CONFLICT",
-        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+        }
       },
       "FoloUnavailable": {
         "description": "FOLO_UNAVAILABLE",
-        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+        }
       },
       "AINotConfigured": {
         "description": "AI_NOT_CONFIGURED",
-        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+        }
       },
       "AIProviderUnavailable": {
         "description": "AI_PROVIDER_UNAVAILABLE",
-        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+        }
       },
       "AIOutputInvalid": {
         "description": "AI_OUTPUT_INVALID; prior filter, topics and queue remain active",
-        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+        }
       },
       "LocalStorageError": {
         "description": "LOCAL_STORAGE_ERROR",
-        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+        }
       },
       "NotFound": {
         "description": "NOT_FOUND",
-        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+        }
       },
       "RateLimited": {
         "description": "RATE_LIMITED",
-        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+        }
       },
       "ServiceUnavailable": {
         "description": "SERVICE_NOT_READY",
-        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+        }
       }
     }
   },
-  "security": [
-    { "LocalSession": [] }
-  ]
+  "security": [{ "LocalSession": [] }]
 }

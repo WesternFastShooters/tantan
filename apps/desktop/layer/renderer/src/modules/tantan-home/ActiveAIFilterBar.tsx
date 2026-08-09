@@ -1,10 +1,11 @@
 interface ActiveAIFilterBarProps {
   prompt: string | null
+  onEdit: () => void
   onReset: () => void
   resetting: boolean
 }
 
-export function ActiveAIFilterBar({ prompt, onReset, resetting }: ActiveAIFilterBarProps) {
+export function ActiveAIFilterBar({ prompt, onEdit, onReset, resetting }: ActiveAIFilterBarProps) {
   if (!prompt) return null
   return (
     <div
@@ -13,6 +14,14 @@ export function ActiveAIFilterBar({ prompt, onReset, resetting }: ActiveAIFilter
     >
       <i className="i-mgc-sparkles-2-cute-re size-4 shrink-0 text-orange-400" aria-hidden />
       <span className="min-w-0 flex-1 truncate">{prompt}</span>
+      <button
+        type="button"
+        disabled={resetting}
+        onClick={onEdit}
+        className="min-h-9 shrink-0 rounded-lg px-2 font-medium text-orange-300 outline-none hover:bg-orange-500/15 focus-visible:ring-2 focus-visible:ring-orange-500 disabled:opacity-50"
+      >
+        编辑筛选
+      </button>
       <button
         type="button"
         disabled={resetting}

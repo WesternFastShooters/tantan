@@ -36,7 +36,19 @@ export default defineConfig({
   projects: [
     {
       name: "web",
-      testMatch: /tests\/web\/.*\.spec\.ts/,
+      testMatch: /tests\/web\/tantan-(?:[^/]+\.spec\.ts|acceptance\/.*\.spec\.ts)/,
+      use: {
+        ...devices["Desktop Chrome"],
+        channel: "chromium",
+        ignoreHTTPSErrors: true,
+        launchOptions: {
+          args: ["--disable-web-security"],
+        },
+      },
+    },
+    {
+      name: "web-legacy",
+      testMatch: /tests\/web\/(?:core|settings-sync)\.spec\.ts/,
       use: {
         ...devices["Desktop Chrome"],
         channel: "chromium",

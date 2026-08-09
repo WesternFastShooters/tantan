@@ -37,6 +37,7 @@ export function HomePage() {
         </div>
         <ActiveAIFilterBar
           prompt={controller.activeFilterPrompt}
+          onEdit={controller.openFilterSheet}
           onReset={controller.resetFilter}
           resetting={controller.resetFilterPending}
         />
@@ -64,16 +65,42 @@ export function HomePage() {
             hasNextPage={controller.hasNextPage}
             onFetchNext={controller.fetchNext}
             onOpenCard={controller.saveCurrentScroll}
-            onNotInterested={controller.notInterested}
+            onFeedback={controller.sendFeedback}
           />
         )}
         <AIFilterSheet
           open={controller.filterSheetOpen}
+          initialPrompt={controller.activeFilterPrompt ?? ""}
           pending={controller.filterPending}
           error={controller.filterError}
           onClose={controller.closeFilterSheet}
           onSubmit={controller.submitFilter}
         />
+        {controller.undoFeedback && (
+          <aside
+            role="status"
+            className="fixed bottom-20 left-1/2 z-40 flex min-h-12 -translate-x-1/2 items-center gap-3 rounded-xl border border-white/10 bg-zinc-900 px-4 text-sm text-zinc-100 shadow-xl md:bottom-6"
+          >
+            <span>{controller.undoFeedback.label}</span>
+            <button
+              type="button"
+              aria-label="撤销推荐反馈"
+              disabled={controller.undoFeedbackPending}
+              onClick={controller.undoLastFeedback}
+              className="min-h-10 rounded-lg px-2 font-semibold text-orange-400 outline-none focus-visible:ring-2 focus-visible:ring-orange-500 disabled:opacity-50"
+            >
+              撤销
+            </button>
+          </aside>
+        )}
+        {controller.feedbackError && (
+          <p
+            role="alert"
+            className="fixed bottom-20 left-1/2 z-40 -translate-x-1/2 rounded-xl bg-red-950 px-4 py-3 text-sm text-red-200 shadow-xl md:bottom-6"
+          >
+            {controller.feedbackError}
+          </p>
+        )}
       </section>
     </ScrollArea.ScrollArea>
   )

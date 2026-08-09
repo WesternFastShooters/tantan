@@ -46,7 +46,9 @@ const Handler = memo(() => {
       }}
     >
       <PopoverTrigger
+        aria-label="全局弹出层锚点"
         className="pointer-events-none"
+        tabIndex={-1}
         style={
           popoverState.open
             ? { position: "fixed", top: popoverState.position.y, left: popoverState.position.x }

@@ -160,6 +160,16 @@ type FeedbackRequest struct {
 	TopicID *Identifier    \`json:"topicId,omitempty"\`
 }
 
+type SourceBlock struct {
+	SourceID  Identifier \`json:"sourceId"\`
+	Name      string     \`json:"name"\`
+	CreatedAt string     \`json:"createdAt"\`
+}
+
+type SourceBlocksResponse struct {
+	Items []SourceBlock \`json:"items"\`
+}
+
 type Source struct {
 	ID     Identifier \`json:"id"\`
 	Name   string     \`json:"name"\`
@@ -380,6 +390,16 @@ export interface FeedbackRequest {
   entryId: Identifier
   action: FeedbackAction
   topicId?: Identifier | null
+}
+
+export interface SourceBlock {
+  sourceId: Identifier
+  name: string
+  createdAt: string
+}
+
+export interface SourceBlocksResponse {
+  items: SourceBlock[]
 }
 
 export interface HomeCard {

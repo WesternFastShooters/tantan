@@ -86,6 +86,14 @@ describe("PopoverProvider", () => {
     vi.clearAllMocks()
   })
 
+  test("keeps the programmatic anchor named and outside the keyboard order", async () => {
+    ;({ container, root } = await renderProvider())
+
+    const trigger = container.querySelector('button[aria-haspopup="dialog"]')
+    expect(trigger?.getAttribute("aria-label")).toBe("全局弹出层锚点")
+    expect(trigger?.getAttribute("tabindex")).toBe("-1")
+  })
+
   test("closes when clicking outside", async () => {
     ;({ container, root } = await renderProvider())
 

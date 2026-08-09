@@ -222,7 +222,8 @@ def validate_openapi
   expected_paths = %w[
     /healthz /readyz /auth/folo/start /auth/folo/callback /auth/logout
     /tantan/v1/session /tantan/v1/home /tantan/v1/topics /tantan/v1/filter
-    /tantan/v1/recommendation/feedback /tantan/v1/search
+    /tantan/v1/recommendation/feedback /tantan/v1/recommendation/blocks/sources
+    /tantan/v1/recommendation/blocks/sources/{sourceId} /tantan/v1/search
     /tantan/v1/entries/{entryId}/enrichment /tantan/v1/settings/ai-provider
     /tantan/v1/settings/ai-provider/test /tantan/v1/sync/status /tantan/v1/sync
     /tantan/v1/diagnostics
@@ -250,6 +251,7 @@ def validate_openapi
   idempotent_ops = [
     ["/tantan/v1/filter", "put"],
     ["/tantan/v1/recommendation/feedback", "post"],
+    ["/tantan/v1/recommendation/blocks/sources/{sourceId}", "delete"],
     ["/tantan/v1/entries/{entryId}/enrichment", "post"]
   ]
   idempotent_ops.each do |route, method|

@@ -4,7 +4,7 @@ package gen
 
 import "encoding/json"
 
-const ContractSHA256 = "903356ee67d1365af86e53d2fe4e250415b75c5dc2c0767e6823e854a5a1016c"
+const ContractSHA256 = "c523f817478aea6d9cf629c094099ae6056d5b7bb3e0449bd71b276f5ce87532"
 
 type Identifier string
 type EntryType string
@@ -130,6 +130,16 @@ type FeedbackRequest struct {
 	EntryID Identifier     `json:"entryId"`
 	Action  FeedbackAction `json:"action"`
 	TopicID *Identifier    `json:"topicId,omitempty"`
+}
+
+type SourceBlock struct {
+	SourceID  Identifier `json:"sourceId"`
+	Name      string     `json:"name"`
+	CreatedAt string     `json:"createdAt"`
+}
+
+type SourceBlocksResponse struct {
+	Items []SourceBlock `json:"items"`
 }
 
 type Source struct {

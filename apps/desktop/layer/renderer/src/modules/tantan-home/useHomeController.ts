@@ -1,4 +1,4 @@
-import type { InfiniteData } from "@tanstack/react-query"
+import type { InfiniteData, QueryKey } from "@tanstack/react-query"
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router"
@@ -32,6 +32,21 @@ const fallbackTopic = {
   unreadCount: 0,
 } as const
 
+type FeedbackCommand = {
+  card: HomeCard
+  action: FeedbackRequest["action"]
+  topicId?: string
+}
+
+type HomeSnapshot = [QueryKey, InfiniteData<HomeResponse> | undefined]
+
+type UndoFeedback = {
+  entryId: string
+  label: string
+  snapshots: HomeSnapshot[]
+  expiresAt: number
+}
+
 export function useHomeController(scrollRef: React.RefObject<HTMLDivElement | null>) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -40,6 +55,8 @@ export function useHomeController(scrollRef: React.RefObject<HTMLDivElement | nu
   const activeFilterPrompt = useHomeViewStore((state) => state.activeFilterPrompt)
   const scrollY = useHomeViewStore((state) => state.scrollY)
   const [filterSheetOpen, setFilterSheetOpen] = useState(false)
+  const [undoFeedback, setUndoFeedback] = useState<UndoFeedback | null>(null)
+  const [feedbackError, setFeedbackError] = useState<string | null>(null)
   const filterTriggerRef = useRef<HTMLElement | null>(null)
 
   const topicsQuery = useQuery({
@@ -154,29 +171,70 @@ export function useHomeController(scrollRef: React.RefObject<HTMLDivElement | nu
   })
 
   const feedbackMutation = useMutation({
-    mutationFn: (body: FeedbackRequest) => postRecommendationFeedback(body),
-    onMutate: async (body) => {
+    mutationFn: ({ card, action, topicId }: FeedbackCommand) =>
+      postRecommendationFeedback({
+        entryId: card.entryId,
+        action,
+        ...(action === "block_topic" && topicId ? { topicId } : {}),
+      }),
+    onMutate: async ({ card }) => {
+      setFeedbackError(null)
+      setUndoFeedback(null)
       await queryClient.cancelQueries({ queryKey: homeQueryKeys.all })
       const snapshots = queryClient.getQueriesData<InfiniteData<HomeResponse>>({
         queryKey: homeQueryKeys.all,
       })
-      removeEntryFromAllHomeQueries(queryClient, body.entryId)
+      removeEntryFromAllHomeQueries(queryClient, card.entryId)
       return { snapshots }
     },
-    onError: (_error, _body, context) => {
+    onSuccess: (_result, command, context) => {
+      const label =
+        command.action === "block_source"
+          ? `已屏蔽 ${command.card.source.name}`
+          : command.action === "block_topic"
+            ? `已减少 ${command.card.topics[0]?.name ?? "该 Topic"}`
+            : "已减少此类推荐"
+      setUndoFeedback({
+        entryId: command.card.entryId,
+        label,
+        snapshots: context?.snapshots ?? [],
+        expiresAt: Date.now() + 5_000,
+      })
+    },
+    onError: (error, _command, context) => {
       context?.snapshots.forEach(([queryKey, data]) => queryClient.setQueryData(queryKey, data))
+      setFeedbackError(error instanceof Error ? error.message : "推荐反馈失败，卡片已恢复")
     },
   })
 
-  const notInterested = useCallback(
-    (card: HomeCard) => {
-      feedbackMutation.mutate({
-        entryId: card.entryId,
-        action: "not_interested",
-        topicId: activeTopicId,
-      })
+  const undoFeedbackMutation = useMutation({
+    mutationFn: (state: UndoFeedback) =>
+      postRecommendationFeedback({ entryId: state.entryId, action: "undo" }),
+    onMutate: () => setFeedbackError(null),
+    onSuccess: (_result, state) => {
+      state.snapshots.forEach(([queryKey, data]) => queryClient.setQueryData(queryKey, data))
+      setUndoFeedback(null)
     },
-    [activeTopicId, feedbackMutation],
+    onError: (error) => {
+      setFeedbackError(error instanceof Error ? error.message : "撤销失败")
+    },
+  })
+
+  useEffect(() => {
+    if (!undoFeedback) return
+    const timeout = window.setTimeout(
+      () => setUndoFeedback((current) => (current === undoFeedback ? null : current)),
+      Math.max(0, undoFeedback.expiresAt - Date.now()),
+    )
+    return () => window.clearTimeout(timeout)
+  }, [undoFeedback])
+
+  const sendFeedback = useCallback(
+    (card: HomeCard, action: FeedbackRequest["action"], topicId?: string) => {
+      if (action === "undo") return
+      feedbackMutation.mutate({ card, action, topicId })
+    },
+    [feedbackMutation],
   )
 
   return {
@@ -204,6 +262,12 @@ export function useHomeController(scrollRef: React.RefObject<HTMLDivElement | nu
     resetFilter: () => resetFilterMutation.mutate(),
     resetFilterPending: resetFilterMutation.isPending,
     saveCurrentScroll,
-    notInterested,
+    sendFeedback,
+    undoFeedback,
+    undoFeedbackPending: undoFeedbackMutation.isPending,
+    undoLastFeedback: () => {
+      if (undoFeedback) undoFeedbackMutation.mutate(undoFeedback)
+    },
+    feedbackError,
   }
 }

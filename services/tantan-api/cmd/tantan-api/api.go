@@ -73,6 +73,8 @@ func newLocalAPI(config localAPIConfig) (*localhttp.LocalMux, error) {
 	mux.HandleFunc(stdhttp.MethodPut, "/tantan/v1/filter", api.putFilter)
 	mux.HandleFunc(stdhttp.MethodDelete, "/tantan/v1/filter", api.deleteFilter)
 	mux.HandleFunc(stdhttp.MethodPost, "/tantan/v1/recommendation/feedback", api.feedback)
+	mux.HandleFunc(stdhttp.MethodGet, "/tantan/v1/recommendation/blocks/sources", api.listSourceBlocks)
+	mux.HandleFunc(stdhttp.MethodDelete, "/tantan/v1/recommendation/blocks/sources/{sourceId}", api.restoreSourceBlock)
 	mux.HandleFunc(stdhttp.MethodGet, "/tantan/v1/search", api.search)
 	mux.HandleFunc(stdhttp.MethodGet, "/tantan/v1/entries/{entryId}/enrichment", api.getEnrichment)
 	mux.HandleFunc(stdhttp.MethodPost, "/tantan/v1/entries/{entryId}/enrichment", api.ensureEnrichment)
@@ -219,6 +221,53 @@ func (api *localAPI) feedback(writer stdhttp.ResponseWriter, request *stdhttp.Re
 		return
 	}
 	writeLocalJSON(writer, stdhttp.StatusOK, result)
+}
+
+func (api *localAPI) listSourceBlocks(writer stdhttp.ResponseWriter, request *stdhttp.Request) {
+	record, ok := api.record(writer, request)
+	if !ok {
+		return
+	}
+	if !onlyQueryKeys(request.URL.Query()) {
+		writeLocalError(writer, request, stdhttp.StatusBadRequest, gen.ErrorCodeValidationError, "屏蔽列表参数无效", nil)
+		return
+	}
+	blocks, err := api.config.Feedback.ListSourceBlocks(request.Context(), record.User.ID)
+	if err != nil {
+		api.writeDomainError(writer, request, err)
+		return
+	}
+	items := make([]gen.SourceBlock, 0, len(blocks))
+	for _, block := range blocks {
+		items = append(items, gen.SourceBlock{
+			SourceID:  gen.Identifier(block.SourceID),
+			Name:      block.Name,
+			CreatedAt: block.CreatedAt,
+		})
+	}
+	writeLocalJSON(writer, stdhttp.StatusOK, gen.SourceBlocksResponse{Items: items})
+}
+
+func (api *localAPI) restoreSourceBlock(writer stdhttp.ResponseWriter, request *stdhttp.Request) {
+	record, ok := api.record(writer, request)
+	if !ok {
+		return
+	}
+	sourceID := request.PathValue("sourceId")
+	idempotencyKey := request.Header.Get("Idempotency-Key")
+	if !validIdentifier(sourceID) || !validIdempotencyKey(idempotencyKey) {
+		writeLocalError(writer, request, stdhttp.StatusBadRequest, gen.ErrorCodeValidationError, "Source 恢复请求无效", nil)
+		return
+	}
+	if err := api.config.Feedback.RestoreSourceBlock(request.Context(), recommendation.RestoreSourceBlockRequest{
+		UserID:         record.User.ID,
+		SourceID:       sourceID,
+		IdempotencyKey: idempotencyKey,
+	}); err != nil {
+		api.writeDomainError(writer, request, err)
+		return
+	}
+	writeLocalJSON(writer, stdhttp.StatusOK, recommendation.FeedbackResult{Applied: true})
 }
 
 func (api *localAPI) search(writer stdhttp.ResponseWriter, request *stdhttp.Request) {

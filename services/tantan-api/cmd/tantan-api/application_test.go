@@ -206,6 +206,36 @@ func TestApplicationAuthenticatedHomeTopicsSearchAndStrictAISettings(t *testing.
 	if afterSearch.Code != stdhttp.StatusOK || !strings.Contains(afterSearch.Body.String(), `"id":"`+queueID+`"`) {
 		t.Fatalf("search mutated home queue: %s", afterSearch.Body.String())
 	}
+	doWithKey := func(method, path string, body []byte, idempotencyKey string) *httptest.ResponseRecorder {
+		t.Helper()
+		request := httptest.NewRequest(method, "http://127.0.0.1:3000"+path, bytes.NewReader(body))
+		request.Host = "127.0.0.1:3000"
+		request.AddCookie(&stdhttp.Cookie{Name: session.LocalCookieName, Value: rawSession})
+		request.Header.Set("Origin", "http://127.0.0.1:5173")
+		request.Header.Set("Idempotency-Key", idempotencyKey)
+		if body != nil {
+			request.Header.Set("Content-Type", "application/json")
+		}
+		response := httptest.NewRecorder()
+		application.Handler.ServeHTTP(response, request)
+		return response
+	}
+	blocked := doWithKey(stdhttp.MethodPost, "/tantan/v1/recommendation/feedback", []byte(`{"entryId":"entry_api","action":"block_source"}`), "application-block-key-0001")
+	if blocked.Code != stdhttp.StatusOK {
+		t.Fatalf("block Source status=%d body=%s", blocked.Code, blocked.Body.String())
+	}
+	blocks := do(stdhttp.MethodGet, "/tantan/v1/recommendation/blocks/sources", nil)
+	if blocks.Code != stdhttp.StatusOK || !strings.Contains(blocks.Body.String(), `"sourceId":"feed_api"`) || !strings.Contains(blocks.Body.String(), `"name":"API Source"`) {
+		t.Fatalf("list Source blocks status=%d body=%s", blocks.Code, blocks.Body.String())
+	}
+	restored := doWithKey(stdhttp.MethodDelete, "/tantan/v1/recommendation/blocks/sources/feed_api", nil, "application-restore-key-0001")
+	if restored.Code != stdhttp.StatusOK {
+		t.Fatalf("restore Source status=%d body=%s", restored.Code, restored.Body.String())
+	}
+	blocks = do(stdhttp.MethodGet, "/tantan/v1/recommendation/blocks/sources", nil)
+	if blocks.Code != stdhttp.StatusOK || !strings.Contains(blocks.Body.String(), `"items":[]`) {
+		t.Fatalf("Source block remained status=%d body=%s", blocks.Code, blocks.Body.String())
+	}
 
 	canary := "sk-tantan-api-contract-canary"
 	invalidSettings := do(stdhttp.MethodPut, "/tantan/v1/settings/ai-provider", []byte(`{"providerId":"openai","model":"gpt-5-mini","apiKey":"`+canary+`","baseUrl":"https://attacker.invalid"}`))
