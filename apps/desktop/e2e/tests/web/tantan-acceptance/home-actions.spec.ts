@@ -141,8 +141,16 @@ test.describe("Tantan acceptance Home actions", () => {
     await page.getByRole("button", { name: "更多操作：Feedback succeeds" }).click()
     await page.getByRole("button", { name: "不感兴趣" }).click()
     await expect(page.getByText("Feedback succeeds", { exact: true })).toHaveCount(0)
-    await expect(page.getByRole("button", { name: "撤销推荐反馈" })).toBeVisible()
-    await page.getByRole("button", { name: "撤销推荐反馈" }).click()
+    const undoFeedback = page.getByRole("button", { name: "撤销推荐反馈" })
+    await expect(undoFeedback).toBeVisible()
+    const undoLayer = await undoFeedback.evaluate((element) =>
+      Number(getComputedStyle(element.closest("aside")!).zIndex),
+    )
+    const navigationLayer = await page
+      .getByRole("tablist", { name: "主导航" })
+      .evaluate((element) => Number(getComputedStyle(element).zIndex))
+    expect(undoLayer).toBeGreaterThan(navigationLayer)
+    await undoFeedback.click()
     await expect(page.getByText("Feedback succeeds", { exact: true })).toBeVisible()
 
     await page.getByRole("button", { name: "更多操作：Feedback fails" }).click()

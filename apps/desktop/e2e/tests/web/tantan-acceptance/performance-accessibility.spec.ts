@@ -100,7 +100,7 @@ test.describe("Tantan acceptance Performance and Accessibility", () => {
     await page.emulateMedia({ reducedMotion: "reduce" })
     await mockHome(page, 4)
     await page.goto(buildWebAppURL(resolveDesktopE2EEnv()), { waitUntil: "domcontentloaded" })
-    await expect(page.getByRole("navigation", { name: "Mobile navigation" })).toBeVisible()
+    await expect(page.getByRole("tablist", { name: "主导航" })).toBeVisible()
 
     const reduced = await page
       .getByTestId("home-card")

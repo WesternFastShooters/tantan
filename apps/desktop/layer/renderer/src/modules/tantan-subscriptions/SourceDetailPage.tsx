@@ -3,7 +3,7 @@ import { useEntriesQuery, useEntryList } from "@follow/store/entry/hooks"
 import { useFeedById, usePrefetchFeed } from "@follow/store/feed/hooks"
 import { useSubscriptionByFeedId } from "@follow/store/subscription/hooks"
 import { subscriptionSyncService } from "@follow/store/subscription/store"
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { Link, useParams } from "react-router"
 
 import { EntryListRow } from "~/modules/tantan-entry/EntryListRow"
@@ -18,9 +18,11 @@ export function SourceDetailPage() {
   const entries = useEntryList(entriesQuery.entriesIds).filter((entry) => entry !== null)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const mutationLocked = useRef(false)
 
   const toggleSubscription = async () => {
-    if (!feed) return
+    if (!feed || mutationLocked.current) return
+    mutationLocked.current = true
     setPending(true)
     setError(null)
     try {
@@ -41,6 +43,7 @@ export function SourceDetailPage() {
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "订阅操作失败")
     } finally {
+      mutationLocked.current = false
       setPending(false)
     }
   }

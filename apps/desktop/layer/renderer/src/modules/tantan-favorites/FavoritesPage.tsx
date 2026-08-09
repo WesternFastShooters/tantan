@@ -3,7 +3,7 @@ import { collectionSyncService } from "@follow/store/collection/store"
 import { useEntriesQuery, useEntryList } from "@follow/store/entry/hooks"
 import type { EntryModel } from "@follow/store/entry/types"
 import { useFeedById } from "@follow/store/feed/hooks"
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { Link } from "react-router"
 
 import { EntryListRow } from "~/modules/tantan-entry/EntryListRow"
@@ -11,30 +11,45 @@ import { EntryListRow } from "~/modules/tantan-entry/EntryListRow"
 const FavoriteRow = ({ entry }: { entry: EntryModel }) => {
   const feed = useFeedById(entry.feedId)
   const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const mutationLocked = useRef(false)
   return (
-    <EntryListRow
-      entry={entry}
-      feed={feed}
-      view={FeedViewType.All}
-      action={
-        <button
-          type="button"
-          aria-label={`取消收藏 ${entry.title || "无标题"}`}
-          disabled={pending}
-          onClick={async () => {
-            setPending(true)
-            try {
-              await collectionSyncService.unstarEntry({ entryId: entry.id })
-            } finally {
-              setPending(false)
-            }
-          }}
-          className="flex size-11 shrink-0 items-center justify-center rounded-lg text-orange-400 outline-none hover:bg-orange-500/10 focus-visible:ring-2 focus-visible:ring-orange-500 disabled:opacity-50"
-        >
-          <i className="i-mgc-star-cute-fi size-5" aria-hidden />
-        </button>
-      }
-    />
+    <div>
+      <EntryListRow
+        entry={entry}
+        feed={feed}
+        view={FeedViewType.All}
+        action={
+          <button
+            type="button"
+            aria-label={`取消收藏 ${entry.title || "无标题"}`}
+            disabled={pending}
+            onClick={async () => {
+              if (mutationLocked.current) return
+              mutationLocked.current = true
+              setPending(true)
+              setError(null)
+              try {
+                await collectionSyncService.unstarEntry({ entryId: entry.id })
+              } catch (reason) {
+                setError(reason instanceof Error ? reason.message : "取消收藏失败")
+              } finally {
+                mutationLocked.current = false
+                setPending(false)
+              }
+            }}
+            className="flex size-11 shrink-0 items-center justify-center rounded-lg text-orange-400 outline-none hover:bg-orange-500/10 focus-visible:ring-2 focus-visible:ring-orange-500 disabled:opacity-50"
+          >
+            <i className="i-mgc-star-cute-fi size-5" aria-hidden />
+          </button>
+        }
+      />
+      {error && (
+        <p role="alert" className="mt-1 rounded-xl bg-red-500/10 p-2 text-xs text-red-300">
+          {error}
+        </p>
+      )}
+    </div>
   )
 }
 

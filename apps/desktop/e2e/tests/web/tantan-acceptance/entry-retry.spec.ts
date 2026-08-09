@@ -63,6 +63,13 @@ const mockShell = async (page: Page) => {
       body: JSON.stringify({ data: true }),
     }),
   )
+  await page.route("**/api/folo/collections?**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ code: 0, data: false }),
+    }),
+  )
 }
 
 test("FE:TC-013 failed enrichment keeps original content and exposes retry", async ({ page }) => {

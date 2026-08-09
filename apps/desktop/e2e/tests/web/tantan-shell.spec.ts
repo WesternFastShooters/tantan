@@ -54,6 +54,13 @@ const mockSession = async (
       }),
     }),
   )
+  await page.route("**/api/folo/subscriptions**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ code: 0, data: [] }),
+    }),
+  )
   await page.route("**/api/tantan/v1/topics", (route) =>
     route.fulfill({
       status: 200,

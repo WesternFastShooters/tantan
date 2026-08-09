@@ -98,6 +98,7 @@ test.describe("Tantan acceptance Search and Detail", () => {
     await mockSession(page)
     const entryId = "309246809866240002"
     let collectionMethod = ""
+    let collectionMutations = 0
     await page.route("**/api/folo/entries?**", (route) =>
       route.fulfill({
         status: 200,
@@ -135,8 +136,26 @@ test.describe("Tantan acceptance Search and Detail", () => {
         body: JSON.stringify({ data: true }),
       }),
     )
-    await page.route("**/api/folo/collections", (route) => {
+    await page.route("**/api/folo/collections**", (route) => {
       collectionMethod = route.request().method()
+      if (collectionMethod === "GET") {
+        return route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ code: 0, data: false }),
+        })
+      }
+      collectionMutations += 1
+      if (collectionMutations === 1) {
+        return route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({
+            requestId: "collection-failure",
+            error: { code: "UPSTREAM_UNAVAILABLE", message: "收藏服务暂不可用", retryable: true },
+          }),
+        })
+      }
       return route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -176,8 +195,17 @@ test.describe("Tantan acceptance Search and Detail", () => {
     await expect(sourceLink).toHaveAttribute("target", "_blank")
     await expect(sourceLink).toHaveAttribute("rel", /noreferrer/)
     await expect(sourceLink).toHaveAttribute("rel", /noopener/)
+    await page.getByRole("button", { name: "收藏" }).evaluate((button) => {
+      button.click()
+      button.click()
+    })
+    await expect.poll(() => collectionMutations).toBe(1)
+    await expect(page.getByRole("alert")).toContainText("收藏服务暂不可用")
+    await expect(page.getByRole("button", { name: "收藏" })).toBeVisible()
+
     await page.getByRole("button", { name: "收藏" }).click()
     await expect.poll(() => collectionMethod).toBe("POST")
+    await expect.poll(() => collectionMutations).toBe(2)
     await expect(page.getByRole("button", { name: "取消收藏" })).toBeVisible()
   })
 })

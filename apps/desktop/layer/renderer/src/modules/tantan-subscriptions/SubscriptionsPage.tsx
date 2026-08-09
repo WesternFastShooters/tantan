@@ -2,7 +2,7 @@ import { FeedViewType } from "@follow/constants"
 import { useFeedsByIds } from "@follow/store/feed/hooks"
 import { useAllFeedSubscription, usePrefetchSubscription } from "@follow/store/subscription/hooks"
 import { subscriptionSyncService } from "@follow/store/subscription/store"
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { Link } from "react-router"
 
 import { TantanShellPage } from "~/modules/tantan-shell/TantanAppShell"
@@ -15,6 +15,7 @@ export function SubscriptionsPage() {
   const [url, setURL] = useState("")
   const [mutationError, setMutationError] = useState<string | null>(null)
   const [pendingId, setPendingId] = useState<string | null>(null)
+  const mutationLocks = useRef(new Set<string>())
   const subscriptionQuery = usePrefetchSubscription()
   const subscriptions = useAllFeedSubscription()
   const filtered = useMemo(
@@ -38,7 +39,8 @@ export function SubscriptionsPage() {
 
   const subscribe = async () => {
     const value = url.trim()
-    if (!value) return
+    if (!value || mutationLocks.current.has("add")) return
+    mutationLocks.current.add("add")
     setPendingId("add")
     setMutationError(null)
     try {
@@ -57,11 +59,14 @@ export function SubscriptionsPage() {
     } catch (error) {
       setMutationError(error instanceof Error ? error.message : "添加订阅失败")
     } finally {
+      mutationLocks.current.delete("add")
       setPendingId(null)
     }
   }
 
   const unsubscribe = async (feedId: string) => {
+    if (mutationLocks.current.has(feedId)) return
+    mutationLocks.current.add(feedId)
     setPendingId(feedId)
     setMutationError(null)
     try {
@@ -69,6 +74,7 @@ export function SubscriptionsPage() {
     } catch (error) {
       setMutationError(error instanceof Error ? error.message : "取消订阅失败")
     } finally {
+      mutationLocks.current.delete(feedId)
       setPendingId(null)
     }
   }

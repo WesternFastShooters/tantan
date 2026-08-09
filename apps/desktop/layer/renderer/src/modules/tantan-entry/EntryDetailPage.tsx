@@ -10,7 +10,12 @@ import { useLocation, useNavigate, useParams } from "react-router"
 import type { HomeCard } from "~/lib/tantan-api/gen/types"
 import { removeEntryFromAllHomeQueries } from "~/modules/tantan-home/home-cache"
 
-import { getEntryDetail } from "./entry-api"
+import {
+  getEntryCollectionStatus,
+  getEntryDetail,
+  markEntryAsReadDirect,
+  updateEntryCollectionDirect,
+} from "./entry-api"
 import { useEntryEnrichment } from "./useEntryEnrichment"
 
 const safeURL = (value: string | null | undefined) => {
@@ -46,12 +51,20 @@ export function EntryDetailPage() {
   })
   const resolvedEntry = entry ?? detailQuery.data
   const enrichment = useEntryEnrichment(entryId)
-  const starred = useIsEntryStarred(entryId)
+  const storeStarred = useIsEntryStarred(entryId)
+  const collectionStatusQuery = useQuery({
+    queryKey: ["tantan", "entry", entryId, "collection"],
+    queryFn: ({ signal }) => getEntryCollectionStatus(entryId, signal),
+    enabled: entryId.length > 0 && Boolean(resolvedEntry) && !entry,
+    staleTime: 30_000,
+  })
+  const [directStarred, setDirectStarred] = useState<boolean | null>(null)
   const [readError, setReadError] = useState<string | null>(null)
   const [collectionError, setCollectionError] = useState<string | null>(null)
   const [collectionPending, setCollectionPending] = useState(false)
   const [showTranslation, setShowTranslation] = useState(false)
   const attemptedEntryIdRef = useRef<string | null>(null)
+  const collectionMutationLocked = useRef(false)
 
   useEffect(() => {
     if (!resolvedEntry || !entryId || attemptedEntryIdRef.current === entryId) return
@@ -60,14 +73,16 @@ export function EntryDetailPage() {
       removeEntryFromAllHomeQueries(queryClient, entryId)
       return
     }
-    unreadSyncService
-      .markEntryAsRead(entryId)
+    const markRead = entry
+      ? unreadSyncService.markEntryAsRead(entryId)
+      : markEntryAsReadDirect(entryId)
+    markRead
       .then(() => removeEntryFromAllHomeQueries(queryClient, entryId))
       .catch((error: unknown) => {
         attemptedEntryIdRef.current = null
         setReadError(error instanceof Error ? error.message : "已读同步失败")
       })
-  }, [entryId, queryClient, resolvedEntry])
+  }, [entry, entryId, queryClient, resolvedEntry])
 
   const sourceURL = safeURL(resolvedEntry?.url)
   const content = useMemo(
@@ -91,17 +106,25 @@ export function EntryDetailPage() {
         : card?.type === "post"
           ? FeedViewType.SocialMedia
           : FeedViewType.Articles
+  const starred = directStarred ?? (entry ? storeStarred : (collectionStatusQuery.data ?? false))
 
   const toggleCollection = async () => {
-    if (!resolvedEntry) return
+    if (!resolvedEntry || collectionMutationLocked.current) return
+    collectionMutationLocked.current = true
     setCollectionPending(true)
     setCollectionError(null)
     try {
-      if (starred) await collectionSyncService.unstarEntry({ entryId })
-      else await collectionSyncService.starEntry({ entryId, view: collectionView })
+      if (entry) {
+        if (starred) await collectionSyncService.unstarEntry({ entryId })
+        else await collectionSyncService.starEntry({ entryId, view: collectionView })
+      } else {
+        await updateEntryCollectionDirect(entryId, collectionView, !starred)
+        setDirectStarred(!starred)
+      }
     } catch (error) {
       setCollectionError(error instanceof Error ? error.message : "收藏同步失败")
     } finally {
+      collectionMutationLocked.current = false
       setCollectionPending(false)
     }
   }
@@ -121,7 +144,7 @@ export function EntryDetailPage() {
         <button
           type="button"
           aria-label={starred ? "取消收藏" : "收藏"}
-          disabled={!resolvedEntry || collectionPending}
+          disabled={!resolvedEntry || collectionPending || collectionStatusQuery.isPending}
           onClick={toggleCollection}
           className="flex size-11 items-center justify-center rounded-full text-orange-400 outline-none hover:bg-orange-500/10 focus-visible:ring-2 focus-visible:ring-orange-500 disabled:opacity-40"
         >

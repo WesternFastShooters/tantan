@@ -92,7 +92,18 @@ export const followClient = new FollowClient({
   timeout: 60_000,
   baseURL: foloAPIURL,
   fetch: async (input, options = {}) => {
-    const request = new Request(input.toString(), {
+    let requestURL = input.toString()
+    if (!isElectronRuntime() && typeof window !== "undefined") {
+      const parsed = new URL(requestURL)
+      if (parsed.origin !== window.location.origin) {
+        throw new Error("Folo browser requests must remain same-origin")
+      }
+      if (parsed.pathname !== "/api/folo" && !parsed.pathname.startsWith("/api/folo/")) {
+        parsed.pathname = `/api/folo${parsed.pathname}`
+      }
+      requestURL = parsed.toString()
+    }
+    const request = new Request(requestURL, {
       ...options,
       cache: "no-store",
     })

@@ -72,6 +72,12 @@ describe("SettingsRoute account boundary", () => {
 
     expect(container.textContent).toContain("Mingrui")
     expect(container.textContent).toContain("mingrui@example.com")
+    expect(container.querySelectorAll("[data-settings-group]").length).toBeGreaterThanOrEqual(2)
+    expect(container.textContent).not.toMatch(/Plan|Power|Wallet|升级|额度|会员/u)
+    expect(container.querySelector<HTMLAnchorElement>('a[href="/settings/general"]')).not.toBeNull()
+    expect(
+      container.querySelector<HTMLAnchorElement>('a[href="/settings/appearance"]'),
+    ).not.toBeNull()
     const logout = Array.from(container.querySelectorAll("button")).find((button) =>
       button.textContent?.includes("退出登录"),
     )

@@ -76,7 +76,7 @@ export function HomePage() {
         {controller.undoFeedback && (
           <aside
             role="status"
-            className="fixed bottom-20 left-1/2 z-40 flex min-h-12 -translate-x-1/2 items-center gap-3 rounded-xl border border-white/10 bg-zinc-900 px-4 text-sm text-zinc-100 shadow-xl md:bottom-6"
+            className="fixed bottom-20 left-1/2 z-50 flex min-h-12 -translate-x-1/2 items-center gap-3 rounded-xl border border-white/10 bg-zinc-900 px-4 text-sm text-zinc-100 shadow-xl"
           >
             <span>{controller.undoFeedback.label}</span>
             <button
@@ -93,7 +93,7 @@ export function HomePage() {
         {controller.feedbackError && (
           <p
             role="alert"
-            className="fixed bottom-20 left-1/2 z-40 -translate-x-1/2 rounded-xl bg-red-950 px-4 py-3 text-sm text-red-200 shadow-xl md:bottom-6"
+            className="fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-xl bg-red-950 px-4 py-3 text-sm text-red-200 shadow-xl"
           >
             {controller.feedbackError}
           </p>
@@ -101,7 +101,7 @@ export function HomePage() {
         {controller.queueRefreshNotice && (
           <p
             role="status"
-            className="fixed bottom-20 left-1/2 z-40 -translate-x-1/2 rounded-xl bg-zinc-900 px-4 py-3 text-sm text-zinc-100 shadow-xl md:bottom-6"
+            className="fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-xl bg-zinc-900 px-4 py-3 text-sm text-zinc-100 shadow-xl"
           >
             {controller.queueRefreshNotice}
           </p>

@@ -1,3 +1,5 @@
+import type { FeedViewType } from "@follow/constants"
+
 import { tantanRequest } from "~/lib/tantan-api/client"
 
 export interface EntryDetail {
@@ -42,3 +44,28 @@ export const getEntryDetail = async (entryId: string, signal?: AbortSignal) => {
     read: entry.read === true,
   } satisfies EntryDetail
 }
+
+export const markEntryAsReadDirect = (entryId: string) =>
+  tantanRequest<{ data: null }>("/api/folo/reads", {
+    method: "POST",
+    body: JSON.stringify({ entryIds: [entryId], isInbox: false }),
+  })
+
+export const getEntryCollectionStatus = async (entryId: string, signal?: AbortSignal) => {
+  const search = new URLSearchParams({ entryId })
+  const response = await tantanRequest<{ data: boolean | null }>(
+    `/api/folo/collections?${search}`,
+    { signal },
+  )
+  return response.data === true
+}
+
+export const updateEntryCollectionDirect = (
+  entryId: string,
+  view: FeedViewType,
+  starred: boolean,
+) =>
+  tantanRequest<void>("/api/folo/collections", {
+    method: starred ? "POST" : "DELETE",
+    body: JSON.stringify(starred ? { entryId, view } : { entryId }),
+  })

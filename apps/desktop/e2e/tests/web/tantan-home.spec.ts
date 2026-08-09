@@ -76,6 +76,13 @@ const mockSession = async (page: Page) => {
       body: JSON.stringify(sessionResponse),
     }),
   )
+  await page.route("**/api/folo/collections?**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ code: 0, data: false }),
+    }),
+  )
 }
 
 test.describe("Tantan Home", () => {
@@ -136,11 +143,19 @@ test.describe("Tantan Home", () => {
     await page.getByTestId("home-pagination-sentinel").scrollIntoViewIfNeeded()
     await expect.poll(() => homeCalls).toBe(3)
     const lastCard = page.locator('[data-entry-id="059"]')
-    await expect(lastCard).toHaveCount(1)
-    await page.getByTestId("home-scroll-viewport").evaluate((element) => {
-      element.scrollTop = element.scrollHeight
-      element.dispatchEvent(new Event("scroll"))
-    })
+    const viewport = page.getByTestId("home-scroll-viewport")
+    await expect
+      .poll(async () => {
+        await viewport.evaluate(async (element) => {
+          element.scrollTop = element.scrollHeight
+          element.dispatchEvent(new Event("scroll"))
+          await new Promise<void>((resolve) => {
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+          })
+        })
+        return lastCard.count()
+      })
+      .toBe(1)
     await expect(lastCard).toBeVisible()
     await expect(page.getByText("今天已经看完", { exact: true })).toBeVisible()
 
@@ -363,11 +378,94 @@ test.describe("Tantan Home", () => {
     await page.goto(buildWebAppURL(resolveDesktopE2EEnv()), { waitUntil: "domcontentloaded" })
     await page.getByRole("link", { name: "阅读：Read me" }).click()
     await expect(page).toHaveURL(new RegExp(`/entries/${entryId}$`))
-    await expect(page.getByRole("navigation", { name: "Mobile navigation" })).toHaveCount(0)
+    await expect(page.getByRole("tablist", { name: "主导航" })).toHaveCount(0)
     await expect(page.getByRole("heading", { name: "Read me" })).toBeVisible()
 
     await page.getByRole("button", { name: "返回首页" }).click()
     await expect(page).toHaveURL(/\/$/)
     await expect(page.locator(`[data-entry-id="${entryId}"]`)).toHaveCount(0)
+  })
+
+  test("REQ:FE-03 read failure reports the error and preserves the Home card", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await mockSession(page)
+    const entryId = "309246809866240005"
+    await page.route("**/api/tantan/v1/topics", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          version: 1,
+          topicsRevision: 1,
+          activeFilterId: null,
+          topics: [topic("recommend", "推荐")],
+        }),
+      }),
+    )
+    await page.route("**/api/tantan/v1/home?**", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(
+          homePage([card(entryId, "article", "Keep me")], null, "generation-read-fail", 1),
+        ),
+      }),
+    )
+    await page.route("**/api/folo/entries?**", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: {
+            entries: {
+              id: entryId,
+              title: "Keep me",
+              url: "https://example.com/keep-me",
+              content: "Entry body",
+              description: "Entry description",
+              guid: entryId,
+              author: "Author",
+              authorUrl: null,
+              authorAvatar: null,
+              insertedAt: "2026-08-09T12:00:00Z",
+              publishedAt: "2026-08-09T12:00:00Z",
+              media: null,
+              categories: null,
+              attachments: null,
+              extra: null,
+              language: "en",
+              read: false,
+            },
+            feeds: { id: "feed-1", type: "feed" },
+            settings: null,
+          },
+        }),
+      }),
+    )
+    await page.route(`**/api/tantan/v1/entries/${entryId}/enrichment?**`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ state: "pending", data: null, error: null }),
+      }),
+    )
+    await page.route("**/api/folo/reads", (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({
+          requestId: "read-failure",
+          error: { code: "UPSTREAM_UNAVAILABLE", message: "Folo unavailable", retryable: true },
+        }),
+      }),
+    )
+
+    await page.goto(buildWebAppURL(resolveDesktopE2EEnv()), { waitUntil: "domcontentloaded" })
+    await page.getByRole("link", { name: "阅读：Keep me" }).click()
+    await expect(page.getByRole("alert")).toContainText("卡片已保留")
+    await page.getByRole("button", { name: "返回首页" }).click()
+
+    await expect(page).toHaveURL(/\/$/)
+    await expect(page.locator(`[data-entry-id="${entryId}"]`)).toHaveCount(1)
   })
 })

@@ -67,6 +67,13 @@ const mockSession = async (page: Page) => {
       body: JSON.stringify(sessionResponse),
     }),
   )
+  await page.route("**/api/tantan/v1/recommendation/blocks/sources", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ items: [] }),
+    }),
+  )
 }
 
 test.describe("Tantan phase-one flows", () => {
@@ -403,7 +410,7 @@ test.describe("Tantan phase-one flows", () => {
         body: JSON.stringify({ data: true }),
       }),
     )
-    await page.route("**/api/folo/collections", (route) => {
+    await page.route("**/api/folo/collections**", (route) => {
       collectionMethod = route.request().method()
       return route.fulfill({
         status: 200,
