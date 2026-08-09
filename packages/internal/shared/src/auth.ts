@@ -1,4 +1,3 @@
-import { stripeClient } from "@better-auth/stripe/client"
 import { IN_ELECTRON } from "@follow/shared"
 import type { AuthPlugins } from "@follow-app/client-sdk/auth"
 import type {
@@ -55,7 +54,6 @@ export const baseAuthPlugins = [
     },
   }),
   twoFactorClient(),
-  stripeClient({ subscription: true }),
   lastLoginMethodClient(),
   magicLinkClient(),
 ] as const satisfies readonly BetterAuthClientPlugin[]

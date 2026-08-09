@@ -3,14 +3,14 @@ import { RSSHubLogo } from "@follow/components/ui/platform-icon/icons.js"
 import { RootPortal } from "@follow/components/ui/portal/index.js"
 import { EllipsisHorizontalTextWithTooltip } from "@follow/components/ui/typography/EllipsisWithTooltip.js"
 import { useMeasure } from "@follow/hooks"
-import { useUserRole, useWhoami } from "@follow/store/user/hooks"
+import { useWhoami } from "@follow/store/user/hooks"
 import { cn } from "@follow/utils/utils"
 import type { FC } from "react"
 import { memo, useCallback, useLayoutEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 
-import { useIsInMASReview, useServerConfigs } from "~/atoms/server-configs"
+import { useIsInMASReview } from "~/atoms/server-configs"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,39 +19,31 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu/dropdown-menu"
-import { useFeature } from "~/hooks/biz/useFeature"
 import { UrlBuilder } from "~/lib/url-builder"
 import { usePresentUserProfileModal } from "~/modules/profile/hooks"
 import { useSettingModal } from "~/modules/settings/modal/use-setting-modal-hack"
 import { signOut, useSession } from "~/queries/auth"
-import { useWallet } from "~/queries/wallet"
 
 import type { LoginProps } from "./LoginButton"
 import { LoginButton } from "./LoginButton"
 import { UserAvatar } from "./UserAvatar"
-import { UserProBadge } from "./UserProBadge"
 
 export type ProfileButtonProps = LoginProps & {
   animatedAvatar?: boolean
 }
 
 export const ProfileButton: FC<ProfileButtonProps> = memo((props) => {
-  const serverConfig = useServerConfigs()
   const { status, session } = useSession()
   const whoami = useWhoami()
   const user = session?.user ?? whoami
   const settingModalPresent = useSettingModal()
   const presentUserProfile = usePresentUserProfileModal("dialog")
   const { t } = useTranslation()
-  const aiEnabled = useFeature("ai")
-  const wallet = useWallet()
-  const hasPowerToken = !!wallet.data?.[0]?.powerToken
 
   const [dropdown, setDropdown] = useState(false)
 
   const navigate = useNavigate()
 
-  const role = useUserRole()
   const isInMASReview = useIsInMASReview()
 
   if (status !== "authenticated" && !user) {
@@ -86,66 +78,18 @@ export const ProfileButton: FC<ProfileButtonProps> = memo((props) => {
             <EllipsisHorizontalTextWithTooltip className="mx-auto max-w-[20ch] truncate text-lg">
               {user?.name}
             </EllipsisHorizontalTextWithTooltip>
-            {!isInMASReview && serverConfig?.PAYMENT_ENABLED ? (
-              <UserProBadge
-                role={role}
-                withText
-                className="mt-0.5 w-full justify-center"
-                onClick={() => {
-                  settingModalPresent("plan")
-                }}
-              />
-            ) : (
-              <>
-                {!!user?.handle && (
-                  <a href={UrlBuilder.profile(user.handle)} target="_blank" className="block">
-                    <EllipsisHorizontalTextWithTooltip className="mt-0.5 truncate text-xs font-medium text-zinc-500">
-                      @{user.handle}
-                    </EllipsisHorizontalTextWithTooltip>
-                  </a>
-                )}
-              </>
+            {!!user?.handle && (
+              <a href={UrlBuilder.profile(user.handle)} target="_blank" className="block">
+                <EllipsisHorizontalTextWithTooltip className="mt-0.5 truncate text-xs font-medium text-zinc-500">
+                  @{user.handle}
+                </EllipsisHorizontalTextWithTooltip>
+              </a>
             )}
           </div>
         </DropdownMenuLabel>
 
         <DropdownMenuSeparator />
 
-        {!isInMASReview && serverConfig?.PAYMENT_ENABLED && (
-          <DropdownMenuItem
-            className="pl-3"
-            onClick={() => {
-              settingModalPresent("plan")
-            }}
-            icon={<i className="i-mgc-power-outline" />}
-          >
-            {t("activation.plan.title")}
-          </DropdownMenuItem>
-        )}
-
-        {aiEnabled && (
-          <DropdownMenuItem
-            className="pl-3"
-            onClick={() => {
-              navigate("/ai")
-            }}
-            icon={<i className="i-mgc-ai-cute-re" />}
-          >
-            {t("user_button.ai")}
-          </DropdownMenuItem>
-        )}
-
-        {!isInMASReview && hasPowerToken && (
-          <DropdownMenuItem
-            className="pl-3"
-            onClick={() => {
-              navigate("/power")
-            }}
-            icon={<i className="i-mgc-power-outline" />}
-          >
-            {t("user_button.wallet")}
-          </DropdownMenuItem>
-        )}
         <DropdownMenuItem
           className="pl-3"
           onClick={() => {

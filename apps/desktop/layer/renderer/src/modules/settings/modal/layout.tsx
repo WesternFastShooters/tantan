@@ -19,7 +19,6 @@ import { resizableOnly } from "~/components/ui/modal"
 import { useModalResizeAndDrag } from "~/components/ui/modal/stacked/internal/use-drag"
 import { ElECTRON_CUSTOM_TITLEBAR_HEIGHT } from "~/constants"
 import { useRequireLogin } from "~/hooks/common/useRequireLogin"
-import { useUpgradePlanModal } from "~/modules/plan"
 
 import { isGuestAccessibleSettingTab, SETTING_MODAL_ID } from "../constants"
 import { EnhancedSettingsIndicator } from "../helper/EnhancedIndicator"
@@ -174,8 +173,6 @@ const SettingItemButtonImpl = (props: {
   ]
   const disabled = guestLocked || disabledByConfig
   const why = disabledByConfig ? whyFromConfig : DisableWhy.Noop
-  const presentActivationModal = useUpgradePlanModal()
-
   return (
     <button
       data-testid={`settings-tab-${path}`}
@@ -196,7 +193,6 @@ const SettingItemButtonImpl = (props: {
         if (disabled) {
           switch (why) {
             case DisableWhy.NotActivation: {
-              presentActivationModal()
               return
             }
             case DisableWhy.Noop: {
@@ -206,7 +202,7 @@ const SettingItemButtonImpl = (props: {
         }
         setTab(path)
         onChange?.(path)
-      }, [disabled, ensureLogin, guestLocked, onChange, path, presentActivationModal, setTab, why])}
+      }, [disabled, ensureLogin, guestLocked, onChange, path, setTab, why])}
     >
       <SettingsSidebarTitle path={path} className="text-[0.94rem] font-medium" />
     </button>

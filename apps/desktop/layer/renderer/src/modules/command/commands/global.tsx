@@ -2,7 +2,6 @@ import { EventBus } from "@follow/utils/event-bus"
 import { useTranslation } from "react-i18next"
 
 import { setAppSearchOpen } from "~/atoms/app"
-import { getAIPanelVisibility, setAIPanelVisibility } from "~/atoms/settings/ai"
 import { useShortcutsModal } from "~/modules/modal/hooks/useShortcutsModal"
 
 import { useRegisterCommandEffect } from "../hooks/use-register-command"
@@ -68,20 +67,6 @@ export const useRegisterGlobalCommands = () => {
       },
       category,
     },
-
-    {
-      id: COMMAND_ID.global.toggleAIChat,
-      label: {
-        title: t("command.global.toggle_ai_chat.title"),
-        description: t("command.global.toggle_ai_chat.description"),
-      },
-      run: () => {
-        const isVisible = getAIPanelVisibility()
-        setAIPanelVisibility(!isVisible)
-      },
-
-      category,
-    },
   ])
 }
 
@@ -100,19 +85,10 @@ export type QuickAddCommand = Command<{
   fn: () => void
 }>
 
-export type ToggleAIChatCommand = Command<{
-  id: typeof COMMAND_ID.global.toggleAIChat
-  fn: (ctx?: { entryId?: string }) => void
-}>
-
 export type QuickSearchCommand = Command<{
   id: typeof COMMAND_ID.global.quickSearch
   fn: () => void
 }>
 
 export type GlobalCommand =
-  | ShowShortcutsCommand
-  | ToggleCornerPlayCommand
-  | QuickAddCommand
-  | ToggleAIChatCommand
-  | QuickSearchCommand
+  ShowShortcutsCommand | ToggleCornerPlayCommand | QuickAddCommand | QuickSearchCommand

@@ -1,7 +1,7 @@
 import "./wdyr"
 import "./styles/main.css"
 
-import { IN_ELECTRON, WEB_BUILD } from "@follow/shared/constants"
+import { IN_ELECTRON } from "@follow/shared/constants"
 import { apiContext, authClientContext, queryClientContext } from "@follow/store/context"
 import { getOS } from "@follow/utils/utils"
 import * as React from "react"
@@ -24,12 +24,6 @@ queryClientContext.provide(queryClient)
 apiContext.provide(followApi)
 
 initializeApp().finally(() => {
-  import("./push-notification").then(({ registerWebPushNotifications }) => {
-    if (navigator.serviceWorker && WEB_BUILD) {
-      registerWebPushNotifications()
-    }
-  })
-
   flushSync(() => setAppIsReady(true))
 })
 

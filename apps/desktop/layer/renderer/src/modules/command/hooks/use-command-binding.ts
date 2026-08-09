@@ -50,7 +50,6 @@ export const defaultCommandShortcuts = {
   [COMMAND_ID.global.toggleCornerPlay]: "Space",
   [COMMAND_ID.global.quickAdd]: transformShortcut("$mod+N"),
   [COMMAND_ID.global.showShortcuts]: "?",
-  [COMMAND_ID.global.toggleAIChat]: transformShortcut("$mod+I"),
   [COMMAND_ID.global.quickSearch]: transformShortcut("$mod+K"),
 } as const
 

@@ -7,7 +7,6 @@ import { useIsInbox } from "@follow/store/inbox/hooks"
 import { cn } from "@follow/utils"
 import { useEffect, useMemo, useRef, useState } from "react"
 
-import { AIChatPanelStyle, useAIChatPanelStyle, useAIPanelVisibility } from "~/atoms/settings/ai"
 import { useUISettingKey } from "~/atoms/settings/ui"
 import { ErrorBoundary } from "~/components/common/ErrorBoundary"
 import { ShadowDOM } from "~/components/common/ShadowDOM"
@@ -50,11 +49,6 @@ export const ArticleLayout: React.FC<EntryLayoutProps> = ({
   const { content } = useEntryContent(entryId)
   const customCSS = useUISettingKey("customCSS")
 
-  const aiChatPanelStyle = useAIChatPanelStyle()
-  const isAIPanelVisible = useAIPanelVisibility()
-
-  const shouldShowAISummary = aiChatPanelStyle === AIChatPanelStyle.Floating || !isAIPanelVisible
-
   if (!entry) return null
 
   return (
@@ -72,7 +66,7 @@ export const ArticleLayout: React.FC<EntryLayoutProps> = ({
 
       <WrappedElementProvider boundingDetection>
         <div className="mx-auto mb-32 mt-6 max-w-full cursor-auto text-[0.94rem]">
-          {shouldShowAISummary && <AISummary entryId={entryId} />}
+          <AISummary entryId={entryId} />
           <ErrorBoundary fallback={EntryRenderError}>
             <ReadabilityNotice entryId={entryId} />
             {showTranscript ? (

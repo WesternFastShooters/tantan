@@ -1,1 +1,1 @@
-export { AIEnhancedTimelineLayout as Component } from "~/modules/app-layout/ai-enhanced-timeline"
+export { TimelineLayout as Component } from "~/modules/app-layout/timeline"

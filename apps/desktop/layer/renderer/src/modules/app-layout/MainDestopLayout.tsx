@@ -4,7 +4,7 @@ import { useWhoami } from "@follow/store/user/hooks"
 import { preventDefault } from "@follow/utils/dom"
 import type { PropsWithChildren } from "react"
 import * as React from "react"
-import { Suspense, useRef, useState } from "react"
+import { useRef, useState } from "react"
 import { Outlet } from "react-router"
 
 import { setMainContainerElement, setRootContainerElement } from "~/atoms/dom"
@@ -22,7 +22,6 @@ import { EntriesProvider } from "~/modules/entry-column/context/EntriesContext"
 import { CmdF } from "~/modules/panel/cmdf"
 import { SearchCmdK } from "~/modules/panel/cmdk"
 import { CmdNTrigger } from "~/modules/panel/cmdn"
-import { AppNotificationContainer } from "~/modules/upgrade/lazy/index"
 
 import { SubscriptionColumnContainer } from "./subscription-column/SubscriptionColumn"
 
@@ -171,10 +170,6 @@ export function MainDestopLayout() {
     <RootContainer ref={containerRef}>
       {!PROD && <EnvironmentIndicator />}
 
-      <Suspense>
-        <AppNotificationContainer />
-      </Suspense>
-
       <EntriesProvider>
         <SubscriptionColumnContainer />
 
@@ -266,28 +261,6 @@ DebugRegistry.add("App Tip Dialog", () => {
       canClose: true,
       clickOutsideToDismiss: false,
       overlay: false,
-    })
-  })
-})
-
-DebugRegistry.add("AI Onboarding", () => {
-  import("~/modules/ai-onboarding/ai-onboarding-modal-content").then((m) => {
-    window.presentModal({
-      title: "AI Onboarding",
-      content: ({ dismiss }) => (
-        <m.AiOnboardingModalContent
-          onClose={() => {
-            dismiss()
-          }}
-        />
-      ),
-
-      CustomModalComponent: PlainModal,
-      modalContainerClassName: "flex items-center justify-center",
-
-      canClose: false,
-      clickOutsideToDismiss: false,
-      overlay: true,
     })
   })
 })

@@ -11,7 +11,6 @@ export enum HotkeyScope {
   EntryRender = "entry-render",
   SubscriptionList = "subscription-list",
   SubLayer = "sub-layer",
-  AIChat = "ai-chat",
 }
 
 export const FloatingLayerScope = [

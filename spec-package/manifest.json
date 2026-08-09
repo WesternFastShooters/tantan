@@ -53,33 +53,132 @@
   ],
   "validationEntry": "bash spec-package/scripts/validate-package.sh",
   "files": [
-    { "path": "README.md", "role": "package-index", "sha256": "c89393fbf75432cb843d64b994b66e5ae929cec48844db60063f27ecbb4ba0f7" },
-    { "path": "agent/BASELINE_IMPORT.md", "role": "safe-baseline-import", "sha256": "04d33f4519b937efb1ec2f400717052fb3de9bdad9dd87ced63b250db972f8ba" },
-    { "path": "agent/EXECUTION.md", "role": "agent-safety-protocol", "sha256": "e24b270140346b401b925a4e01492c68d7d138fe9db84da1b4f16a7f85e7035a" },
-    { "path": "agent/paid-feature-removal.md", "role": "removal-policy", "sha256": "97ac3bd0ab717dc407a40b0912139502914902d7016f62d78e2bfa58e2def04b" },
-    { "path": "agent/task-manifest.json", "role": "task-dag-and-write-boundaries", "sha256": "41dda61cccde7b40171f369611c15751e1d5e8f7ada391cf498bdf7218817b0c" },
-    { "path": "api/folo-route-policy.json", "role": "upstream-route-policy", "sha256": "780dad2814c560a626e9ad738c97a5cdc66d84a465d7a9b70bb1e269a86c8bbb" },
-    { "path": "api/openapi.json", "role": "public-http-contract", "sha256": "f10bc459a6e7a81fc62cfbc738609579088c7251c5964c8d96a0cc7cad80391d" },
-    { "path": "db/0001_core.sql", "role": "sqlite-migration", "sha256": "3ba2b6f9a9c871fe06bdeaa4625c7f1e59aed85508113f2ae0b1f4275b15d4ef" },
-    { "path": "db/0002_search_fts.sql", "role": "sqlite-migration", "sha256": "b0fc9c33a5b8819685236882cbbfcfc4a16b699b4154b3f0e046a4bd1a6a9db5" },
-    { "path": "db/0003_seed_core_topics.sql", "role": "sqlite-migration", "sha256": "ba89ba40d804a05ab5a32d57e490e5d0b4bf728eb76710673fd3d0f897b97b51" },
-    { "path": "examples/ai-enrichment-v1.json", "role": "schema-example", "sha256": "a3d2bb2a536fc43a970faf02e9144636a271bd5d62d3c976b624d2bf80c37c6f" },
-    { "path": "examples/filter-spec-v1.json", "role": "schema-example", "sha256": "85ad5825b980d7430b7fec6abfcaa60b8948c8230e05348feef20ebea32dc2d0" },
-    { "path": "examples/home-response.json", "role": "schema-example", "sha256": "2dac6b6bf53b186cf99c19bb691ce9451e524ccbf578b7ba75fec3d001c849eb" },
-    { "path": "examples/topic-classification-v1.json", "role": "schema-example", "sha256": "73b9bf616006a987c55d6a0d5adeb0e42f1ebf2e1f8d65da86d710c08f88fa58" },
-    { "path": "schemas/ai-enrichment-v1.schema.json", "role": "ai-output-schema", "sha256": "6d1c643e468bbc0372f7c7d544800db58c8fb21fff429d442ca29060843bbc51" },
-    { "path": "schemas/filter-spec-v1.schema.json", "role": "ai-output-schema", "sha256": "144c375d6e3b146227dc7600cdc333abb0f470fadf2c18c0f302b43bd5f29a76" },
-    { "path": "schemas/home-response.schema.json", "role": "public-dto-schema", "sha256": "8879bd84aff76f114e2d42a0a173f8eb99defe0d2d3ebfefe7deb4da5be57c1f" },
-    { "path": "schemas/topic-classification-v1.schema.json", "role": "ai-output-schema", "sha256": "0ea3d8ff824310681437fbdb3eab5ad386f93f95955462b008824f789c6662b8" },
-    { "path": "scripts/validate-package.rb", "role": "offline-contract-validator", "sha256": "3a7d271c45993856277b0e3e405d5a77f16192569c8929ec6b5781d29a3f84ac" },
-    { "path": "scripts/validate-package.sh", "role": "validation-entry", "sha256": "2ff85546305e813c5a7322690f0bb2bd29ca455efd6c493ecd51ad8e0de30bef" },
-    { "path": "tests/acceptance-matrix.md", "role": "acceptance-tests", "sha256": "34aeaa4da2d961e6a83ab3a311c93c96047eb81c9d88107f2f2b047f00d97599" }
+    {
+      "path": "README.md",
+      "role": "package-index",
+      "sha256": "c89393fbf75432cb843d64b994b66e5ae929cec48844db60063f27ecbb4ba0f7"
+    },
+    {
+      "path": "agent/BASELINE_IMPORT.md",
+      "role": "safe-baseline-import",
+      "sha256": "04d33f4519b937efb1ec2f400717052fb3de9bdad9dd87ced63b250db972f8ba"
+    },
+    {
+      "path": "agent/EXECUTION.md",
+      "role": "agent-safety-protocol",
+      "sha256": "e24b270140346b401b925a4e01492c68d7d138fe9db84da1b4f16a7f85e7035a"
+    },
+    {
+      "path": "agent/paid-feature-removal.md",
+      "role": "removal-policy",
+      "sha256": "97ac3bd0ab717dc407a40b0912139502914902d7016f62d78e2bfa58e2def04b"
+    },
+    {
+      "path": "agent/task-manifest.json",
+      "role": "task-dag-and-write-boundaries",
+      "sha256": "cfb2db124459dca6f590b4c31bba313d12aef1a3c9789bae5f0c10c1a59fedc7"
+    },
+    {
+      "path": "api/folo-route-policy.json",
+      "role": "upstream-route-policy",
+      "sha256": "780dad2814c560a626e9ad738c97a5cdc66d84a465d7a9b70bb1e269a86c8bbb"
+    },
+    {
+      "path": "api/openapi.json",
+      "role": "public-http-contract",
+      "sha256": "f10bc459a6e7a81fc62cfbc738609579088c7251c5964c8d96a0cc7cad80391d"
+    },
+    {
+      "path": "db/0001_core.sql",
+      "role": "sqlite-migration",
+      "sha256": "3ba2b6f9a9c871fe06bdeaa4625c7f1e59aed85508113f2ae0b1f4275b15d4ef"
+    },
+    {
+      "path": "db/0002_search_fts.sql",
+      "role": "sqlite-migration",
+      "sha256": "b0fc9c33a5b8819685236882cbbfcfc4a16b699b4154b3f0e046a4bd1a6a9db5"
+    },
+    {
+      "path": "db/0003_seed_core_topics.sql",
+      "role": "sqlite-migration",
+      "sha256": "ba89ba40d804a05ab5a32d57e490e5d0b4bf728eb76710673fd3d0f897b97b51"
+    },
+    {
+      "path": "examples/ai-enrichment-v1.json",
+      "role": "schema-example",
+      "sha256": "a3d2bb2a536fc43a970faf02e9144636a271bd5d62d3c976b624d2bf80c37c6f"
+    },
+    {
+      "path": "examples/filter-spec-v1.json",
+      "role": "schema-example",
+      "sha256": "85ad5825b980d7430b7fec6abfcaa60b8948c8230e05348feef20ebea32dc2d0"
+    },
+    {
+      "path": "examples/home-response.json",
+      "role": "schema-example",
+      "sha256": "2dac6b6bf53b186cf99c19bb691ce9451e524ccbf578b7ba75fec3d001c849eb"
+    },
+    {
+      "path": "examples/topic-classification-v1.json",
+      "role": "schema-example",
+      "sha256": "73b9bf616006a987c55d6a0d5adeb0e42f1ebf2e1f8d65da86d710c08f88fa58"
+    },
+    {
+      "path": "schemas/ai-enrichment-v1.schema.json",
+      "role": "ai-output-schema",
+      "sha256": "6d1c643e468bbc0372f7c7d544800db58c8fb21fff429d442ca29060843bbc51"
+    },
+    {
+      "path": "schemas/filter-spec-v1.schema.json",
+      "role": "ai-output-schema",
+      "sha256": "144c375d6e3b146227dc7600cdc333abb0f470fadf2c18c0f302b43bd5f29a76"
+    },
+    {
+      "path": "schemas/home-response.schema.json",
+      "role": "public-dto-schema",
+      "sha256": "8879bd84aff76f114e2d42a0a173f8eb99defe0d2d3ebfefe7deb4da5be57c1f"
+    },
+    {
+      "path": "schemas/topic-classification-v1.schema.json",
+      "role": "ai-output-schema",
+      "sha256": "0ea3d8ff824310681437fbdb3eab5ad386f93f95955462b008824f789c6662b8"
+    },
+    {
+      "path": "scripts/validate-package.rb",
+      "role": "offline-contract-validator",
+      "sha256": "3a7d271c45993856277b0e3e405d5a77f16192569c8929ec6b5781d29a3f84ac"
+    },
+    {
+      "path": "scripts/validate-package.sh",
+      "role": "validation-entry",
+      "sha256": "2ff85546305e813c5a7322690f0bb2bd29ca455efd6c493ecd51ad8e0de30bef"
+    },
+    {
+      "path": "tests/acceptance-matrix.md",
+      "role": "acceptance-tests",
+      "sha256": "34aeaa4da2d961e6a83ab3a311c93c96047eb81c9d88107f2f2b047f00d97599"
+    }
   ],
   "inputs": [
-    { "path": "../2026-08-09-tantan-实施落地方案.md", "sha256": "9017c1121fd8187a962a5993a7137121192dcb52be56ae5a2573e54ff37793da" },
-    { "path": "../2026-08-09-tantan-frontend-spec.md", "sha256": "a6a9a063d727a621afa92561761db7a701c92ac0652c4aba9ef32ec8444fde4f" },
-    { "path": "../2026-08-09-tantan-backend-spec.md", "sha256": "a20252cbd1c98f3140c3f0afeab5960fa6b6349c2987a036f71d2422a8523e7a" },
-    { "path": "../prd(5).md", "sha256": "7bfbb8382b64b6cf95a42fc33376ba0d07978080fd5b5cf12a72de39741565d9" },
-    { "path": "../tantan前端原型.zip", "sha256": "c1d0353502c4cb8f5ae6caa1b784ae6a65be0c4998162a7469f7be5e449ad616" }
+    {
+      "path": "../2026-08-09-tantan-实施落地方案.md",
+      "sha256": "9017c1121fd8187a962a5993a7137121192dcb52be56ae5a2573e54ff37793da"
+    },
+    {
+      "path": "../2026-08-09-tantan-frontend-spec.md",
+      "sha256": "a6a9a063d727a621afa92561761db7a701c92ac0652c4aba9ef32ec8444fde4f"
+    },
+    {
+      "path": "../2026-08-09-tantan-backend-spec.md",
+      "sha256": "a20252cbd1c98f3140c3f0afeab5960fa6b6349c2987a036f71d2422a8523e7a"
+    },
+    {
+      "path": "../prd(5).md",
+      "sha256": "7bfbb8382b64b6cf95a42fc33376ba0d07978080fd5b5cf12a72de39741565d9"
+    },
+    {
+      "path": "../tantan前端原型.zip",
+      "sha256": "c1d0353502c4cb8f5ae6caa1b784ae6a65be0c4998162a7469f7be5e449ad616"
+    }
   ]
 }

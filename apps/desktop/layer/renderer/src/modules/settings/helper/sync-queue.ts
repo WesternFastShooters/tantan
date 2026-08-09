@@ -1,4 +1,4 @@
-import type { AISettings, GeneralSettings, UISettings } from "@follow/shared/settings/interface"
+import type { GeneralSettings, UISettings } from "@follow/shared/settings/interface"
 import type { SpotlightSettings } from "@follow/shared/spotlight"
 import {
   mergeAppearancePayloadWithSpotlightSettings,
@@ -14,7 +14,6 @@ import type { SettingsTab } from "@follow-app/client-sdk"
 import { FollowAPIError } from "@follow-app/client-sdk"
 import type { PrimitiveAtom } from "jotai"
 
-import { __aiSettingAtom, aiServerSyncWhiteListKeys, getAISettings } from "~/atoms/settings/ai"
 import {
   __generalSettingAtom,
   generalServerSyncWhiteListKeys,
@@ -34,11 +33,10 @@ import { settings } from "~/queries/settings"
 type SettingMapping = {
   appearance: UISettings
   general: GeneralSettings
-  ai: AISettings
   spotlight: SpotlightSettings
 }
 type SettingDomain = keyof SettingMapping
-type RemoteSettingsTab = "appearance" | "general" | "ai"
+type RemoteSettingsTab = "appearance" | "general"
 export interface RemoteSettingsResponse {
   code: 0
   settings: Record<string, any>
@@ -61,7 +59,6 @@ const pickSyncPayload = <T extends object>(payload: T, keys: readonly (keyof T |
 const localSettingGetterMap = {
   appearance: () => getUISettings(),
   general: () => getGeneralSettings(),
-  ai: () => getAISettings(),
   spotlight: () => getSpotlightSettings(),
 }
 
@@ -75,34 +72,30 @@ const createInternalSetter =
 const localSettingSetterMap = {
   appearance: createInternalSetter(__uiSettingAtom),
   general: createInternalSetter(__generalSettingAtom),
-  ai: createInternalSetter(__aiSettingAtom),
   spotlight: createInternalSetter(__spotlightSettingAtom),
 }
 
 const settingWhiteListMap = {
   appearance: uiServerSyncWhiteListKeys,
   general: generalServerSyncWhiteListKeys,
-  ai: aiServerSyncWhiteListKeys,
   spotlight: spotlightServerSyncWhiteListKeys,
 }
 
 const remoteTabMap: Record<SettingDomain, RemoteSettingsTab> = {
   appearance: "appearance",
   general: "general",
-  ai: "ai",
   spotlight: "appearance",
 }
 
 const remoteTabToDomainMap: Record<RemoteSettingsTab, SettingDomain[]> = {
   appearance: ["appearance", "spotlight"],
   general: ["general"],
-  ai: ["ai"],
 }
 
 const bizSettingKeyToTabMapping = {
   ui: "appearance",
   general: "general",
-  ai: "ai",
+  ai: null,
   spotlight: "spotlight",
 } as const
 
@@ -516,10 +509,6 @@ class SettingSyncQueue {
       followClient.api.settings.update({
         tab: "general",
         ...getLocalPayloadForRemoteTab("general"),
-      }),
-      followClient.api.settings.update({
-        tab: "ai",
-        ...getLocalPayloadForRemoteTab("ai"),
       }),
     ])
   }

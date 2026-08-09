@@ -207,10 +207,7 @@
         "services/tantan-api/internal/testutil/**",
         "docs/runbooks/**"
       ],
-      "forbiddenWrites": [
-        "services/tantan-api/migrations/**",
-        "apps/**"
-      ],
+      "forbiddenWrites": ["services/tantan-api/migrations/**", "apps/**"],
       "requiredGates": [
         "doctor checks SQLite, Keychain, DNS and TLS without exposing secrets",
         "backup is consistent and restore passes integrity and row-count checks",
@@ -240,10 +237,33 @@
         "apps/desktop/layer/renderer/src/modules/settings/helper/sync-queue.test.ts",
         "apps/desktop/layer/renderer/src/pages/**",
         "apps/desktop/layer/renderer/src/queries/wallet.tsx",
+        "apps/desktop/layer/renderer/src/queries/_.ts",
         "apps/desktop/layer/renderer/src/lib/auth.ts",
         "apps/desktop/layer/renderer/src/lib/api-client.ts",
+        "apps/desktop/layer/renderer/src/generated-routes.ts",
+        "apps/desktop/layer/renderer/src/initialize/**",
+        "apps/desktop/layer/renderer/src/main.tsx",
+        "apps/desktop/layer/renderer/src/components/common/Focusable.tsx",
+        "apps/desktop/layer/renderer/src/constants/hotkeys.ts",
+        "apps/desktop/layer/renderer/src/hooks/biz/useShowEntryDetailsColumn.ts",
+        "apps/desktop/layer/renderer/src/modules/app-layout/MainDestopLayout.tsx",
+        "apps/desktop/layer/renderer/src/modules/app-layout/timeline/**",
+        "apps/desktop/layer/renderer/src/modules/app-tip/**",
+        "apps/desktop/layer/renderer/src/modules/discover/**",
+        "apps/desktop/layer/renderer/src/modules/trending/**",
+        "apps/desktop/layer/renderer/src/modules/command/**",
+        "apps/desktop/layer/renderer/src/modules/entry-column/**",
+        "apps/desktop/layer/renderer/src/modules/entry-content/**",
+        "apps/desktop/layer/renderer/src/modules/new-user-guide/**",
+        "apps/desktop/layer/renderer/src/modules/settings/**",
+        "apps/desktop/layer/renderer/src/modules/settings/tabs/plan.tsx",
+        "apps/desktop/layer/renderer/src/modules/user/ProfileButton.tsx",
+        "apps/desktop/layer/renderer/src/modules/user/UserAvatar.tsx",
+        "apps/desktop/layer/renderer/src/modules/user/UserProBadge.tsx",
+        "apps/desktop/layer/renderer/src/providers/main-view-hotkeys-provider.tsx",
         "apps/desktop/layer/renderer/src/modules/tantan-policy/**",
-        "apps/desktop/e2e/tests/web/tantan-no-paid.spec.ts"
+        "apps/desktop/e2e/tests/web/tantan-no-paid.spec.ts",
+        "packages/internal/shared/src/auth.ts"
       ],
       "forbiddenWrites": [
         "packages/internal/store/src/modules/subscription/**",
@@ -353,7 +373,13 @@
       "id": "TASK-E2E-RELEASE",
       "title": "执行全量验收、隐私审计和本地发布门禁",
       "dependsOn": ["TASK-FE-FLOWS", "TASK-BE-OPS"],
-      "sourceSpecTasks": ["TASK-FE-05.1", "TASK-FE-05.2", "TASK-FE-05.3", "TASK-FE-05.4", "TASK-BE-05.4"],
+      "sourceSpecTasks": [
+        "TASK-FE-05.1",
+        "TASK-FE-05.2",
+        "TASK-FE-05.3",
+        "TASK-FE-05.4",
+        "TASK-BE-05.4"
+      ],
       "allowedWrites": [
         "apps/desktop/e2e/tests/web/tantan-acceptance/**",
         "apps/desktop/layer/renderer/src/**/*.test.ts",

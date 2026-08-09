@@ -206,4 +206,13 @@ describe("desktop spotlight setting sync", () => {
 
     expect(settingsUpdateMock).not.toHaveBeenCalled()
   })
+
+  test("REQ:FE-01 full replacement never writes Folo AI settings", async () => {
+    await settingSyncQueue.replaceRemote()
+
+    expect(settingsUpdateMock.mock.calls.map(([payload]) => payload.tab)).toEqual([
+      "appearance",
+      "general",
+    ])
+  })
 })

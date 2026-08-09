@@ -8,6 +8,10 @@ import { FollowClient } from "@follow-app/client-sdk"
 import PKG from "@pkg"
 
 import { setLoginModalShow } from "~/atoms/user"
+import {
+  isRemovedFoloRoute,
+  removedFoloResponse,
+} from "~/modules/tantan-policy/removed-folo-routes"
 
 import { ipcServices } from "./client"
 import { getAuthSessionToken, getClientId, getSessionId } from "./client-session"
@@ -19,6 +23,9 @@ const isElectronRuntime = () => {
 const fetchWithElectronAuth = async (request: Request) => {
   const requestURL = new URL(request.url)
   const apiURL = new URL(env.VITE_API_URL)
+  if (isRemovedFoloRoute(requestURL, apiURL.origin)) {
+    return removedFoloResponse()
+  }
   const authService = ipcServices?.auth as
     | (NonNullable<typeof ipcServices>["auth"] & {
         fetchWithAuth?: (payload: {

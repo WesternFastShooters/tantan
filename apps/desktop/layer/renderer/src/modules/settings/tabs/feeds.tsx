@@ -52,7 +52,6 @@ import { UrlBuilder } from "~/lib/url-builder"
 import { FeedIcon } from "~/modules/feed/feed-icon"
 import { useConfirmUnsubscribeSubscriptionModal } from "~/modules/modal/hooks/useConfirmUnsubscribeSubscriptionModal"
 import { SettingModalContentPortal } from "~/modules/settings/modal/layout"
-import { Balance } from "~/modules/wallet/balance"
 import { Queries } from "~/queries"
 
 type SortField = "name" | "view" | "date" | "subscriptionCount" | "updatesPerWeek"
@@ -694,9 +693,6 @@ const FeedClaimedSection = () => {
                   <TableHead className="text-center" size="sm">
                     {t("feeds.tableHeaders.subscriptionCount")}
                   </TableHead>
-                  <TableHead className="text-center" size="sm">
-                    {t("feeds.tableHeaders.tipAmount")}
-                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody className="border-t-[12px] border-transparent">
@@ -716,9 +712,6 @@ const FeedClaimedSection = () => {
                     </TableCell>
                     <TableCell align="center" className="tabular-nums" size="sm">
                       {numberFormatter.format(row.subscriptionCount)}
-                    </TableCell>
-                    <TableCell align="center" size="sm">
-                      <Balance>{BigInt(row.tipAmount || 0n)}</Balance>
                     </TableCell>
                   </TableRow>
                 ))}

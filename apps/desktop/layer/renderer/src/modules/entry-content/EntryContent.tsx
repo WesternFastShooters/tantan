@@ -29,8 +29,6 @@ import { GlassButton } from "~/components/ui/button/GlassButton"
 import { HotkeyScope } from "~/constants"
 import { useRouteParamsSelector } from "~/hooks/biz/useRouteParams"
 import { useFeedSafeUrl } from "~/hooks/common/useFeedSafeUrl"
-import { useBlockActions } from "~/modules/ai-chat/store/hooks"
-import { BlockSliceAction } from "~/modules/ai-chat/store/slices/block.slice"
 import { COMMAND_ID } from "~/modules/command/commands/id"
 
 import { setEntryContentScrollToTop } from "./atoms"
@@ -100,17 +98,6 @@ const EntryContentImpl: Component<EntryContentProps> = ({
     FeedViewType.Videos,
   ].includes(view)
 
-  const { addOrUpdateBlock, removeBlock } = useBlockActions()
-  useEffect(() => {
-    addOrUpdateBlock({
-      id: BlockSliceAction.SPECIAL_TYPES.mainEntry,
-      type: "mainEntry",
-      value: entryId,
-    })
-    return () => {
-      removeBlock(BlockSliceAction.SPECIAL_TYPES.mainEntry)
-    }
-  }, [addOrUpdateBlock, entryId, removeBlock])
   const animationController = useAnimationControls()
 
   const focusableRef = useRef<HTMLDivElement>(null)
