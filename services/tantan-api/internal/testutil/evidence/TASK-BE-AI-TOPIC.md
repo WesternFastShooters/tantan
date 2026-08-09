@@ -55,6 +55,14 @@ go test ./internal/enrichment -run 'TestWorkerCannotOverwriteNewContent|TestWork
 
 Each target exited `1` before the strict UTF-8 check, transactional revalidation, guarded stale transition, and current-content read constraint were implemented.
 
+After the search dependency fix, a final Topic Red showed old-hash assignments still contributed to unread counts:
+
+```text
+go test ./internal/topic -run TestTopicUnreadCountsIgnoreAssignmentsFromAnOldContentHash -count=1
+```
+
+Exit `1` with unread count `1`; Topic counting now joins only assignments whose hash equals the current Entry hash.
+
 The Green implementation now provides:
 
 - five exact preset endpoints with provider-specific credential headers, no redirects/proxy/custom URL, public-IP-only dialing, 2 MiB requests, 4 MiB responses, and a 60 second client timeout;
@@ -72,7 +80,7 @@ go test ./... -count=1
 go test -race ./internal/ai/... ./internal/topic/... ./internal/enrichment/... -count=1
 ```
 
-Exit: `0`. Target race results: AI `1.534s`, AI schema `2.315s`, Topic `1.953s`, Enrichment `3.450s`.
+Exit: `0`. Final target race results: AI `1.716s`, AI schema `1.141s`, Topic `1.801s`, Enrichment `3.244s`. The final full Go regression also passed, including the 100,000-entry sync/search fixture (`39.221s`).
 
 Security and regression audit:
 

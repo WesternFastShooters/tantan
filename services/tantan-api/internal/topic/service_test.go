@@ -204,3 +204,29 @@ func TestGeneratedTopicCanParticipateInCallerTransaction(t *testing.T) {
 		t.Fatalf("generated topic escaped rollback: count=%d", count)
 	}
 }
+
+func TestTopicUnreadCountsIgnoreAssignmentsFromAnOldContentHash(t *testing.T) {
+	ctx := context.Background()
+	store := openTopicStore(t)
+	insertTopicFixture(t, store)
+	service := topic.NewService(store, func() time.Time { return time.Date(2026, 8, 9, 12, 0, 0, 0, time.UTC) })
+	if err := service.EnsureCore(ctx, "user_1"); err != nil {
+		t.Fatal(err)
+	}
+	aiTopicID := topic.CoreID("user_1", "ai")
+	if err := service.ApplyClassification(ctx, "user_1", "entry_1", strings.Repeat("a", 64), ai.TopicClassificationV1{Version: 1, Topics: []ai.TopicClassification{{TopicID: aiTopicID, Confidence: 0.9, Reason: "AI"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.DB().ExecContext(ctx, "UPDATE entries SET content_hash=? WHERE entry_id='entry_1'", strings.Repeat("b", 64)); err != nil {
+		t.Fatal(err)
+	}
+	list, err := service.List(ctx, "user_1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range list.Topics {
+		if item.ID == aiTopicID && item.UnreadCount != 0 {
+			t.Fatalf("old assignment unread count=%d", item.UnreadCount)
+		}
+	}
+}

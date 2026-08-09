@@ -191,7 +191,8 @@ SELECT
   COUNT(ae.entry_id) FILTER (WHERE ae.read_at IS NULL)
 FROM topics t
 LEFT JOIN entry_topics et ON et.user_id=t.user_id AND et.topic_id=t.topic_id
-LEFT JOIN account_entries ae ON ae.user_id=et.user_id AND ae.entry_id=et.entry_id
+LEFT JOIN entries e ON e.entry_id=et.entry_id AND e.content_hash=et.content_hash
+LEFT JOIN account_entries ae ON ae.user_id=et.user_id AND ae.entry_id=e.entry_id
 WHERE t.user_id=?
 GROUP BY t.topic_id
 ORDER BY t.pinned DESC,t.sort_order,t.topic_id`, userID)
