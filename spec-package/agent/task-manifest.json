@@ -283,6 +283,7 @@
         "services/tantan-api/internal/observability/**",
         "services/tantan-api/internal/http/health*.go",
         "services/tantan-api/internal/http/diagnostics*.go",
+        "services/tantan-api/internal/http/router.go",
         "services/tantan-api/internal/testutil/**",
         "services/tantan-api/cmd/tantan-api/**",
         "apps/desktop/layer/renderer/src/workers/sw/**",

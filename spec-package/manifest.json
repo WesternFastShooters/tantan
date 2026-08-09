@@ -104,7 +104,7 @@
     {
       "path": "agent/task-manifest.json",
       "role": "task-dag-and-write-boundaries",
-      "sha256": "ecee75adc4e606516f168c5884d883260d9b80c5e368f86d4712803685e99f46"
+      "sha256": "2129e88e0b6a8cd2f87dc71c0257e948725773ec0742a934f45020e4abd17880"
     },
     {
       "path": "api/folo-route-policy.json",
@@ -185,6 +185,11 @@
       "path": "scripts/validate-package.sh",
       "role": "validation-entry",
       "sha256": "16c6afaff62e60a8af7eaeccc27040a435d7846a50ae624a7bb536ff22cf335e"
+    },
+    {
+      "path": "scripts/verify-security.sh",
+      "role": "release-security-gate",
+      "sha256": "773a8f5d7a4060fd288fb7984c34f2680538f622440d9e63f98c1c57ed4841ba"
     },
     {
       "path": "spec.yaml",

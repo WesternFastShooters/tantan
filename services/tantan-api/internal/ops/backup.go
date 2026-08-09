@@ -293,6 +293,21 @@ func InspectDatabase(ctx context.Context, path string) (DatabaseInspection, erro
 	if err := database.QueryRowContext(ctx, "PRAGMA integrity_check").Scan(&integrity); err != nil || integrity != "ok" {
 		return DatabaseInspection{}, errors.New("database integrity check failed")
 	}
+	foreignKeyRows, err := database.QueryContext(ctx, "PRAGMA foreign_key_check")
+	if err != nil {
+		return DatabaseInspection{}, errors.New("database foreign-key check failed")
+	}
+	if foreignKeyRows.Next() {
+		_ = foreignKeyRows.Close()
+		return DatabaseInspection{}, errors.New("database foreign-key check failed")
+	}
+	if err := foreignKeyRows.Err(); err != nil {
+		_ = foreignKeyRows.Close()
+		return DatabaseInspection{}, errors.New("database foreign-key check failed")
+	}
+	if err := foreignKeyRows.Close(); err != nil {
+		return DatabaseInspection{}, errors.New("database foreign-key check failed")
+	}
 	if err := CheckMigrations(ctx, database); err != nil {
 		return DatabaseInspection{}, errors.New("database migration check failed")
 	}

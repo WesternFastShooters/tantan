@@ -137,3 +137,34 @@ func TestDailyBackupIsIdempotentAndKeepsExactlySevenVerifiedFiles(t *testing.T) 
 		t.Fatalf("repeated=%#v err=%v", repeated, err)
 	}
 }
+
+func TestInspectDatabaseRejectsForeignKeyViolations(t *testing.T) {
+	ctx := context.Background()
+	dataDirectory := t.TempDir()
+	store, err := storage.Open(ctx, storage.Config{DataDir: dataDirectory})
+	if err != nil {
+		t.Fatal(err)
+	}
+	connection, err := store.DB().Conn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := connection.ExecContext(ctx, "PRAGMA foreign_keys=OFF"); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 8, 9, 12, 0, 0, 0, time.UTC).Format(time.RFC3339Nano)
+	if _, err := connection.ExecContext(ctx, `INSERT INTO account_entries(user_id,entry_id,last_seen_at) VALUES('missing-user','missing-entry',?)`, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := connection.Close(); err != nil {
+		t.Fatal(err)
+	}
+	databasePath := store.Path()
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := ops.InspectDatabase(ctx, databasePath); err == nil {
+		t.Fatal("database inspection accepted a foreign-key violation")
+	}
+}

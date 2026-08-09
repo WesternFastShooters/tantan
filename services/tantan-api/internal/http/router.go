@@ -455,7 +455,7 @@ func newRequestID() string {
 
 func setSecurityHeaders(header stdhttp.Header) {
 	header.Set("Cache-Control", "no-store")
-	header.Set("Content-Security-Policy", "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
+	header.Set("Content-Security-Policy", "default-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
 	header.Set("Referrer-Policy", "no-referrer")
 	header.Set("X-Content-Type-Options", "nosniff")
 	header.Set("X-Frame-Options", "DENY")
