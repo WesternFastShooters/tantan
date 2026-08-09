@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "windowDays": 7,
+  "includeTopics": ["topic_ai", "topic_agent"],
+  "excludeTopics": [],
+  "includeSources": [],
+  "excludeSources": [],
+  "includeTerms": ["Claude Code", "Codex"],
+  "negativeTerms": ["融资"],
+  "languages": ["zh-CN", "en"],
+  "contentStyles": ["article", "post"],
+  "weights": {
+    "freshness": 1.2,
+    "topicMatch": 1.6,
+    "sourceAffinity": 0.8,
+    "quality": 1,
+    "diversity": 1
+  }
+}

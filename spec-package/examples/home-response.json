@@ -1,0 +1,32 @@
+{
+  "items": [
+    {
+      "entryId": "entry_01JEXAMPLE",
+      "type": "article",
+      "title": "Claude Code 与 Codex 的本地工作流",
+      "excerpt": "一篇关于本地 Agent 工具链的示例文章。",
+      "cover": "https://images.example.invalid/entry_01.jpg",
+      "source": {
+        "id": "feed_01JEXAMPLE",
+        "name": "Example Engineering",
+        "avatar": null
+      },
+      "publishedAt": "2026-08-09T08:00:00Z",
+      "topics": [
+        { "id": "topic_ai", "name": "AI" },
+        { "id": "topic_agent", "name": "Agent" }
+      ],
+      "translated": true
+    }
+  ],
+  "nextCursor": "eyJxdWV1ZUlkIjoicXVldWVfMDEiLCJ2ZXJzaW9uIjoxfQ",
+  "queue": {
+    "id": "queue_01JEXAMPLE",
+    "version": 1,
+    "total": 50,
+    "unread": 50,
+    "finished": false,
+    "candidateWindowDays": 7,
+    "generatedAt": "2026-08-09T08:10:00Z"
+  }
+}

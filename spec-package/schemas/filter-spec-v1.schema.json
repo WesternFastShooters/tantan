@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tantan.local/schemas/filter-spec-v1.schema.json",
+  "title": "FilterSpecV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "windowDays",
+    "includeTopics",
+    "excludeTopics",
+    "includeSources",
+    "excludeSources",
+    "includeTerms",
+    "negativeTerms",
+    "languages",
+    "contentStyles",
+    "weights"
+  ],
+  "properties": {
+    "version": { "const": 1 },
+    "windowDays": { "type": "integer", "minimum": 1, "maximum": 30 },
+    "includeTopics": { "$ref": "#/$defs/identifiers" },
+    "excludeTopics": { "$ref": "#/$defs/identifiers" },
+    "includeSources": { "$ref": "#/$defs/identifiers" },
+    "excludeSources": { "$ref": "#/$defs/identifiers" },
+    "includeTerms": { "$ref": "#/$defs/terms" },
+    "negativeTerms": { "$ref": "#/$defs/terms" },
+    "languages": {
+      "type": "array",
+      "maxItems": 10,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$"
+      }
+    },
+    "contentStyles": {
+      "type": "array",
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": ["article", "post", "image", "video"]
+      }
+    },
+    "weights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["freshness", "topicMatch", "sourceAffinity", "quality", "diversity"],
+      "properties": {
+        "freshness": { "$ref": "#/$defs/weight" },
+        "topicMatch": { "$ref": "#/$defs/weight" },
+        "sourceAffinity": { "$ref": "#/$defs/weight" },
+        "quality": { "$ref": "#/$defs/weight" },
+        "diversity": { "$ref": "#/$defs/weight" }
+      }
+    }
+  },
+  "$defs": {
+    "terms": {
+      "type": "array",
+      "maxItems": 30,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 80 }
+    },
+    "identifiers": {
+      "type": "array",
+      "maxItems": 50,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+      }
+    },
+    "weight": { "type": "number", "minimum": 0, "maximum": 2 }
+  }
+}

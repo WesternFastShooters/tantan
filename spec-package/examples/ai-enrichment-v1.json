@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "detectedLanguage": "en",
+  "titleZh": "Claude Code 与 Codex 的本地工作流",
+  "contentZh": "这是仅用于合同测试的简短译文。",
+  "summaryZh": "文章介绍如何在本地安全地编排编码 Agent。",
+  "keyPoints": [
+    "为每个 Agent 限定写入范围",
+    "公共合同变更先修订规格",
+    "密钥只存系统钥匙串"
+  ]
+}

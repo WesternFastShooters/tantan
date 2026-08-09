@@ -1,0 +1,384 @@
+{
+  "schemaVersion": "1.0.0",
+  "packageVersion": "1.0.0",
+  "executionPolicy": {
+    "oneActiveTaskPerAgent": true,
+    "defaultWriteAction": "deny",
+    "contractChangeRequiresSpecAmendment": true,
+    "redEvidenceRequired": true,
+    "independentSecurityVerificationRequired": true
+  },
+  "globalForbiddenWrites": [
+    "/Users/mingrui/Project/Folo/**",
+    "apps/mobile/**",
+    "prd(5).md",
+    "tantan前端原型.zip",
+    "spec-package/**"
+  ],
+  "sharedOwners": {
+    "spec-package/api/**": "TASK-CONTRACT",
+    "spec-package/schemas/**": "TASK-CONTRACT",
+    "spec-package/db/**": "TASK-CONTRACT",
+    "apps/desktop/layer/renderer/src/router.ts": "TASK-FE-SHELL",
+    "apps/desktop/layer/renderer/src/pages/(main)/layout.tsx": "TASK-FE-SHELL",
+    "services/tantan-api/internal/http/router.go": "TASK-BE-AUTH-PROXY"
+  },
+  "tasks": [
+    {
+      "id": "TASK-BASELINE",
+      "title": "导入并锁定 Folo 基线",
+      "dependsOn": [],
+      "sourceSpecTasks": ["TASK-FE-00", "TASK-BE-00"],
+      "allowedWrites": [
+        ".gitignore",
+        "AGENTS.md",
+        "docs/baseline/**",
+        "package.json",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        ".nvmrc",
+        "apps/**",
+        "packages/**",
+        "services/tantan-api/go.mod",
+        "services/tantan-api/go.sum"
+      ],
+      "forbiddenWrites": [
+        "apps/mobile/**",
+        "spec-package/**",
+        "services/tantan-api/**/*.go",
+        "services/tantan-api/migrations/**"
+      ],
+      "requiredGates": [
+        "Folo imported commit equals 3846c90b67da351b6017cd4fe9d0992b8077224e",
+        "@follow-app/client-sdk equals 0.3.95",
+        "node version contract equals 22",
+        "pnpm packageManager equals 10.17.0",
+        "baseline typecheck, Vitest and Web E2E results recorded without concealing failures",
+        "git diff contains no apps/mobile changes"
+      ]
+    },
+    {
+      "id": "TASK-CONTRACT",
+      "title": "固化生成代码与迁移合同",
+      "dependsOn": ["TASK-BASELINE"],
+      "sourceSpecTasks": ["TASK-BE-00.2", "TASK-FE-00.1"],
+      "allowedWrites": [
+        "services/tantan-api/internal/api/gen/**",
+        "services/tantan-api/internal/ai/schema/**",
+        "services/tantan-api/migrations/**",
+        "apps/desktop/layer/renderer/src/lib/tantan-api/gen/**",
+        "docs/contracts/**"
+      ],
+      "forbiddenWrites": [
+        "services/tantan-api/internal/**/handler*.go",
+        "services/tantan-api/internal/**/service*.go",
+        "apps/desktop/layer/renderer/src/modules/**"
+      ],
+      "requiredGates": [
+        "generated types are reproducible from spec-package contracts",
+        "empty SQLite database applies 0001, 0002 and 0003 exactly once",
+        "PRAGMA foreign_key_check returns no rows",
+        "PRAGMA integrity_check returns ok",
+        "contract snapshots match package files byte-for-byte or by canonical JSON"
+      ]
+    },
+    {
+      "id": "TASK-BE-AUTH-PROXY",
+      "title": "实现 loopback 服务、认证桥和默认拒绝代理",
+      "dependsOn": ["TASK-CONTRACT"],
+      "sourceSpecTasks": ["TASK-BE-01.1", "TASK-BE-01.2", "TASK-BE-01.3", "TASK-BE-01.4"],
+      "allowedWrites": [
+        "services/tantan-api/cmd/tantan-api/**",
+        "services/tantan-api/internal/auth/**",
+        "services/tantan-api/internal/folo/**",
+        "services/tantan-api/internal/http/**",
+        "services/tantan-api/internal/session/**",
+        "services/tantan-api/internal/testutil/**"
+      ],
+      "forbiddenWrites": [
+        "services/tantan-api/migrations/**",
+        "services/tantan-api/internal/ai/**",
+        "services/tantan-api/internal/home/**",
+        "apps/**"
+      ],
+      "requiredGates": [
+        "Red evidence exists for auth callback, origin, token redaction and deny-by-default proxy",
+        "listener address test proves 127.0.0.1 only",
+        "unknown and disabled Folo routes return FOLO_ROUTE_DENIED before upstream request",
+        "Folo one-time token and upstream cookie never appear in browser response or logs",
+        "go test -race ./internal/auth/... ./internal/folo/... ./internal/http/... passes"
+      ]
+    },
+    {
+      "id": "TASK-BE-STORAGE-SYNC",
+      "title": "实现 SQLite、Folo 同步和 FTS 搜索",
+      "dependsOn": ["TASK-BE-AUTH-PROXY"],
+      "sourceSpecTasks": ["TASK-BE-02.1", "TASK-BE-02.2", "TASK-BE-02.3", "TASK-BE-02.4"],
+      "allowedWrites": [
+        "services/tantan-api/internal/storage/**",
+        "services/tantan-api/internal/sync/**",
+        "services/tantan-api/internal/search/**",
+        "services/tantan-api/internal/jobs/**",
+        "services/tantan-api/internal/testutil/**"
+      ],
+      "forbiddenWrites": [
+        "services/tantan-api/migrations/**",
+        "services/tantan-api/internal/auth/**",
+        "services/tantan-api/internal/ai/**",
+        "services/tantan-api/internal/home/**",
+        "apps/**"
+      ],
+      "requiredGates": [
+        "Red evidence exists for idempotent sync, checkpoint resume and translated-text search",
+        "same upstream entry syncs without duplicates",
+        "crash between pages resumes from committed checkpoint",
+        "FTS covers original, translation, source, topic and tag fields",
+        "100k entry load fixture meets backend performance budget",
+        "go test -race ./internal/storage/... ./internal/sync/... ./internal/search/... passes"
+      ]
+    },
+    {
+      "id": "TASK-BE-AI-TOPIC",
+      "title": "实现用户 Key、AI 结构化输出、翻译摘要和 Topic",
+      "dependsOn": ["TASK-BE-STORAGE-SYNC"],
+      "sourceSpecTasks": ["TASK-BE-03.1", "TASK-BE-03.2", "TASK-BE-03.3", "TASK-BE-03.4"],
+      "allowedWrites": [
+        "services/tantan-api/internal/ai/**",
+        "services/tantan-api/internal/topic/**",
+        "services/tantan-api/internal/enrichment/**",
+        "services/tantan-api/internal/jobs/**",
+        "services/tantan-api/internal/keyring/**",
+        "services/tantan-api/internal/testutil/**"
+      ],
+      "forbiddenWrites": [
+        "services/tantan-api/migrations/**",
+        "services/tantan-api/internal/auth/**",
+        "services/tantan-api/internal/folo/**",
+        "services/tantan-api/internal/home/**",
+        "apps/**"
+      ],
+      "requiredGates": [
+        "Red evidence exists for key leakage canary, schema rejection and provider failure fallback",
+        "API key persists only through OS Keychain abstraction",
+        "SQLite, HTTP responses and logs contain no key canary",
+        "AI responses failing package JSON Schema never commit",
+        "all Folo AI route requests remain zero",
+        "go test -race ./internal/ai/... ./internal/topic/... ./internal/enrichment/... passes"
+      ]
+    },
+    {
+      "id": "TASK-BE-HOME",
+      "title": "实现稳定每日队列、AI Filter 和反馈",
+      "dependsOn": ["TASK-BE-AI-TOPIC"],
+      "sourceSpecTasks": ["TASK-BE-04.1", "TASK-BE-04.2", "TASK-BE-04.3", "TASK-BE-04.4"],
+      "allowedWrites": [
+        "services/tantan-api/internal/home/**",
+        "services/tantan-api/internal/filter/**",
+        "services/tantan-api/internal/recommendation/**",
+        "services/tantan-api/internal/jobs/**",
+        "services/tantan-api/internal/testutil/**"
+      ],
+      "forbiddenWrites": [
+        "services/tantan-api/migrations/**",
+        "services/tantan-api/internal/auth/**",
+        "services/tantan-api/internal/folo/**",
+        "apps/**"
+      ],
+      "requiredGates": [
+        "Red evidence exists for cursor binding, queue stability, filter atomicity and feedback idempotency",
+        "queue candidates are unread entries from the most recent 7 calendar days in requested timezone",
+        "initial queue is at most 50 and same-day append never exceeds 60",
+        "old cursor after generation change returns QUEUE_VERSION_CHANGED",
+        "failed filter keeps prior active filter, topics and ready queue",
+        "go test -race ./internal/home/... ./internal/filter/... ./internal/recommendation/... passes"
+      ]
+    },
+    {
+      "id": "TASK-BE-OPS",
+      "title": "实现 readiness、诊断、备份恢复和最终后端门禁",
+      "dependsOn": ["TASK-BE-HOME"],
+      "sourceSpecTasks": ["TASK-BE-05.1", "TASK-BE-05.2", "TASK-BE-05.3", "TASK-BE-05.4"],
+      "allowedWrites": [
+        "services/tantan-api/cmd/tantan-api/**",
+        "services/tantan-api/internal/ops/**",
+        "services/tantan-api/internal/observability/**",
+        "services/tantan-api/internal/http/health*.go",
+        "services/tantan-api/internal/http/diagnostics*.go",
+        "services/tantan-api/internal/testutil/**",
+        "docs/runbooks/**"
+      ],
+      "forbiddenWrites": [
+        "services/tantan-api/migrations/**",
+        "apps/**"
+      ],
+      "requiredGates": [
+        "doctor checks SQLite, Keychain, DNS and TLS without exposing secrets",
+        "backup is consistent and restore passes integrity and row-count checks",
+        "readyz fails closed when migrations or Keychain are unavailable",
+        "go vet ./... passes",
+        "go test -race ./... passes",
+        "go build ./cmd/tantan-api passes"
+      ]
+    },
+    {
+      "id": "TASK-FE-POLICY",
+      "title": "移除 Folo 付费、付费 AI 与外发初始化",
+      "dependsOn": ["TASK-BE-AUTH-PROXY"],
+      "sourceSpecTasks": ["TASK-FE-01.1", "TASK-FE-01.2", "TASK-FE-01.3", "TASK-FE-01.4"],
+      "allowedWrites": [
+        "apps/desktop/layer/renderer/src/modules/plan/**",
+        "apps/desktop/layer/renderer/src/modules/power/**",
+        "apps/desktop/layer/renderer/src/modules/wallet/**",
+        "apps/desktop/layer/renderer/src/modules/ai-chat/**",
+        "apps/desktop/layer/renderer/src/modules/ai-chat-session/**",
+        "apps/desktop/layer/renderer/src/modules/ai-onboarding/**",
+        "apps/desktop/layer/renderer/src/modules/ai-task/**",
+        "apps/desktop/layer/renderer/src/modules/app-layout/ai/**",
+        "apps/desktop/layer/renderer/src/modules/app-layout/ai-enhanced-timeline/**",
+        "apps/desktop/layer/renderer/src/modules/upgrade/**",
+        "apps/desktop/layer/renderer/src/modules/settings/helper/sync-queue.ts",
+        "apps/desktop/layer/renderer/src/modules/settings/helper/sync-queue.test.ts",
+        "apps/desktop/layer/renderer/src/pages/**",
+        "apps/desktop/layer/renderer/src/queries/wallet.tsx",
+        "apps/desktop/layer/renderer/src/lib/auth.ts",
+        "apps/desktop/layer/renderer/src/lib/api-client.ts",
+        "apps/desktop/layer/renderer/src/modules/tantan-policy/**",
+        "apps/desktop/e2e/tests/web/tantan-no-paid.spec.ts"
+      ],
+      "forbiddenWrites": [
+        "packages/internal/store/src/modules/subscription/**",
+        "packages/internal/store/src/modules/entry/**",
+        "packages/internal/store/src/modules/feed/**",
+        "packages/internal/store/src/modules/unread/**",
+        "packages/internal/store/src/modules/collection/**",
+        "apps/mobile/**",
+        "services/**"
+      ],
+      "requiredGates": [
+        "Red evidence shows paid routes, UI or requests exist on baseline",
+        "paid-feature-removal.md sequence and exact-target rule followed",
+        "RSS subscription store has no diff",
+        "generated route table contains no Plan, Power, Wallet, paid Upgrade or Folo AI route",
+        "browser HAR contains zero denied Folo routes",
+        "typecheck and no-paid Vitest/Playwright tests pass"
+      ]
+    },
+    {
+      "id": "TASK-FE-SHELL",
+      "title": "实现 PC/Mobile Web/PWA Shell 和本地服务状态",
+      "dependsOn": ["TASK-FE-POLICY", "TASK-BE-OPS"],
+      "sourceSpecTasks": ["TASK-FE-02.1", "TASK-FE-02.2", "TASK-FE-02.3", "TASK-FE-02.4"],
+      "allowedWrites": [
+        "apps/desktop/layer/renderer/src/pages/(main)/layout.tsx",
+        "apps/desktop/layer/renderer/src/pages/(main)/index.sync.tsx",
+        "apps/desktop/layer/renderer/src/router.ts",
+        "apps/desktop/layer/renderer/src/modules/tantan-shell/**",
+        "apps/desktop/layer/renderer/src/modules/tantan-service-status/**",
+        "apps/desktop/layer/renderer/src/lib/tantan-api/**",
+        "apps/desktop/layer/renderer/src/styles/**",
+        "apps/desktop/e2e/tests/web/tantan-shell.spec.ts"
+      ],
+      "forbiddenWrites": [
+        "apps/mobile/**",
+        "services/**",
+        "packages/internal/store/src/modules/subscription/**"
+      ],
+      "requiredGates": [
+        "Red evidence shows mobile DownloadPage and root Timeline redirect on baseline",
+        "390x844 renders bottom navigation and 1440x900 renders desktop navigation",
+        "root route renders Home rather than Timeline",
+        "Go unavailable state preserves cache and exposes retry",
+        "PWA service worker never caches /tantan/v1 or auth responses",
+        "keyboard and focus smoke tests pass"
+      ]
+    },
+    {
+      "id": "TASK-FE-HOME",
+      "title": "实现小红书式首页、Topic、AI Filter 与详情退出",
+      "dependsOn": ["TASK-FE-SHELL", "TASK-BE-HOME"],
+      "sourceSpecTasks": ["TASK-FE-03.1", "TASK-FE-03.2", "TASK-FE-03.3", "TASK-FE-03.4"],
+      "allowedWrites": [
+        "apps/desktop/layer/renderer/src/modules/tantan-home/**",
+        "apps/desktop/layer/renderer/src/modules/tantan-entry/**",
+        "apps/desktop/layer/renderer/src/modules/tantan-shell/HomeRoute*.tsx",
+        "apps/desktop/e2e/tests/web/tantan-home*.spec.ts"
+      ],
+      "forbiddenWrites": [
+        "apps/desktop/layer/renderer/src/router.ts",
+        "apps/mobile/**",
+        "services/**",
+        "packages/internal/store/src/modules/subscription/**"
+      ],
+      "requiredGates": [
+        "Red evidence exists for topic cache, cursor paging, read removal and AI Sheet callback",
+        "Home renders HomeHeader, TopicTabs, ActiveAIFilterBar, MasonryFeed and AIFilterSheet",
+        "columns are 2 below 1024, 3 from 1024, 4 from 1440",
+        "entryId dedup works across overlapping pages",
+        "read success removes the card from every home query cache without changing upstream read semantics",
+        "topic data and scroll position restore independently",
+        "normal search callback navigates while AI callback only opens the Sheet",
+        "queue completion and image fallback states pass E2E"
+      ]
+    },
+    {
+      "id": "TASK-FE-FLOWS",
+      "title": "实现搜索、订阅、收藏、Topic 管理和 AI 设置",
+      "dependsOn": ["TASK-FE-HOME", "TASK-BE-AI-TOPIC"],
+      "sourceSpecTasks": ["TASK-FE-04.1", "TASK-FE-04.2", "TASK-FE-04.3", "TASK-FE-04.4"],
+      "allowedWrites": [
+        "apps/desktop/layer/renderer/src/modules/tantan-search/**",
+        "apps/desktop/layer/renderer/src/modules/tantan-subscriptions/**",
+        "apps/desktop/layer/renderer/src/modules/tantan-favorites/**",
+        "apps/desktop/layer/renderer/src/modules/tantan-topics/**",
+        "apps/desktop/layer/renderer/src/modules/tantan-settings/**",
+        "apps/desktop/layer/renderer/src/pages/search/**",
+        "apps/desktop/e2e/tests/web/tantan-flows*.spec.ts"
+      ],
+      "forbiddenWrites": [
+        "apps/desktop/layer/renderer/src/router.ts",
+        "apps/mobile/**",
+        "services/**",
+        "packages/internal/store/src/modules/subscription/**"
+      ],
+      "requiredGates": [
+        "Red evidence exists for search isolation, provider key handling and subscription preservation",
+        "search debounce is 250ms and result scope matches API contract",
+        "return from search restores home topic, filter and scroll without queue mutation",
+        "AI provider form never echoes or stores the key in browser storage",
+        "RSS add, cancel, read and collection flows remain compatible",
+        "PC and Mobile flow E2E pass"
+      ]
+    },
+    {
+      "id": "TASK-E2E-RELEASE",
+      "title": "执行全量验收、隐私审计和本地发布门禁",
+      "dependsOn": ["TASK-FE-FLOWS", "TASK-BE-OPS"],
+      "sourceSpecTasks": ["TASK-FE-05.1", "TASK-FE-05.2", "TASK-FE-05.3", "TASK-FE-05.4", "TASK-BE-05.4"],
+      "allowedWrites": [
+        "apps/desktop/e2e/tests/web/tantan-acceptance/**",
+        "apps/desktop/layer/renderer/src/**/*.test.ts",
+        "apps/desktop/layer/renderer/src/**/*.test.tsx",
+        "services/tantan-api/**/*_test.go",
+        "docs/verification/**",
+        "docs/runbooks/**"
+      ],
+      "forbiddenWrites": [
+        "apps/desktop/layer/renderer/src/pages/**",
+        "apps/desktop/layer/renderer/src/lib/**",
+        "services/tantan-api/cmd/**",
+        "services/tantan-api/migrations/**",
+        "apps/mobile/**"
+      ],
+      "requiredGates": [
+        "package validator passes",
+        "frontend and backend final spec validators pass with zero warnings",
+        "pnpm typecheck and lint pass",
+        "renderer Vitest and PC/Mobile Playwright suites pass",
+        "go test -race ./... and go build ./cmd/tantan-api pass",
+        "secret canary absent from logs, SQLite, browser storage, HAR and build artifacts",
+        "all denied Folo route counts are zero upstream calls",
+        "acceptance matrix has evidence for every FE:TC and BE:TC row"
+      ]
+    }
+  ]
+}

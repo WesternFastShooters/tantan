@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "topics": [
+    {
+      "topicId": "topic_ai",
+      "confidence": 0.98,
+      "reason": "内容主要讨论 AI 编码工具"
+    },
+    {
+      "topicId": "topic_agent",
+      "confidence": 0.92,
+      "reason": "内容包含 Agent 编排和执行边界"
+    }
+  ]
+}
