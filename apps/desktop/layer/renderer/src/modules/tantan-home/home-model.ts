@@ -1,4 +1,31 @@
-import type { HomeCard } from "~/lib/tantan-api/gen/types"
+import type { HomeCard, HomeResponse } from "~/lib/tantan-api/gen/types"
+
+export interface HomePageParam {
+  cursor: string | null
+  generation: string | null
+}
+
+export class HomeQueueGenerationChangedError extends Error {
+  readonly code = "HOME_QUEUE_GENERATION_CHANGED"
+
+  constructor() {
+    super("HOME_QUEUE_GENERATION_CHANGED")
+    this.name = "HomeQueueGenerationChangedError"
+  }
+}
+
+export const assertHomePageGeneration = (
+  page: HomeResponse,
+  expectedGeneration: string | null,
+): HomeResponse => {
+  if (expectedGeneration && page.queueGeneration !== expectedGeneration) {
+    throw new HomeQueueGenerationChangedError()
+  }
+  return page
+}
+
+export const nextHomePageParam = (page: HomeResponse): HomePageParam | undefined =>
+  page.nextCursor ? { cursor: page.nextCursor, generation: page.queueGeneration } : undefined
 
 export const dedupeHomeCards = (cards: readonly HomeCard[]): HomeCard[] => {
   const seen = new Set<string>()
@@ -9,8 +36,4 @@ export const dedupeHomeCards = (cards: readonly HomeCard[]): HomeCard[] => {
   })
 }
 
-export const homeColumnCount = (viewportWidth: number) => {
-  if (viewportWidth >= 1440) return 4
-  if (viewportWidth >= 1024) return 3
-  return 2
-}
+export const homeColumnCount = (_viewportWidth: number) => 2

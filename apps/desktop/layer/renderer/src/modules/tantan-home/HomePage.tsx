@@ -1,10 +1,8 @@
 import { ScrollArea } from "@follow/components/ui/scroll-area/index.js"
 import { useRef } from "react"
-import { useWindowSize } from "usehooks-ts"
 
 import { ActiveAIFilterBar } from "./ActiveAIFilterBar"
 import { AIFilterSheet } from "./AIFilterSheet"
-import { homeColumnCount } from "./home-model"
 import { HomeHeader } from "./HomeHeader"
 import { MasonryFeed } from "./MasonryFeed"
 import { TopicTabs } from "./TopicTabs"
@@ -12,8 +10,6 @@ import { useHomeController } from "./useHomeController"
 
 export function HomePage() {
   const scrollRef = useRef<HTMLDivElement>(null)
-  const { width } = useWindowSize({ initializeWithValue: true })
-  const columns = homeColumnCount(width)
   const controller = useHomeController(scrollRef)
 
   return (
@@ -21,6 +17,7 @@ export function HomePage() {
       ref={scrollRef}
       rootClassName="h-full bg-[#08090b]"
       viewportClassName="h-full"
+      viewportProps={{ "data-testid": "home-scroll-viewport" }}
       scrollbarClassName="z-20"
     >
       <section className="mx-auto min-h-full w-full max-w-[1280px]">
@@ -59,7 +56,7 @@ export function HomePage() {
           <MasonryFeed
             cards={controller.cards}
             queue={controller.queue}
-            columns={columns}
+            columns={2}
             loading={controller.homeLoading || controller.topicsLoading}
             fetchingNext={controller.fetchingNext}
             hasNextPage={controller.hasNextPage}
@@ -99,6 +96,14 @@ export function HomePage() {
             className="fixed bottom-20 left-1/2 z-40 -translate-x-1/2 rounded-xl bg-red-950 px-4 py-3 text-sm text-red-200 shadow-xl md:bottom-6"
           >
             {controller.feedbackError}
+          </p>
+        )}
+        {controller.queueRefreshNotice && (
+          <p
+            role="status"
+            className="fixed bottom-20 left-1/2 z-40 -translate-x-1/2 rounded-xl bg-zinc-900 px-4 py-3 text-sm text-zinc-100 shadow-xl md:bottom-6"
+          >
+            {controller.queueRefreshNotice}
           </p>
         )}
       </section>

@@ -1,9 +1,14 @@
 import { describe, expect, test } from "vitest"
 
-import type { HomeCard } from "~/lib/tantan-api/gen/types"
+import type { HomeCard, HomeResponse } from "~/lib/tantan-api/gen/types"
 
 import { resolveCardPresentation } from "./card-presentation"
-import { dedupeHomeCards, homeColumnCount } from "./home-model"
+import {
+  assertHomePageGeneration,
+  dedupeHomeCards,
+  homeColumnCount,
+  nextHomePageParam,
+} from "./home-model"
 
 const card = (entryId: string, type: HomeCard["type"] = "article"): HomeCard => ({
   entryId,
@@ -15,6 +20,22 @@ const card = (entryId: string, type: HomeCard["type"] = "article"): HomeCard => 
   publishedAt: "2026-08-09T12:00:00Z",
   topics: [{ id: "topic-ai", name: "AI" }],
   translated: false,
+})
+
+const page = (generation: string, nextCursor: string | null): HomeResponse => ({
+  items: [card(`entry-${generation}`)],
+  nextCursor,
+  queue: {
+    id: `queue-${generation}`,
+    version: 1,
+    generation,
+    total: 1,
+    unread: 1,
+    finished: false,
+    candidateWindowDays: 7,
+    generatedAt: "2026-08-09T12:00:00Z",
+  },
+  queueGeneration: generation,
 })
 
 describe("Tantan Home model", () => {
@@ -29,12 +50,30 @@ describe("Tantan Home model", () => {
     ])
   })
 
-  test("REQ:FE-03 uses 2/3/4 columns at the approved viewport boundaries", () => {
+  test("FR-03 keeps the deployable Mobile Web feed at exactly two columns on every viewport", () => {
     expect(homeColumnCount(390)).toBe(2)
+    expect(homeColumnCount(430)).toBe(2)
     expect(homeColumnCount(800)).toBe(2)
-    expect(homeColumnCount(1024)).toBe(3)
-    expect(homeColumnCount(1439)).toBe(3)
-    expect(homeColumnCount(1440)).toBe(4)
+    expect(homeColumnCount(1024)).toBe(2)
+    expect(homeColumnCount(1440)).toBe(2)
+    expect(homeColumnCount(2560)).toBe(2)
+  })
+
+  test("XR-03 binds the next cursor to the response generation", () => {
+    expect(nextHomePageParam(page("generation-1", "cursor-2"))).toEqual({
+      cursor: "cursor-2",
+      generation: "generation-1",
+    })
+    expect(nextHomePageParam(page("generation-1", null))).toBeUndefined()
+  })
+
+  test("TC-33 rejects a delayed page from another generation", () => {
+    expect(assertHomePageGeneration(page("generation-1", null), "generation-1")).toEqual(
+      page("generation-1", null),
+    )
+    expect(() => assertHomePageGeneration(page("generation-2", null), "generation-1")).toThrow(
+      "HOME_QUEUE_GENERATION_CHANGED",
+    )
   })
 
   test.each([

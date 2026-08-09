@@ -86,7 +86,7 @@ func (service *Service) Get(ctx context.Context, query Query) (Page, error) {
 		if cursor.QueryHash != queryHash {
 			return Page{}, ErrCursorMismatch
 		}
-		if cursor.QueueID != queue.ID || cursor.QueueVer != queue.Version {
+		if cursor.Generation != queue.Generation || cursor.QueueID != queue.ID || cursor.QueueVer != queue.Version {
 			return Page{}, ErrQueueVersionChanged
 		}
 		afterRank = cursor.AfterRank
@@ -95,7 +95,7 @@ func (service *Service) Get(ctx context.Context, query Query) (Page, error) {
 	if err != nil {
 		return Page{}, err
 	}
-	return Page{Items: items, NextCursor: next, Queue: state}, nil
+	return Page{Items: items, NextCursor: next, Queue: state, QueueGeneration: state.Generation}, nil
 }
 
 func (service *Service) Rebuild(ctx context.Context, request PlanRequest) (QueueState, error) {

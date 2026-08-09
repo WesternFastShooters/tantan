@@ -97,7 +97,7 @@ func (api *localAPI) home(writer stdhttp.ResponseWriter, request *stdhttp.Reques
 	}
 	limit, err := queryLimit(request.URL.Query().Get("limit"))
 	if err != nil {
-		writeLocalError(writer, request, stdhttp.StatusBadRequest, gen.ErrorCodeValidationError, "limit 必须为 1 到 50", nil)
+		writeLocalError(writer, request, stdhttp.StatusBadRequest, gen.ErrorCodeValidationError, "limit 必须为 1 到 20", nil)
 		return
 	}
 	page, err := api.config.Home.Get(request.Context(), home.Query{UserID: record.User.ID, TopicID: request.URL.Query().Get("topicId"), FilterID: request.URL.Query().Get("filterId"), Timezone: record.Timezone, Limit: limit, Cursor: request.URL.Query().Get("cursor")})
@@ -544,7 +544,7 @@ func queryLimit(raw string) (int, error) {
 		return 20, nil
 	}
 	value, err := strconv.Atoi(raw)
-	if err != nil || value < 1 || value > 50 {
+	if err != nil || value < 1 || value > 20 {
 		return 0, errors.New("invalid limit")
 	}
 	return value, nil
@@ -590,7 +590,7 @@ func homeResponse(page home.Page) gen.HomeResponse {
 	for _, item := range page.Items {
 		items = append(items, homeCard(item.EntryID, item.Type, item.Title, item.Excerpt, safeAPIURL(item.Cover), item.Source.ID, item.Source.Name, safeAPIURL(item.Source.Avatar), item.PublishedAt, homeTopics(item.Topics), item.Translated))
 	}
-	return gen.HomeResponse{Items: items, NextCursor: page.NextCursor, Queue: gen.QueueState{ID: gen.Identifier(page.Queue.ID), Version: page.Queue.Version, Total: page.Queue.Total, Unread: page.Queue.Unread, Finished: page.Queue.Finished, CandidateWindowDays: page.Queue.CandidateWindowDays, GeneratedAt: page.Queue.GeneratedAt}}
+	return gen.HomeResponse{Items: items, NextCursor: page.NextCursor, Queue: gen.QueueState{ID: gen.Identifier(page.Queue.ID), Version: page.Queue.Version, Generation: gen.Identifier(page.Queue.Generation), Total: page.Queue.Total, Unread: page.Queue.Unread, Finished: page.Queue.Finished, CandidateWindowDays: page.Queue.CandidateWindowDays, GeneratedAt: page.Queue.GeneratedAt}, QueueGeneration: gen.Identifier(page.QueueGeneration)}
 }
 
 func searchResponse(page search.Page) gen.SearchResponse {
@@ -624,7 +624,7 @@ func topicsResponse(response topic.ListResponse) gen.TopicsResponse {
 		value := gen.Identifier(*response.ActiveFilterID)
 		active = &value
 	}
-	return gen.TopicsResponse{Version: int(response.Version), ActiveFilterID: active, Topics: items}
+	return gen.TopicsResponse{Version: int(response.Version), TopicsRevision: int(response.TopicsRevision), ActiveFilterID: active, Topics: items}
 }
 
 func topicItems(items []topic.Item) []gen.Topic {

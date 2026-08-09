@@ -3,6 +3,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router"
 
+import { TantanAPIError } from "~/lib/tantan-api/client"
 import type {
   FeedbackRequest,
   HomeCard,
@@ -18,8 +19,13 @@ import {
   putActiveFilter,
 } from "./api"
 import { removeEntryFromAllHomeQueries } from "./home-cache"
-import { dedupeHomeCards } from "./home-model"
-import { homeViewStore, useHomeViewStore } from "./home-view-store"
+import {
+  assertHomePageGeneration,
+  dedupeHomeCards,
+  HomeQueueGenerationChangedError,
+  nextHomePageParam,
+} from "./home-model"
+import { homeQueueScope, homeViewStore, useHomeViewStore } from "./home-view-store"
 import { homeQueryKeys } from "./query-keys"
 
 const fallbackTopic = {
@@ -47,6 +53,10 @@ type UndoFeedback = {
   expiresAt: number
 }
 
+const isQueueGenerationError = (error: unknown) =>
+  error instanceof HomeQueueGenerationChangedError ||
+  (error instanceof TantanAPIError && error.code === "QUEUE_VERSION_CHANGED")
+
 export function useHomeController(scrollRef: React.RefObject<HTMLDivElement | null>) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -54,9 +64,13 @@ export function useHomeController(scrollRef: React.RefObject<HTMLDivElement | nu
   const activeFilterId = useHomeViewStore((state) => state.activeFilterId)
   const activeFilterPrompt = useHomeViewStore((state) => state.activeFilterPrompt)
   const scrollY = useHomeViewStore((state) => state.scrollY)
+  const queueGeneration = useHomeViewStore(
+    (state) => state.queueGenerations[homeQueueScope(activeTopicId, activeFilterId)] ?? null,
+  )
   const [filterSheetOpen, setFilterSheetOpen] = useState(false)
   const [undoFeedback, setUndoFeedback] = useState<UndoFeedback | null>(null)
   const [feedbackError, setFeedbackError] = useState<string | null>(null)
+  const [queueRefreshNotice, setQueueRefreshNotice] = useState<string | null>(null)
   const filterTriggerRef = useRef<HTMLElement | null>(null)
 
   const topicsQuery = useQuery({
@@ -72,18 +86,35 @@ export function useHomeController(scrollRef: React.RefObject<HTMLDivElement | nu
     }
   }, [topicsQuery.data?.activeFilterId])
 
+  const homeQueryKey = homeQueryKeys.feed(activeTopicId, activeFilterId, queueGeneration)
   const homeQuery = useInfiniteQuery({
-    queryKey: homeQueryKeys.feed(activeTopicId, activeFilterId),
-    queryFn: ({ pageParam, signal }) =>
-      getHome({
+    queryKey: homeQueryKey,
+    queryFn: async ({ pageParam, signal }) => {
+      const page = await getHome({
         topicId: activeTopicId,
         filterId: activeFilterId,
-        cursor: pageParam,
+        cursor: pageParam.cursor,
         signal,
-      }),
-    initialPageParam: null as string | null,
-    getNextPageParam: (page) => page.nextCursor ?? undefined,
+      })
+      return assertHomePageGeneration(page, pageParam.generation)
+    },
+    initialPageParam: { cursor: null, generation: null } as const,
+    getNextPageParam: nextHomePageParam,
+    staleTime: 30_000,
   })
+
+  useEffect(() => {
+    const data = homeQuery.data
+    const returnedGeneration = data?.pages[0]?.queueGeneration
+    if (!data || !returnedGeneration || returnedGeneration === queueGeneration) return
+    queryClient.setQueryData(
+      homeQueryKeys.feed(activeTopicId, activeFilterId, returnedGeneration),
+      data,
+    )
+    homeViewStore
+      .getState()
+      .rememberQueueGeneration(activeTopicId, activeFilterId, returnedGeneration)
+  }, [activeFilterId, activeTopicId, homeQuery.data, queryClient, queueGeneration])
 
   const cards = useMemo(
     () => dedupeHomeCards(homeQuery.data?.pages.flatMap((page) => page.items) ?? []),
@@ -144,6 +175,9 @@ export function useHomeController(scrollRef: React.RefObject<HTMLDivElement | nu
       if (result.filter) {
         homeViewStore
           .getState()
+          .rememberQueueGeneration("recommend", result.filter.id, result.queueGeneration)
+        homeViewStore
+          .getState()
           .activateFilter(result.filter.id, "recommend", result.filter.prompt || prompt)
       }
       setFilterSheetOpen(false)
@@ -165,6 +199,7 @@ export function useHomeController(scrollRef: React.RefObject<HTMLDivElement | nu
         topics: result.topics,
       }))
       homeViewStore.getState().clearFilter("recommend")
+      homeViewStore.getState().rememberQueueGeneration("recommend", null, result.queueGeneration)
       queryClient.invalidateQueries({ queryKey: homeQueryKeys.all })
       requestAnimationFrame(() => {
         if (scrollRef.current) scrollRef.current.scrollTop = 0
@@ -239,6 +274,32 @@ export function useHomeController(scrollRef: React.RefObject<HTMLDivElement | nu
     [feedbackMutation],
   )
 
+  const fetchNext = useCallback(async () => {
+    try {
+      const result = await homeQuery.fetchNextPage()
+      if (result.error && isQueueGenerationError(result.error)) {
+        queryClient.removeQueries({
+          queryKey: homeQueryKeys.scope(activeTopicId, activeFilterId),
+        })
+        homeViewStore.getState().forgetQueueGeneration(activeTopicId, activeFilterId)
+        setQueueRefreshNotice("推荐已更新")
+      }
+    } catch (error) {
+      if (!isQueueGenerationError(error)) throw error
+      queryClient.removeQueries({
+        queryKey: homeQueryKeys.scope(activeTopicId, activeFilterId),
+      })
+      homeViewStore.getState().forgetQueueGeneration(activeTopicId, activeFilterId)
+      setQueueRefreshNotice("推荐已更新")
+    }
+  }, [activeFilterId, activeTopicId, homeQuery, queryClient])
+
+  useEffect(() => {
+    if (!queueRefreshNotice) return
+    const timeout = window.setTimeout(() => setQueueRefreshNotice(null), 3_000)
+    return () => window.clearTimeout(timeout)
+  }, [queueRefreshNotice])
+
   return {
     activeTopicId,
     activeFilterId,
@@ -248,11 +309,15 @@ export function useHomeController(scrollRef: React.RefObject<HTMLDivElement | nu
     cards,
     queue,
     homeLoading: homeQuery.isPending,
-    homeError: homeQuery.error instanceof Error ? homeQuery.error.message : null,
+    homeError:
+      homeQuery.error instanceof Error && !isQueueGenerationError(homeQuery.error)
+        ? homeQuery.error.message
+        : null,
     refetchHome: homeQuery.refetch,
     hasNextPage: Boolean(homeQuery.hasNextPage),
     fetchingNext: homeQuery.isFetchingNextPage,
-    fetchNext: () => homeQuery.fetchNextPage(),
+    fetchNext,
+    queueRefreshNotice,
     changeTopic,
     openSearch,
     openFilterSheet,

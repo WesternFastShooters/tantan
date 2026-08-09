@@ -192,13 +192,18 @@ func TestApplicationAuthenticatedHomeTopicsSearchAndStrictAISettings(t *testing.
 			EntryID string `json:"entryId"`
 		} `json:"items"`
 		Queue struct {
-			ID string `json:"id"`
+			ID         string `json:"id"`
+			Generation string `json:"generation"`
 		} `json:"queue"`
+		QueueGeneration string `json:"queueGeneration"`
 	}
-	if err := json.Unmarshal(homeResponse.Body.Bytes(), &homeBody); err != nil || len(homeBody.Items) != 1 || homeBody.Items[0].EntryID != "entry_api" || homeBody.Queue.ID == "" {
+	if err := json.Unmarshal(homeResponse.Body.Bytes(), &homeBody); err != nil || len(homeBody.Items) != 1 || homeBody.Items[0].EntryID != "entry_api" || homeBody.Queue.ID == "" || homeBody.Queue.Generation == "" || homeBody.QueueGeneration != homeBody.Queue.Generation {
 		t.Fatalf("home response=%s err=%v", homeResponse.Body.String(), err)
 	}
 	queueID := homeBody.Queue.ID
+	if response := do(stdhttp.MethodGet, "/api/tantan/v1/home?topicId=recommend&limit=21", nil); response.Code != stdhttp.StatusBadRequest {
+		t.Fatalf("home accepted limit=21: status=%d body=%s", response.Code, response.Body.String())
+	}
 
 	for _, path := range []string{"/api/tantan/v1/topics", "/api/tantan/v1/search?q=Contract%20Needle&limit=20"} {
 		response := do(stdhttp.MethodGet, path, nil)

@@ -35,6 +35,7 @@ type Item struct {
 
 type ListResponse struct {
 	Version        int64
+	TopicsRevision int64
 	ActiveFilterID *string
 	Topics         []Item
 }
@@ -103,13 +104,24 @@ func (service *Service) EnsureCoreTx(ctx context.Context, transaction *sql.Tx, u
 		return fmt.Errorf("close core topic templates: %w", err)
 	}
 	now := service.now().UTC().Format(time.RFC3339Nano)
+	changed := false
 	for _, item := range templates {
 		normalized := NormalizeName(item.name)
-		_, err := transaction.ExecContext(ctx, `
+		result, err := transaction.ExecContext(ctx, `
 INSERT OR IGNORE INTO topics(topic_id,user_id,name,normalized_name,kind,pinned,hidden,sort_order,created_at,updated_at)
 VALUES(?,?,?,?, 'core',0,0,?,?,?)`, CoreID(userID, item.slug), userID, item.name, normalized, item.sortOrder, now, now)
 		if err != nil {
 			return fmt.Errorf("seed core topic: %w", err)
+		}
+		inserted, err := result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("inspect core topic seed: %w", err)
+		}
+		changed = changed || inserted > 0
+	}
+	if changed {
+		if err := service.bumpTopicsRevisionTx(ctx, transaction, userID, now); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -167,6 +179,9 @@ ON CONFLICT(user_id,normalized_name) DO UPDATE SET
 		generatedID(userID, kind, normalized), userID, display, normalized, kind, sortOrder, stableUntil, timestamp, timestamp); err != nil {
 		return Item{}, fmt.Errorf("merge generated topic: %w", err)
 	}
+	if err := service.bumpTopicsRevisionTx(ctx, transaction, userID, timestamp); err != nil {
+		return Item{}, err
+	}
 	var result Item
 	var pinned int
 	var hidden int
@@ -184,6 +199,10 @@ FROM topics WHERE user_id=? AND normalized_name=?`, userID, normalized).Scan(&re
 func (service *Service) List(ctx context.Context, userID string) (ListResponse, error) {
 	if service == nil || service.store == nil || strings.TrimSpace(userID) == "" {
 		return ListResponse{}, errors.New("topic storage and user are required")
+	}
+	var topicsRevision int64
+	if err := service.store.DB().QueryRowContext(ctx, "SELECT topics_revision FROM accounts WHERE user_id=?", userID).Scan(&topicsRevision); err != nil {
+		return ListResponse{}, fmt.Errorf("read topics revision: %w", err)
 	}
 	rows, err := service.store.DB().QueryContext(ctx, `
 SELECT
@@ -231,7 +250,7 @@ ORDER BY t.pinned DESC,t.sort_order,t.topic_id`, userID)
 	if err := service.store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM account_entries WHERE user_id=? AND read_at IS NULL", userID).Scan(&totalUnread); err != nil {
 		return ListResponse{}, fmt.Errorf("count unread entries: %w", err)
 	}
-	result := ListResponse{Version: versionOf(records), Topics: []Item{{ID: "recommend", Name: "推荐", Kind: "virtual", Fixed: true, UnreadCount: totalUnread}}}
+	result := ListResponse{Version: versionOf(records), TopicsRevision: topicsRevision, Topics: []Item{{ID: "recommend", Name: "推荐", Kind: "virtual", Fixed: true, UnreadCount: totalUnread}}}
 	var activeFilter sql.NullString
 	err = service.store.DB().QueryRowContext(ctx, "SELECT filter_id FROM home_filters WHERE user_id=? AND status='active'", userID).Scan(&activeFilter)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -324,6 +343,9 @@ func (service *Service) Patch(ctx context.Context, userID string, version int64,
 				return fmt.Errorf("update topic: %w", err)
 			}
 		}
+		if err := service.bumpTopicsRevisionTx(ctx, transaction, userID, timestamp); err != nil {
+			return err
+		}
 		return nil
 	})
 	if err != nil {
@@ -383,6 +405,27 @@ INSERT INTO entry_topics(user_id,entry_id,topic_id,confidence,is_primary,content
 VALUES(?,?,?,?,?,?,?)`, userID, entryID, assignment.TopicID, assignment.Confidence, boolInt(index == 0), contentHash, now); err != nil {
 			return fmt.Errorf("insert topic classification: %w", err)
 		}
+	}
+	if err := service.bumpTopicsRevisionTx(ctx, transaction, userID, now); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (service *Service) bumpTopicsRevisionTx(ctx context.Context, transaction *sql.Tx, userID, timestamp string) error {
+	result, err := transaction.ExecContext(ctx, `
+UPDATE accounts
+SET topics_revision=topics_revision+1,updated_at=?
+WHERE user_id=?`, timestamp, userID)
+	if err != nil {
+		return fmt.Errorf("advance topics revision: %w", err)
+	}
+	updated, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("inspect topics revision: %w", err)
+	}
+	if updated != 1 {
+		return errors.New("topic account was not found")
 	}
 	return nil
 }

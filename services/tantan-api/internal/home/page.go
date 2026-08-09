@@ -91,7 +91,7 @@ ORDER BY qi.rank LIMIT ?`
 	if len(items) > limit {
 		items = items[:limit]
 		last := items[len(items)-1]
-		encoded, err := encodeCursor(service.cursorKey, cursorPayload{Version: 1, QueryHash: queryHash, QueueID: queue.ID, QueueVer: queue.Version, AfterRank: last.Rank})
+		encoded, err := encodeCursor(service.cursorKey, cursorPayload{Version: 2, QueryHash: queryHash, Generation: queue.Generation, QueueID: queue.ID, QueueVer: queue.Version, AfterRank: last.Rank})
 		if err != nil {
 			return nil, nil, QueueState{}, err
 		}
@@ -123,7 +123,7 @@ WHERE qi.queue_id=?`
 	if err := service.store.DB().QueryRowContext(ctx, statement, arguments...).Scan(&total, &unread); err != nil {
 		return QueueState{}, fmt.Errorf("read home queue state: %w", err)
 	}
-	return QueueState{ID: queue.ID, Version: queue.Version, Total: total, Unread: unread, Finished: unread == 0, CandidateWindowDays: 7, GeneratedAt: queue.GeneratedAt.UTC().Format(time.RFC3339Nano)}, nil
+	return QueueState{ID: queue.ID, Version: queue.Version, Generation: queue.Generation, Total: total, Unread: unread, Finished: unread == 0, CandidateWindowDays: 7, GeneratedAt: queue.GeneratedAt.UTC().Format(time.RFC3339Nano)}, nil
 }
 
 func queueStateTx(ctx context.Context, transaction *sql.Tx, queue queueRecord, topicID string) (QueueState, error) {
@@ -139,7 +139,7 @@ JOIN account_entries ae ON ae.entry_id=qi.entry_id AND ae.user_id=?
 WHERE qi.queue_id=?`, queue.UserID, queue.ID).Scan(&total, &unread); err != nil {
 		return QueueState{}, err
 	}
-	return QueueState{ID: queue.ID, Version: queue.Version, Total: total, Unread: unread, Finished: unread == 0, CandidateWindowDays: 7, GeneratedAt: queue.GeneratedAt.UTC().Format(time.RFC3339Nano)}, nil
+	return QueueState{ID: queue.ID, Version: queue.Version, Generation: queue.Generation, Total: total, Unread: unread, Finished: unread == 0, CandidateWindowDays: 7, GeneratedAt: queue.GeneratedAt.UTC().Format(time.RFC3339Nano)}, nil
 }
 
 func coverFromMedia(raw string) *string {

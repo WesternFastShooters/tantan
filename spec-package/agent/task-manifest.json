@@ -158,7 +158,7 @@
     {
       "id": "TASK-04",
       "title": "交付同步、FTS、Topic 和稳定每日 Home 队列",
-      "status": "pending",
+      "status": "completed",
       "dependsOn": ["TASK-02", "TASK-03"],
       "allowedWrites": [
         "services/tantan-api/internal/storage/**",
@@ -169,6 +169,8 @@
         "services/tantan-api/internal/home/**",
         "services/tantan-api/internal/recommendation/**",
         "services/tantan-api/internal/testutil/**",
+        "services/tantan-api/cmd/tantan-api/api.go",
+        "services/tantan-api/cmd/tantan-api/application_test.go",
         "apps/desktop/layer/renderer/src/modules/tantan-home/**",
         "apps/desktop/layer/renderer/src/modules/tantan-topics/**",
         "apps/desktop/layer/renderer/src/lib/tantan-api/**",

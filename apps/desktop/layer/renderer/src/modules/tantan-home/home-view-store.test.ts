@@ -17,4 +17,20 @@ describe("Tantan Home view state", () => {
       activeTopicId: "recommend",
     })
   })
+
+  test("ST-03 remembers queue generations independently by topic and filter scope", () => {
+    homeViewStore.getState().rememberQueueGeneration("recommend", null, "generation-default")
+    homeViewStore.getState().rememberQueueGeneration("topic-ai", null, "generation-ai")
+    homeViewStore.getState().rememberQueueGeneration("recommend", "filter-1", "generation-filter")
+
+    expect(homeViewStore.getState().queueGenerations).toEqual({
+      "recommend\u0000": "generation-default",
+      "topic-ai\u0000": "generation-ai",
+      "recommend\u0000filter-1": "generation-filter",
+    })
+
+    homeViewStore.getState().forgetQueueGeneration("recommend", "filter-1")
+    expect(homeViewStore.getState().queueGenerations["recommend\u0000filter-1"]).toBeUndefined()
+    expect(homeViewStore.getState().queueGenerations["recommend\u0000"]).toBe("generation-default")
+  })
 })

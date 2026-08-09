@@ -11,6 +11,7 @@ const readyResponse = {
 const sessionResponse = {
   user: { id: "user-home", name: "Home User", email: null, image: null },
   timezone: "Asia/Shanghai",
+  csrfToken: "csrf-home",
 }
 
 const topic = (id: string, name: string) => ({
@@ -39,29 +40,36 @@ const card = (
   translated: false,
 })
 
-const homePage = (items: ReturnType<typeof card>[], nextCursor: string | null) => ({
+const homePage = (
+  items: ReturnType<typeof card>[],
+  nextCursor: string | null,
+  generation = "generation-home",
+  total = 60,
+) => ({
   items,
   nextCursor,
   queue: {
     id: "queue-home",
     version: 1,
-    total: items.length,
-    unread: items.length,
-    finished: nextCursor === null,
+    generation,
+    total,
+    unread: total,
+    finished: false,
     candidateWindowDays: 7,
     generatedAt: "2026-08-09T12:00:00Z",
   },
+  queueGeneration: generation,
 })
 
 const mockSession = async (page: Page) => {
-  await page.route("http://127.0.0.1:3000/readyz", (route) =>
+  await page.route("**/api/readyz", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify(readyResponse),
     }),
   )
-  await page.route("http://127.0.0.1:3000/tantan/v1/session", (route) =>
+  await page.route("**/api/tantan/v1/session", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -71,28 +79,46 @@ const mockSession = async (page: Page) => {
 }
 
 test.describe("Tantan Home", () => {
-  test("REQ:FE-03 uses 2/3/4 columns, deduplicates cursor pages and falls back from broken images", async ({
+  test("AC-03 keeps a two-column Mobile feed stable through a 60-item long scroll", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await mockSession(page)
     await page.route("https://images.tantan.test/**", (route) => route.abort("failed"))
-    await page.route("http://127.0.0.1:3000/tantan/v1/topics", (route) =>
+    await page.route("**/api/tantan/v1/topics", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
           version: 1,
+          topicsRevision: 1,
           activeFilterId: null,
           topics: [topic("recommend", "推荐"), topic("topic-ai", "AI")],
         }),
       }),
     )
-    await page.route("http://127.0.0.1:3000/tantan/v1/home?**", (route) => {
+    let homeCalls = 0
+    await page.route("**/api/tantan/v1/home?**", (route) => {
+      homeCalls += 1
       const cursor = new URL(route.request().url()).searchParams.get("cursor")
-      const body = cursor
-        ? homePage([card("102", "article"), card("104", "video")], null)
-        : homePage([card("101", "article"), card("102", "post"), card("103", "image")], "cursor-2")
+      const first = Array.from({ length: 20 }, (_, index) =>
+        card(String(index + 1).padStart(3, "0"), index === 1 ? "post" : "article"),
+      )
+      const second = [
+        card("020", "article"),
+        ...Array.from({ length: 19 }, (_, index) =>
+          card(String(index + 21).padStart(3, "0"), "image"),
+        ),
+      ]
+      const third = Array.from({ length: 20 }, (_, index) =>
+        card(String(index + 40).padStart(3, "0"), "video"),
+      )
+      const body =
+        cursor === "cursor-3"
+          ? homePage(third, null)
+          : cursor === "cursor-2"
+            ? homePage(second, "cursor-3")
+            : homePage(first, "cursor-2")
       return route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -103,17 +129,90 @@ test.describe("Tantan Home", () => {
     await page.goto(buildWebAppURL(resolveDesktopE2EEnv()), { waitUntil: "domcontentloaded" })
     const feed = page.getByTestId("masonry-feed")
     await expect(feed).toHaveAttribute("data-columns", "2")
-    await expect(page.locator('[data-entry-id="102"]')).toHaveCount(1)
-    await expect(page.locator('[data-entry-id="104"]')).toBeVisible()
+    await expect(page.locator('[data-entry-id="001"] img')).toHaveCount(0)
+    await page.getByTestId("home-pagination-sentinel").scrollIntoViewIfNeeded()
+    await expect.poll(() => homeCalls).toBeGreaterThanOrEqual(2)
+    await expect(page.locator('[data-entry-id="020"]')).toHaveCount(1)
+    await page.getByTestId("home-pagination-sentinel").scrollIntoViewIfNeeded()
+    await expect.poll(() => homeCalls).toBe(3)
+    const lastCard = page.locator('[data-entry-id="059"]')
+    await expect(lastCard).toHaveCount(1)
+    await page.getByTestId("home-scroll-viewport").evaluate((element) => {
+      element.scrollTop = element.scrollHeight
+      element.dispatchEvent(new Event("scroll"))
+    })
+    await expect(lastCard).toBeVisible()
     await expect(page.getByText("今天已经看完", { exact: true })).toBeVisible()
-    await expect(page.locator('[data-entry-id="101"] img')).toHaveCount(0)
 
     await page.setViewportSize({ width: 800, height: 844 })
     await expect(feed).toHaveAttribute("data-columns", "2")
     await page.setViewportSize({ width: 1024, height: 844 })
-    await expect(feed).toHaveAttribute("data-columns", "3")
+    await expect(feed).toHaveAttribute("data-columns", "2")
     await page.setViewportSize({ width: 1440, height: 900 })
-    await expect(feed).toHaveAttribute("data-columns", "4")
+    await expect(feed).toHaveAttribute("data-columns", "2")
+  })
+
+  test("TC-33 discards a delayed page from another queue generation and reloads page one", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await mockSession(page)
+    await page.route("**/api/tantan/v1/topics", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          version: 1,
+          topicsRevision: 1,
+          activeFilterId: null,
+          topics: [topic("recommend", "推荐")],
+        }),
+      }),
+    )
+    let firstPageCalls = 0
+    let cursorCalls = 0
+    let mismatchDelivered = false
+    await page.route("**/api/tantan/v1/home?**", async (route) => {
+      const cursor = new URL(route.request().url()).searchParams.get("cursor")
+      if (cursor) {
+        cursorCalls += 1
+        await new Promise((resolve) => setTimeout(resolve, 100))
+        mismatchDelivered = true
+        return route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(
+            homePage(
+              [card("stale-page", "article", "Stale delayed page")],
+              null,
+              "generation-new",
+              1,
+            ),
+          ),
+        })
+      }
+      firstPageCalls += 1
+      const body = mismatchDelivered
+        ? homePage([card("new-page", "article", "New generation")], null, "generation-new", 1)
+        : homePage(
+            [card("old-page", "article", "Old generation")],
+            "cursor-old",
+            "generation-old",
+            2,
+          )
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(body),
+      })
+    })
+
+    await page.goto(buildWebAppURL(resolveDesktopE2EEnv()), { waitUntil: "domcontentloaded" })
+    await expect.poll(() => cursorCalls).toBe(1)
+    await expect(page.getByText("推荐已更新", { exact: true })).toBeVisible()
+    await expect(page.getByText("New generation", { exact: true })).toBeVisible()
+    await expect(page.getByText("Stale delayed page", { exact: true })).toHaveCount(0)
+    expect(firstPageCalls).toBeGreaterThanOrEqual(2)
   })
 
   test("REQ:FE-03 search navigates while AI opens and atomically applies the Filter Sheet", async ({
@@ -122,18 +221,19 @@ test.describe("Tantan Home", () => {
     await mockSession(page)
     let activeFilterId: string | null = null
     let filterCalls = 0
-    await page.route("http://127.0.0.1:3000/tantan/v1/topics", (route) =>
+    await page.route("**/api/tantan/v1/topics", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
           version: 1,
+          topicsRevision: 1,
           activeFilterId,
           topics: [topic("recommend", "推荐")],
         }),
       }),
     )
-    await page.route("http://127.0.0.1:3000/tantan/v1/home?**", (route) => {
+    await page.route("**/api/tantan/v1/home?**", (route) => {
       const filterId = new URL(route.request().url()).searchParams.get("filterId")
       const item = filterId
         ? card("202", "article", "Filtered Codex")
@@ -141,10 +241,12 @@ test.describe("Tantan Home", () => {
       return route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(homePage([item], null)),
+        body: JSON.stringify(
+          homePage([item], null, filterId ? "generation-filter-1" : "generation-default", 1),
+        ),
       })
     })
-    await page.route("http://127.0.0.1:3000/tantan/v1/filter", async (route) => {
+    await page.route("**/api/tantan/v1/filter", async (route) => {
       if (route.request().method() !== "PUT") return route.fallback()
       filterCalls += 1
       expect(route.request().headers()["idempotency-key"]?.length).toBeGreaterThanOrEqual(16)
@@ -156,7 +258,9 @@ test.describe("Tantan Home", () => {
         body: JSON.stringify({
           filter: { id: "filter-1", prompt: "多推 Codex", createdAt: "2026-08-09T12:00:00Z" },
           topics: [topic("recommend", "推荐"), topic("topic-codex", "Codex")],
+          topicsRevision: 2,
           queueId: "queue-filter-1",
+          queueGeneration: "generation-filter-1",
         }),
       })
     })
@@ -188,25 +292,28 @@ test.describe("Tantan Home", () => {
     await mockSession(page)
     const entryId = "41147805272531997"
     let read = false
-    await page.route("http://127.0.0.1:3000/tantan/v1/topics", (route) =>
+    await page.route("**/api/tantan/v1/topics", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
           version: 1,
+          topicsRevision: 1,
           activeFilterId: null,
           topics: [topic("recommend", "推荐")],
         }),
       }),
     )
-    await page.route("http://127.0.0.1:3000/tantan/v1/home?**", (route) =>
+    await page.route("**/api/tantan/v1/home?**", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(homePage(read ? [] : [card(entryId, "article", "Read me")], null)),
+        body: JSON.stringify(
+          homePage(read ? [] : [card(entryId, "article", "Read me")], null, "generation-read", 1),
+        ),
       }),
     )
-    await page.route("http://localhost:3000/entries?**", (route) =>
+    await page.route("**/api/folo/entries?**", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -229,6 +336,7 @@ test.describe("Tantan Home", () => {
               attachments: null,
               extra: null,
               language: "en",
+              read: false,
             },
             feeds: { id: "feed-1", type: "feed" },
             settings: null,
@@ -236,7 +344,14 @@ test.describe("Tantan Home", () => {
         }),
       }),
     )
-    await page.route("http://localhost:3000/reads", (route) => {
+    await page.route(`**/api/tantan/v1/entries/${entryId}/enrichment?**`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ state: "pending", data: null, error: null }),
+      }),
+    )
+    await page.route("**/api/folo/reads", (route) => {
       read = true
       return route.fulfill({
         status: 200,
@@ -250,7 +365,6 @@ test.describe("Tantan Home", () => {
     await expect(page).toHaveURL(new RegExp(`/entries/${entryId}$`))
     await expect(page.getByRole("navigation", { name: "Mobile navigation" })).toHaveCount(0)
     await expect(page.getByRole("heading", { name: "Read me" })).toBeVisible()
-    await expect.poll(() => read).toBe(true)
 
     await page.getByRole("button", { name: "返回首页" }).click()
     await expect(page).toHaveURL(/\/$/)

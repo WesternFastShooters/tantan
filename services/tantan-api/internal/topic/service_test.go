@@ -64,7 +64,7 @@ func TestCoreTopicsAreSeededIdempotentlyAndClassificationIsAtomic(t *testing.T) 
 	if err != nil {
 		t.Fatalf("list topics: %v", err)
 	}
-	if list.Version < 1 || len(list.Topics) != 7 || list.Topics[0].ID != "recommend" || list.Topics[0].Kind != "virtual" {
+	if list.Version < 1 || list.TopicsRevision < 1 || len(list.Topics) != 7 || list.Topics[0].ID != "recommend" || list.Topics[0].Kind != "virtual" {
 		t.Fatalf("topics=%#v", list)
 	}
 	aiTopicID := topic.CoreID("user_1", "ai")
@@ -118,6 +118,9 @@ func TestTopicPatchUsesPersistentOptimisticVersionAndImmutableRecommend(t *testi
 	}
 	if after.Version <= before.Version {
 		t.Fatalf("version before=%d after=%d", before.Version, after.Version)
+	}
+	if after.TopicsRevision <= before.TopicsRevision {
+		t.Fatalf("topics revision before=%d after=%d", before.TopicsRevision, after.TopicsRevision)
 	}
 	if _, err := service.Patch(ctx, "user_1", before.Version, []topic.Operation{{Op: "show", TopicID: web3TopicID}}); !errors.Is(err, topic.ErrVersionConflict) {
 		t.Fatalf("stale version error=%v", err)

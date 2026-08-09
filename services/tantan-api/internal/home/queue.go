@@ -14,6 +14,7 @@ import (
 
 type queueRecord struct {
 	ID          string
+	Generation  string
 	UserID      string
 	LocalDate   string
 	FilterKey   string
@@ -66,7 +67,7 @@ func (service *Service) ensureQueue(ctx context.Context, request PlanRequest) (q
 		if err != nil {
 			return err
 		}
-		result = queueRecord{ID: state.ID, UserID: plan.UserID, LocalDate: plan.LocalDate, FilterKey: plan.FilterKey, Timezone: plan.Timezone, Version: state.Version, GeneratedAt: plan.GeneratedAt}
+		result = queueRecord{ID: state.ID, Generation: state.Generation, UserID: plan.UserID, LocalDate: plan.LocalDate, FilterKey: plan.FilterKey, Timezone: plan.Timezone, Version: state.Version, GeneratedAt: plan.GeneratedAt}
 		return nil
 	})
 	if err != nil {
@@ -133,6 +134,11 @@ func (service *Service) persistPlanTx(ctx context.Context, transaction *sql.Tx, 
 		return QueueState{}, fmt.Errorf("choose queue version: %w", err)
 	}
 	timestamp := plan.GeneratedAt.UTC().Format(time.RFC3339Nano)
+	generation := fmt.Sprintf("%s-v%d", plan.ID, version)
+	var filterID any
+	if plan.FilterKey != defaultFilterKey {
+		filterID = plan.FilterKey
+	}
 	if replace {
 		if _, err := transaction.ExecContext(ctx, `
 UPDATE daily_queues SET status='superseded',updated_at=?
@@ -141,8 +147,8 @@ WHERE user_id=? AND local_date=? AND filter_key=? AND status='ready'`, timestamp
 		}
 	}
 	if _, err := transaction.ExecContext(ctx, `
-INSERT INTO daily_queues(queue_id,user_id,local_date,filter_key,timezone,target_size,hard_limit,status,version,generated_at,created_at,updated_at)
-VALUES(?,?,?,?,?,50,60,'building',?,?,?,?)`, plan.ID, plan.UserID, plan.LocalDate, plan.FilterKey, plan.Timezone, version, timestamp, timestamp, timestamp); err != nil {
+INSERT INTO daily_queues(queue_id,user_id,local_date,filter_key,timezone,target_size,hard_limit,status,version,generated_at,created_at,updated_at,generation,topic_id,filter_id)
+VALUES(?,?,?,?,?,50,60,'building',?,?,?,?,?,'recommend',?)`, plan.ID, plan.UserID, plan.LocalDate, plan.FilterKey, plan.Timezone, version, timestamp, timestamp, timestamp, generation, filterID); err != nil {
 		return QueueState{}, fmt.Errorf("create queue: %w", err)
 	}
 	for index, item := range plan.Items {
@@ -159,7 +165,7 @@ VALUES(?,?,?,?,?,'unread',?,?)`, plan.ID, item.EntryID, index+1, item.Score.Tota
 	if _, err := transaction.ExecContext(ctx, "UPDATE daily_queues SET status='ready',generated_at=?,updated_at=? WHERE queue_id=? AND status='building'", timestamp, timestamp, plan.ID); err != nil {
 		return QueueState{}, fmt.Errorf("publish queue: %w", err)
 	}
-	record := queueRecord{ID: plan.ID, UserID: plan.UserID, LocalDate: plan.LocalDate, FilterKey: plan.FilterKey, Timezone: plan.Timezone, Version: version, GeneratedAt: plan.GeneratedAt.UTC()}
+	record := queueRecord{ID: plan.ID, Generation: generation, UserID: plan.UserID, LocalDate: plan.LocalDate, FilterKey: plan.FilterKey, Timezone: plan.Timezone, Version: version, GeneratedAt: plan.GeneratedAt.UTC()}
 	return queueStateTx(ctx, transaction, record, "recommend")
 }
 
@@ -244,13 +250,16 @@ func (service *Service) queryReady(ctx context.Context, userID, localDate, filte
 	var record queueRecord
 	var generated string
 	err := service.store.DB().QueryRowContext(ctx, `
-SELECT queue_id,user_id,local_date,filter_key,timezone,version,generated_at
-FROM daily_queues WHERE user_id=? AND local_date=? AND filter_key=? AND status='ready'`, userID, localDate, filterKey).Scan(&record.ID, &record.UserID, &record.LocalDate, &record.FilterKey, &record.Timezone, &record.Version, &generated)
+SELECT queue_id,generation,user_id,local_date,filter_key,timezone,version,generated_at
+FROM daily_queues WHERE user_id=? AND local_date=? AND filter_key=? AND status='ready'`, userID, localDate, filterKey).Scan(&record.ID, &record.Generation, &record.UserID, &record.LocalDate, &record.FilterKey, &record.Timezone, &record.Version, &generated)
 	if errors.Is(err, sql.ErrNoRows) {
 		return queueRecord{}, false, nil
 	}
 	if err != nil {
 		return queueRecord{}, false, fmt.Errorf("read ready queue: %w", err)
+	}
+	if !validHomeID(record.Generation) {
+		return queueRecord{}, false, errors.New("ready queue has invalid generation")
 	}
 	record.GeneratedAt, err = time.Parse(time.RFC3339Nano, generated)
 	if err != nil {
@@ -274,13 +283,16 @@ func queryReadyTx(ctx context.Context, transaction *sql.Tx, userID, localDate, f
 	var record queueRecord
 	var generated string
 	err := transaction.QueryRowContext(ctx, `
-SELECT queue_id,user_id,local_date,filter_key,timezone,version,generated_at
-FROM daily_queues WHERE user_id=? AND local_date=? AND filter_key=? AND status='ready'`, userID, localDate, filterKey).Scan(&record.ID, &record.UserID, &record.LocalDate, &record.FilterKey, &record.Timezone, &record.Version, &generated)
+SELECT queue_id,generation,user_id,local_date,filter_key,timezone,version,generated_at
+FROM daily_queues WHERE user_id=? AND local_date=? AND filter_key=? AND status='ready'`, userID, localDate, filterKey).Scan(&record.ID, &record.Generation, &record.UserID, &record.LocalDate, &record.FilterKey, &record.Timezone, &record.Version, &generated)
 	if errors.Is(err, sql.ErrNoRows) {
 		return queueRecord{}, false, nil
 	}
 	if err != nil {
 		return queueRecord{}, false, err
+	}
+	if !validHomeID(record.Generation) {
+		return queueRecord{}, false, errors.New("ready queue has invalid generation")
 	}
 	record.GeneratedAt, err = time.Parse(time.RFC3339Nano, generated)
 	if err != nil {

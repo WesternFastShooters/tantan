@@ -110,7 +110,7 @@ func TestDailyQueueIsStableBoundedAndCursorBound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(first.Items) != 20 || first.NextCursor == nil || first.Queue.Total != 50 || first.Queue.Unread != 50 || first.Queue.Finished || first.Queue.CandidateWindowDays != 7 {
+	if len(first.Items) != 20 || first.NextCursor == nil || first.Queue.Total != 50 || first.Queue.Unread != 50 || first.Queue.Finished || first.Queue.CandidateWindowDays != 7 || first.Queue.Generation == "" || first.QueueGeneration != first.Queue.Generation {
 		t.Fatalf("first=%#v", first)
 	}
 	if !reflect.DeepEqual(first.Items, again.Items) || first.Queue.ID != again.Queue.ID || first.Queue.Version != again.Queue.Version {
@@ -358,8 +358,9 @@ func TestConcurrentFirstHomeRequestPublishesOneReadyQueue(t *testing.T) {
 	store := openHomeStore(t)
 	insertHomeFixture(t, store, clock, 60, clock.Add(-time.Hour), "base")
 	service := newHomeService(t, store, &clock)
-	const workers = 8
-	ids := make(chan string, workers)
+	const workers = 20
+	type identity struct{ id, generation string }
+	identities := make(chan identity, workers)
 	errorsChannel := make(chan error, workers)
 	var group sync.WaitGroup
 	for range workers {
@@ -371,22 +372,24 @@ func TestConcurrentFirstHomeRequestPublishesOneReadyQueue(t *testing.T) {
 				errorsChannel <- err
 				return
 			}
-			ids <- page.Queue.ID
+			identities <- identity{id: page.Queue.ID, generation: page.Queue.Generation}
 		}()
 	}
 	group.Wait()
-	close(ids)
+	close(identities)
 	close(errorsChannel)
 	for err := range errorsChannel {
 		t.Fatal(err)
 	}
 	first := ""
-	for id := range ids {
+	firstGeneration := ""
+	for item := range identities {
 		if first == "" {
-			first = id
+			first = item.id
+			firstGeneration = item.generation
 		}
-		if id != first {
-			t.Fatalf("concurrent queue IDs %q and %q", first, id)
+		if item.id != first || item.generation == "" || item.generation != firstGeneration {
+			t.Fatalf("concurrent queue identities %q/%q and %q/%q", first, firstGeneration, item.id, item.generation)
 		}
 	}
 	var ready int

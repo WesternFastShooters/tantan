@@ -18,11 +18,12 @@ var (
 )
 
 type cursorPayload struct {
-	Version   int    `json:"v"`
-	QueryHash string `json:"q"`
-	QueueID   string `json:"queue"`
-	QueueVer  int    `json:"queueVersion"`
-	AfterRank int    `json:"afterRank"`
+	Version    int    `json:"v"`
+	QueryHash  string `json:"q"`
+	Generation string `json:"generation"`
+	QueueID    string `json:"queue"`
+	QueueVer   int    `json:"queueVersion"`
+	AfterRank  int    `json:"afterRank"`
 }
 
 func homeQueryHash(userID, topicID, filterKey, timezone string) string {
@@ -53,11 +54,11 @@ func decodeCursor(key []byte, encoded string) (cursorPayload, error) {
 		return cursorPayload{}, ErrCursorInvalid
 	}
 	contents, err := base64.RawURLEncoding.DecodeString(encoded[:dot])
-	if err != nil {
+	if err != nil || base64.RawURLEncoding.EncodeToString(contents) != encoded[:dot] {
 		return cursorPayload{}, ErrCursorInvalid
 	}
 	signature, err := base64.RawURLEncoding.DecodeString(encoded[dot+1:])
-	if err != nil {
+	if err != nil || base64.RawURLEncoding.EncodeToString(signature) != encoded[dot+1:] {
 		return cursorPayload{}, ErrCursorInvalid
 	}
 	mac := hmac.New(sha256.New, key)
@@ -68,7 +69,7 @@ func decodeCursor(key []byte, encoded string) (cursorPayload, error) {
 	decoder := json.NewDecoder(bytes.NewReader(contents))
 	decoder.DisallowUnknownFields()
 	var payload cursorPayload
-	if err := decoder.Decode(&payload); err != nil || decoder.Decode(&struct{}{}) != io.EOF || payload.Version != 1 || len(payload.QueryHash) != 64 || payload.QueueID == "" || payload.QueueVer < 1 || payload.AfterRank < 1 || payload.AfterRank > 60 {
+	if err := decoder.Decode(&payload); err != nil || decoder.Decode(&struct{}{}) != io.EOF || payload.Version != 2 || len(payload.QueryHash) != 64 || !validHomeID(payload.Generation) || payload.QueueID == "" || payload.QueueVer < 1 || payload.AfterRank < 1 || payload.AfterRank > 60 {
 		return cursorPayload{}, ErrCursorInvalid
 	}
 	return payload, nil

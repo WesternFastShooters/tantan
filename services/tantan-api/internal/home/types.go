@@ -32,6 +32,7 @@ type PlanRequest struct {
 type QueueState struct {
 	ID                  string `json:"id"`
 	Version             int    `json:"version"`
+	Generation          string `json:"generation"`
 	Total               int    `json:"total"`
 	Unread              int    `json:"unread"`
 	Finished            bool   `json:"finished"`
@@ -64,9 +65,10 @@ type Card struct {
 }
 
 type Page struct {
-	Items      []Card     `json:"items"`
-	NextCursor *string    `json:"nextCursor"`
-	Queue      QueueState `json:"queue"`
+	Items           []Card     `json:"items"`
+	NextCursor      *string    `json:"nextCursor"`
+	Queue           QueueState `json:"queue"`
+	QueueGeneration string     `json:"queueGeneration"`
 }
 
 type QueuePlan struct {
