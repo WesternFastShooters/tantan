@@ -62,14 +62,14 @@
 
 ## 6. 端到端可观测性、测试与验收
 
-| Flow ID             | Correlation                        | Logs/Metrics/Traces                  | Contract Test                       | E2E/Failure Test                                               | Owner    | AC ID |
-| ------------------- | ---------------------------------- | ------------------------------------ | ----------------------------------- | -------------------------------------------------------------- | -------- | ----- |
-| FLOW-01 Login       | requestId→session idHash（不输出） | auth code/status/duration            | OpenAPI auth + fake Folo Set-Cookie | 成功、错密、2FA、Folo down、secret scan                        | FE+BE    | AC-20 |
-| FLOW-02 Home        | requestId→generation               | page count/duration/version conflict | Home Schema/cursor                  | stable pagination、read removal、图片失败、finished            | FE+BE    | AC-21 |
-| FLOW-03 Filter      | requestId→jobId→revision           | AI/filter/transaction status         | AI Schema + snapshot                | success/invalid/timeout/crash 保持旧首页                       | FE+BE    | AC-22 |
-| FLOW-04 Search/Sync | requestId→sync job/checkpoint      | freshness/result count               | Search DTO                          | 原文/译文/Source/Topic/Tag、cancel/resume                      | FE+BE    | AC-23 |
-| FLOW-05 Server AI   | requestId→provider preset          | provider/model/status                | preset allowlist/schema             | canary 扫 browser request/storage、DB、log、HAR、build、backup | Security | AC-24 |
-| FLOW-06 Deploy/PWA  | requestId→release version          | ready/static/version                 | health/config                       | 真实手机 HTTPS、offline shell、restore                         | Ops      | AC-25 |
+| Flow ID             | Correlation                        | Logs/Metrics/Traces                  | Contract Test                            | E2E/Failure Test                                               | Owner    | AC ID |
+| ------------------- | ---------------------------------- | ------------------------------------ | ---------------------------------------- | -------------------------------------------------------------- | -------- | ----- |
+| FLOW-01 Login       | requestId→session idHash（不输出） | auth code/status/duration            | OpenAPI auth + fake Folo Set-Cookie/TOTP | 成功、错密、2FA 成功/过期、Folo down、secret scan              | FE+BE    | AC-20 |
+| FLOW-02 Home        | requestId→generation               | page count/duration/version conflict | Home Schema/cursor                       | stable pagination、read removal、图片失败、finished            | FE+BE    | AC-21 |
+| FLOW-03 Filter      | requestId→jobId→revision           | AI/filter/transaction status         | AI Schema + snapshot                     | success/invalid/timeout/crash 保持旧首页                       | FE+BE    | AC-22 |
+| FLOW-04 Search/Sync | requestId→sync job/checkpoint      | freshness/result count               | Search DTO                               | 原文/译文/Source/Topic/Tag、cancel/resume                      | FE+BE    | AC-23 |
+| FLOW-05 Server AI   | requestId→provider preset          | provider/model/status                | preset allowlist/schema                  | canary 扫 browser request/storage、DB、log、HAR、build、backup | Security | AC-24 |
+| FLOW-06 Deploy/PWA  | requestId→release version          | ready/static/version                 | health/config                            | 真实手机 HTTPS、offline shell、restore                         | Ops      | AC-25 |
 
 ## 7. 跨领域需求追踪
 

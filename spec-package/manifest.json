@@ -59,27 +59,27 @@
     {
       "path": "00-project.md",
       "role": "project-scope-and-decisions",
-      "sha256": "661a7b5ac3c4d5d49c4e5cf24f4b6c7c3dbbb33e58811f8568affcdb02e4a501"
+      "sha256": "4857e9ee720cc9bf477f4d6d1da5183bdca33a1f84a2da487222f6cc763756ad"
     },
     {
       "path": "10-frontend.md",
       "role": "frontend-domain-spec",
-      "sha256": "c469f5561d39ded649e1da2433daba5e16f77b0d18c231b4ae924127ea6a8917"
+      "sha256": "98d001ce6d815f05098388cc796cd2331da2ef7bf1b4980b37a06719a14a7143"
     },
     {
       "path": "20-backend.md",
       "role": "backend-domain-spec",
-      "sha256": "cbcdcbb8f24b45e38ce874d83c73d3a1555142c9f30ee8cba5e9e919edcfa193"
+      "sha256": "3828c6040aaeb49cde4a16a826f861d6c007deb1fc3fc03e8f84cc2bb4fe8137"
     },
     {
       "path": "80-cross-domain.md",
       "role": "cross-domain-contract",
-      "sha256": "ff20f98fa1d49e9d78a6edd76bbe7e53666d0942ed7d211dfe2d1a96aac4abde"
+      "sha256": "0b52f7cc61f226f37dbf19642a8773c332e2d246046a22ab0caa9d9db673ac7b"
     },
     {
       "path": "90-delivery.md",
       "role": "delivery-and-acceptance-spec",
-      "sha256": "a8aef92891dd08a27fcdbf4019610841d2529a77352285f14417e4a1771b70ac"
+      "sha256": "e8d242aa1fa28fd0e226dc25b0c8209548d75232ab8a4fe4bed653e48fd4cf8e"
     },
     {
       "path": "README.md",
@@ -104,17 +104,17 @@
     {
       "path": "agent/task-manifest.json",
       "role": "task-dag-and-write-boundaries",
-      "sha256": "95a152a02721d9a91e7e37492457e24b38b96fad0eac7319554f8c2eed626cfd"
+      "sha256": "b77c483bbe1a7f915c61e37d4d2c5d995919381a73cae4645f27f755a002e99f"
     },
     {
       "path": "api/folo-route-policy.json",
       "role": "upstream-route-policy",
-      "sha256": "7ece98fe06172c6e7c011e0d30737b10db14e2ea45c9c01681f963372b12acf9"
+      "sha256": "3541a6308e0752c6f3e0edefd1fb8f268d49e4d4236451ad1f8b54a092828de5"
     },
     {
       "path": "api/openapi.json",
       "role": "public-http-contract",
-      "sha256": "fffee801acd3443a0c838601e15516d27d9a746e7ab348a3c6c401e243c099ec"
+      "sha256": "50f81ab2c11a269a12d98aa552b134254079fc94fdc0568c01a758e16dd7d9a4"
     },
     {
       "path": "db/0001_core.sql",
@@ -179,7 +179,7 @@
     {
       "path": "scripts/validate-package.rb",
       "role": "offline-contract-validator",
-      "sha256": "aae5475cb3526384e7300dcd7dd58565e69e1460ed7951735a05b998c3ff96e5"
+      "sha256": "baf83f5d4f5e7407867684655ec44f474c92625559d02c42332a1a124fb114d2"
     },
     {
       "path": "scripts/validate-package.sh",
@@ -194,7 +194,7 @@
     {
       "path": "tests/acceptance-matrix.md",
       "role": "acceptance-tests",
-      "sha256": "710dc5406f43b29bf6ecd3829102f1ea15f93a8220c38347390f02c61318f88c"
+      "sha256": "69495bd771548509387a0d3851052ba3e03f1b20a484ddaf9adb2012c4e11768"
     }
   ],
   "inputs": [

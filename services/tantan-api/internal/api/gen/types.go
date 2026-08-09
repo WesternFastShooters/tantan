@@ -4,7 +4,7 @@ package gen
 
 import "encoding/json"
 
-const ContractSHA256 = "775d01f09672845d7f112d6803f4712bd5ebef1c45c49daf9720777b27aa9486"
+const ContractSHA256 = "5a84281ae8b0870ab64bb3bcdde479ae91fdbcd33c2e2194fe80c24a3ed7bb4a"
 
 type Identifier string
 type EntryType string
@@ -124,6 +124,22 @@ type FoloEmailLoginRequest struct {
 	Email    string  `json:"email"`
 	Password string  `json:"password"`
 	ReturnTo *string `json:"returnTo,omitempty"`
+}
+
+type FoloTwoFactorVerifyRequest struct {
+	FlowID Identifier `json:"flowId"`
+	Code   string     `json:"code"`
+}
+
+type FoloTwoFactorChallenge struct {
+	FlowID    Identifier `json:"flowId"`
+	ExpiresAt string     `json:"expiresAt"`
+}
+
+type FoloTwoFactorChallengeResponse struct {
+	RequestID string                 `json:"requestId"`
+	Error     ErrorObject            `json:"error"`
+	Challenge FoloTwoFactorChallenge `json:"challenge"`
 }
 
 type Topic struct {

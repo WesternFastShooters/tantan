@@ -145,6 +145,22 @@ type FoloEmailLoginRequest struct {
 	ReturnTo *string \`json:"returnTo,omitempty"\`
 }
 
+type FoloTwoFactorVerifyRequest struct {
+	FlowID Identifier \`json:"flowId"\`
+	Code   string     \`json:"code"\`
+}
+
+type FoloTwoFactorChallenge struct {
+	FlowID    Identifier \`json:"flowId"\`
+	ExpiresAt string     \`json:"expiresAt"\`
+}
+
+type FoloTwoFactorChallengeResponse struct {
+	RequestID string                 \`json:"requestId"\`
+	Error     ErrorObject            \`json:"error"\`
+	Challenge FoloTwoFactorChallenge \`json:"challenge"\`
+}
+
 type Topic struct {
 	ID          Identifier \`json:"id"\`
 	Name        string     \`json:"name"\`
@@ -404,6 +420,17 @@ export interface FoloEmailLoginRequest {
   email: string
   password: string
   returnTo?: string
+}
+
+export interface FoloTwoFactorVerifyRequest {
+  flowId: Identifier
+  code: string
+}
+
+export interface FoloTwoFactorChallengeResponse {
+  requestId: string
+  error: ErrorObject & { code: "AUTH_2FA_REQUIRED" }
+  challenge: { flowId: Identifier; expiresAt: string }
 }
 
 export interface Topic {

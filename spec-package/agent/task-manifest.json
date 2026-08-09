@@ -99,7 +99,7 @@
         "spec-package/schemas/**"
       ],
       "requiredGates": [
-        "Red and Verify evidence cover public origin, trusted proxy, provider list, social one-time-token bridge, email login, CSRF and secret redaction",
+        "Red and Verify evidence cover public origin, trusted proxy, provider list, social one-time-token bridge, email plus TOTP login, CSRF and secret redaction",
         "Folo password and session token never appear in browser responses, SQLite plaintext, logs or fixtures",
         "unknown or disabled Folo routes are denied before any upstream request",
         "production listener, static SPA fallback and readiness integration tests pass",

@@ -59,19 +59,20 @@
 
 ### 2.3 用户决策
 
-| Decision ID | 问题            | 用户确认结果                                                                           | 影响的文档/合同                     |
-| ----------- | --------------- | -------------------------------------------------------------------------------------- | ----------------------------------- |
-| DEC-01      | 交付端          | 只做部署后手机访问的 Mobile Web/PWA；不做 PC Web、Electron 和原生 App                  | 全包                                |
-| DEC-02      | 非首页 UI       | Folo Mobile 前端怎样，Tantan Mobile Web 就怎样                                         | `10-frontend.md`                    |
-| DEC-03      | 首页            | 只按原型替换为类小红书瀑布流、AI Topic、搜索和 AI Filter                               | `10-frontend.md`、OpenAPI           |
-| DEC-04      | 导航            | Folo Mobile 当前四 Tab 是权威，原型旧三 Tab 不覆盖“发现”                               | `10-frontend.md`                    |
-| DEC-05      | AI 和会员       | 用项目所有者自己的 Key；不显示或调用 Folo 充值、会员升级和付费 AI                      | 全包、route policy                  |
-| DEC-06      | 推荐队列        | 最近 7 天未读；初始最多 50；当天最多 60；消费完显示“今天已经看完”                      | 前后端、Schema、DDL                 |
-| DEC-07      | 搜索语义        | 普通搜索进入独立页，不改变 Home Topic、Filter 和 Queue                                 | 前后端                              |
-| DEC-08      | AI 图标语义     | 只打开 Filter Sheet；提交成功才原子更新 Filter、Topics 和 Queue                        | 前后端                              |
-| DEC-09      | 执行授权        | 用户要求建立并持续执行长任务满足以上目标                                               | `90-delivery.md`                    |
-| DEC-10      | 登录能力        | Folo 怎么登录，Tantan 就怎么登录；不得只支持 Email                                     | 前后端 Auth、OpenAPI、验收          |
-| DEC-11      | Gemini Key 位置 | 固定 `gemini-3.5-flash-lite`；API Key 由 Go 服务端配置注入，浏览器不得提交、保存或读取 | 后端配置、OpenAPI、设置页、安全验收 |
+| Decision ID | 问题            | 用户确认结果                                                                                          | 影响的文档/合同                     |
+| ----------- | --------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| DEC-01      | 交付端          | 只做部署后手机访问的 Mobile Web/PWA；不做 PC Web、Electron 和原生 App                                 | 全包                                |
+| DEC-02      | 非首页 UI       | Folo Mobile 前端怎样，Tantan Mobile Web 就怎样                                                        | `10-frontend.md`                    |
+| DEC-03      | 首页            | 只按原型替换为类小红书瀑布流、AI Topic、搜索和 AI Filter                                              | `10-frontend.md`、OpenAPI           |
+| DEC-04      | 导航            | Folo Mobile 当前四 Tab 是权威，原型旧三 Tab 不覆盖“发现”                                              | `10-frontend.md`                    |
+| DEC-05      | AI 和会员       | 用项目所有者自己的 Key；不显示或调用 Folo 充值、会员升级和付费 AI                                     | 全包、route policy                  |
+| DEC-06      | 推荐队列        | 最近 7 天未读；初始最多 50；当天最多 60；消费完显示“今天已经看完”                                     | 前后端、Schema、DDL                 |
+| DEC-07      | 搜索语义        | 普通搜索进入独立页，不改变 Home Topic、Filter 和 Queue                                                | 前后端                              |
+| DEC-08      | AI 图标语义     | 只打开 Filter Sheet；提交成功才原子更新 Filter、Topics 和 Queue                                       | 前后端                              |
+| DEC-09      | 执行授权        | 用户要求建立并持续执行长任务满足以上目标                                                              | `90-delivery.md`                    |
+| DEC-10      | 登录能力        | Folo 怎么登录，Tantan 就怎么登录；不得只支持 Email                                                    | 前后端 Auth、OpenAPI、验收          |
+| DEC-11      | Gemini Key 位置 | 固定 `gemini-3.5-flash-lite`；API Key 由 Go 服务端配置注入，浏览器不得提交、保存或读取                | 后端配置、OpenAPI、设置页、安全验收 |
+| DEC-12      | Email 2FA       | Folo Email 登录若要求 TOTP，Tantan 必须在同一登录页完成；pending upstream cookie 只在 Go 内存短时保存 | Auth、OpenAPI、登录 E2E             |
 
 ## 3. 背景、目标与边界
 

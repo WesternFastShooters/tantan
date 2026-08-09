@@ -50,6 +50,11 @@
       "methods": ["POST"],
       "pathPattern": "^/better-auth/one-time-token/verify$"
     },
+    {
+      "id": "auth-two-factor-verify-totp",
+      "methods": ["POST"],
+      "pathPattern": "^/better-auth/two-factor/verify-totp$"
+    },
     { "id": "auth-session", "methods": ["GET"], "pathPattern": "^/better-auth/get-session$" },
     { "id": "auth-sign-out", "methods": ["POST"], "pathPattern": "^/better-auth/sign-out$" }
   ],

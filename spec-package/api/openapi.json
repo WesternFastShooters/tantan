@@ -155,6 +155,37 @@
         }
       }
     },
+    "/api/auth/folo/two-factor": {
+      "post": {
+        "tags": ["Auth"],
+        "operationId": "verifyFoloEmailTwoFactor",
+        "description": "Completes a pending Folo Email TOTP challenge held only in Go memory. The pending upstream cookie is never returned to the browser.",
+        "security": [],
+        "parameters": [{ "$ref": "#/components/parameters/Origin" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/FoloTwoFactorVerifyRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tantan session created",
+            "headers": { "Set-Cookie": { "schema": { "type": "string", "writeOnly": true } } },
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SessionResponse" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/AuthInvalid" },
+          "403": { "$ref": "#/components/responses/OriginRejected" },
+          "410": { "$ref": "#/components/responses/AuthFlowInvalid" },
+          "503": { "$ref": "#/components/responses/FoloUnavailable" }
+        }
+      }
+    },
     "/api/auth/logout": {
       "post": {
         "tags": ["Auth"],
@@ -763,6 +794,41 @@
           "returnTo": { "type": "string", "pattern": "^/[A-Za-z0-9/_?&=.%:-]*$", "maxLength": 1024 }
         }
       },
+      "FoloTwoFactorVerifyRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["flowId", "code"],
+        "properties": {
+          "flowId": { "$ref": "#/components/schemas/Identifier" },
+          "code": { "type": "string", "pattern": "^[0-9]{6,10}$", "writeOnly": true }
+        }
+      },
+      "FoloTwoFactorChallengeResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["requestId", "error", "challenge"],
+        "properties": {
+          "requestId": { "type": "string", "minLength": 8, "maxLength": 128 },
+          "error": {
+            "allOf": [
+              { "$ref": "#/components/schemas/ErrorObject" },
+              {
+                "type": "object",
+                "properties": { "code": { "const": "AUTH_2FA_REQUIRED" } }
+              }
+            ]
+          },
+          "challenge": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["flowId", "expiresAt"],
+            "properties": {
+              "flowId": { "$ref": "#/components/schemas/Identifier" },
+              "expiresAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      },
       "SessionResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -1153,7 +1219,9 @@
       "AuthTwoFactorRequired": {
         "description": "AUTH_2FA_REQUIRED",
         "content": {
-          "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/FoloTwoFactorChallengeResponse" }
+          }
         }
       },
       "AuthTokenUsed": {

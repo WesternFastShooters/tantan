@@ -223,7 +223,7 @@ def validate_openapi
 
   expected_paths = %w[
     /api/healthz /api/readyz /api/auth/folo/providers /api/auth/folo/social-start
-    /api/auth/folo/email /api/auth/folo/token /api/auth/logout
+    /api/auth/folo/email /api/auth/folo/token /api/auth/folo/two-factor /api/auth/logout
     /api/tantan/v1/session /api/tantan/v1/home /api/tantan/v1/topics /api/tantan/v1/filter
     /api/tantan/v1/recommendation/feedback /api/tantan/v1/recommendation/blocks/sources
     /api/tantan/v1/recommendation/blocks/sources/{sourceId} /api/tantan/v1/search
@@ -316,7 +316,7 @@ def validate_route_policy
 
   fail_check("Folo settings must not be publicly proxied") if enabled.any? { |route| route["id"].to_s.start_with?("settings") }
   internal_auth_ids = policy.fetch("internalAuthRoutes", []).map { |route| route["id"] }
-  %w[auth-sign-in-email auth-token-apply auth-token-verify auth-session auth-sign-out].each do |id|
+  %w[auth-sign-in-email auth-token-apply auth-token-verify auth-two-factor-verify-totp auth-session auth-sign-out].each do |id|
     fail_check("internal auth route missing #{id}") unless internal_auth_ids.include?(id)
   end
 
