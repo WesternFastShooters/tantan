@@ -161,7 +161,7 @@ SELECT
   f.image,
   ae.read_at,
   ae.collected_at,
-  COALESCE((SELECT json_group_array(json_object('id',t.topic_id,'name',t.name)) FROM entry_topics et JOIN topics t ON t.topic_id=et.topic_id AND t.user_id=et.user_id WHERE et.user_id=ae.user_id AND et.entry_id=e.entry_id), '[]'),
+  COALESCE((SELECT json_group_array(json_object('id',t.topic_id,'name',t.name)) FROM entry_topics et JOIN topics t ON t.topic_id=et.topic_id AND t.user_id=et.user_id WHERE et.user_id=ae.user_id AND et.entry_id=e.entry_id AND et.content_hash=e.content_hash), '[]'),
   EXISTS(SELECT 1 FROM entry_enrichments en WHERE en.entry_id=e.entry_id AND en.state='ready' AND en.content_hash=e.content_hash AND (en.translated_title IS NOT NULL OR en.translated_content IS NOT NULL)),
   ranked.score
 FROM ranked

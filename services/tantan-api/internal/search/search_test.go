@@ -203,4 +203,9 @@ WHERE entry_id='entry_main'`, newHash); err != nil {
 	if err != nil || !resultContains(page.Items, "entry_main") {
 		t.Fatalf("fresh original search=%#v err=%v", page, err)
 	}
+	for _, item := range page.Items {
+		if item.EntryID == "entry_main" && (item.Translated || len(item.Topics) != 0) {
+			t.Fatalf("fresh card retained stale derived data: %#v", item)
+		}
+	}
 }

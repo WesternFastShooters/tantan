@@ -119,3 +119,5 @@ go test -race ./internal/storage/... ./internal/sync/... ./internal/search/... -
 ```
 
 Exit `0`; race results: storage `1.684s`, sync `4.290s`, search `2.334s`. The 100,000-entry sync/search regression also passed again in the non-race run.
+
+A DTO projection follow-up extended the same Red to assert that a fresh original-content match has `translated=false` and no stale Topic objects. It initially failed with `TopicToken` still present on the card. The result Topic subquery now also requires `entry_topics.content_hash=entries.content_hash`; full search and search-race suites pass (`4.645s` / `1.764s`).
