@@ -92,7 +92,7 @@ export function AIFilterSheet({
             first.focus()
           }
         }}
-        className="relative max-h-[70dvh] w-full max-w-[430px] overflow-y-auto rounded-t-3xl border border-white/10 bg-[#1f2025] px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl"
+        className="relative max-h-[70dvh] w-full overflow-y-auto rounded-t-3xl border border-white/10 bg-[#1f2025] px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl"
       >
         <div className="flex justify-center pb-3 pt-3" aria-hidden>
           <span className="h-1 w-9 rounded-full bg-[#3a3b42]" />

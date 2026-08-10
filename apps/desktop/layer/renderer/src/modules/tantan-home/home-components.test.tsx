@@ -118,6 +118,17 @@ describe("Tantan Home interactions", () => {
     expect(document.activeElement?.getAttribute("aria-label")).toBe("取消")
   })
 
+  test("BUG:ai-filter-sheet spans the mobile shell width without side gutters", async () => {
+    const view = await render(
+      <AIFilterSheet open pending={false} error={null} onClose={vi.fn()} onSubmit={vi.fn()} />,
+    )
+
+    const dialog = view.querySelector<HTMLElement>('[role="dialog"]')
+    expect(dialog).not.toBeNull()
+    expect(dialog?.classList.contains("w-full")).toBe(true)
+    expect([...dialog!.classList].some((className) => className.startsWith("max-w-"))).toBe(false)
+  })
+
   test("REQ:AI-DYNAMIC-TOPICS suggested prompts populate the AI Filter input", async () => {
     const view = await render(
       <AIFilterSheet open pending={false} error={null} onClose={vi.fn()} onSubmit={vi.fn()} />,
