@@ -75,6 +75,7 @@ const mockShell = async (page: Page) => {
 test("FE:TC-013 failed enrichment keeps original content and exposes retry", async ({ page }) => {
   await mockShell(page)
   let retried = false
+  let requestedFields: string[] = []
   await page.route(`**/api/tantan/v1/entries/${entryId}/enrichment?**`, (route) =>
     route.fulfill({
       status: 200,
@@ -88,6 +89,7 @@ test("FE:TC-013 failed enrichment keeps original content and exposes retry", asy
   )
   await page.route(`**/api/tantan/v1/entries/${entryId}/enrichment`, (route) => {
     retried = true
+    requestedFields = route.request().postDataJSON().fields
     return route.fulfill({
       status: 202,
       contentType: "application/json",
@@ -102,6 +104,7 @@ test("FE:TC-013 failed enrichment keeps original content and exposes retry", asy
   await expect(page.getByText("AI 处理失败，已显示原文。")).toBeVisible()
   await page.getByRole("button", { name: "重试翻译与摘要" }).click()
   await expect.poll(() => retried).toBe(true)
+  expect(requestedFields).toEqual(["translation", "summary", "keyPoints"])
   await expect(page.getByText("AI 处理中…原文仍可正常阅读。")).toBeVisible()
   await expect(page.getByText("ORIGINAL CONTENT", { exact: true })).toBeVisible()
 })

@@ -34,8 +34,8 @@ func TestLoad100KHomeMeetsLatencyAndMemoryBudget(t *testing.T) {
 			}
 		}
 		entryStatement, err := transaction.PrepareContext(ctx, `
-INSERT INTO entries(entry_id,feed_id,kind,title,content,media_json,published_at,content_hash,created_at,updated_at)
-VALUES(?,?,?,?,?,'[]',?,?,?,?)`)
+INSERT INTO entries(entry_id,feed_id,kind,title,content,language,media_json,published_at,content_hash,created_at,updated_at)
+VALUES(?,?,?,?,?,'zh-CN','[]',?,?,?,?)`)
 		if err != nil {
 			return err
 		}

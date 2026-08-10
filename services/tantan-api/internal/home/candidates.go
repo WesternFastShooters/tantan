@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
 
 	"tantan.local/tantan-api/internal/recommendation"
 )
@@ -130,16 +131,10 @@ func applyFilter(record candidateRecord, spec *recommendation.FilterSpecV1) (rec
 		return candidate, true
 	}
 	topics := stringSet(record.TopicIDs)
-	if len(spec.IncludeTopics) > 0 && !setIntersects(topics, spec.IncludeTopics) {
-		return recommendation.Candidate{}, false
-	}
 	if setIntersects(topics, spec.ExcludeTopics) || containsString(spec.ExcludeSources, candidate.SourceID) {
 		return recommendation.Candidate{}, false
 	}
-	if len(spec.IncludeSources) > 0 && !containsString(spec.IncludeSources, candidate.SourceID) {
-		return recommendation.Candidate{}, false
-	}
-	if len(spec.Languages) > 0 && !containsString(spec.Languages, record.Language) {
+	if len(spec.Languages) > 0 && !languageAllowed(record, spec.Languages) {
 		return recommendation.Candidate{}, false
 	}
 	if len(spec.ContentStyles) > 0 && !containsString(spec.ContentStyles, record.Kind) {
@@ -147,9 +142,6 @@ func applyFilter(record candidateRecord, spec *recommendation.FilterSpecV1) (rec
 	}
 	haystack := strings.ToLower(record.Title + " " + record.Body)
 	if matchesAny(haystack, spec.NegativeTerms) {
-		return recommendation.Candidate{}, false
-	}
-	if len(spec.IncludeTerms) > 0 && !matchesAny(haystack, spec.IncludeTerms) {
 		return recommendation.Candidate{}, false
 	}
 	matched := 0
@@ -169,12 +161,39 @@ func applyFilter(record candidateRecord, spec *recommendation.FilterSpecV1) (rec
 			}
 		}
 	}
+	// Positive signals are alternatives, not a cumulative AND. A natural-language
+	// preference such as "多推 SpaceX、星链和航天" may be represented by Gemini
+	// as a topic, source, and terms at the same time. Requiring every signal would
+	// incorrectly discard relevant entries when upstream metadata is incomplete.
+	if total > 0 && matched == 0 {
+		return recommendation.Candidate{}, false
+	}
 	if total > 0 {
 		candidate.FilterMatch = 30 * float64(matched) / float64(total)
 	}
 	weights := spec.Weights
 	candidate.FilterWeights = &weights
 	return candidate, true
+}
+
+func languageAllowed(record candidateRecord, requested []string) bool {
+	language := strings.ToLower(strings.TrimSpace(record.Language))
+	if language == "" {
+		language = "en"
+		for _, value := range record.Title + " " + record.Body {
+			if unicode.Is(unicode.Han, value) {
+				language = "zh"
+				break
+			}
+		}
+	}
+	for _, value := range requested {
+		value = strings.ToLower(strings.TrimSpace(value))
+		if value == language || (strings.HasPrefix(value, "zh") && strings.HasPrefix(language, "zh")) {
+			return true
+		}
+	}
+	return false
 }
 
 func stringSet(values []string) map[string]struct{} {

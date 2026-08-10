@@ -47,10 +47,10 @@ func ValidateEnrichmentOutput(contents []byte) (EnrichmentV1, error) {
 	if output.Version != 1 || !languagePattern.MatchString(output.DetectedLanguage) {
 		return EnrichmentV1{}, errors.New("AI enrichment output does not match schema")
 	}
-	if output.TitleZh != nil && utf8.RuneCountInString(*output.TitleZh) > 500 {
+	if output.TitleZh == nil || strings.TrimSpace(*output.TitleZh) == "" || utf8.RuneCountInString(*output.TitleZh) > 500 {
 		return EnrichmentV1{}, errors.New("AI enrichment output does not match schema")
 	}
-	if output.ContentZh != nil && utf8.RuneCountInString(*output.ContentZh) > 100_000 {
+	if output.ContentZh == nil || strings.TrimSpace(*output.ContentZh) == "" || utf8.RuneCountInString(*output.ContentZh) > 100_000 {
 		return EnrichmentV1{}, errors.New("AI enrichment output does not match schema")
 	}
 	if count := utf8.RuneCountInString(output.SummaryZh); count < 1 || count > 2_000 {

@@ -47,7 +47,7 @@ func TestSyncWorkerRejectsInvalidPayloadWithoutCallingUpstream(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := runOneSyncJob(ctx, store, nil, func() time.Time { return now }); err != nil {
+	if err := runOneSyncJob(ctx, store, nil, nil, func() time.Time { return now }); err != nil {
 		t.Fatal(err)
 	}
 	var state, errorCode string
@@ -83,7 +83,7 @@ func TestWorkerDoesNotClaimJobsWhileReadinessFailsClosed(t *testing.T) {
 		t.Fatal(err)
 	}
 	application := &application{Store: store}
-	application.startWorkers(ctx, readiness, nil, nil, func() time.Time { return now }, slog.New(slog.NewJSONHandler(io.Discard, nil)))
+	application.startWorkers(ctx, readiness, nil, nil, nil, func() time.Time { return now }, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 	<-time.After(2 * workerPollInterval)
 	cancel()
 	application.workers.Wait()

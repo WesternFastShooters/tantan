@@ -261,6 +261,15 @@ ORDER BY t.pinned DESC,t.sort_order,t.topic_id`, userID)
 	}
 	now := service.now().UTC()
 	for _, record := range records {
+		if record.Kind == "core" {
+			continue
+		}
+		if activeFilter.Valid && record.Kind != "filter" {
+			continue
+		}
+		if !activeFilter.Valid && record.Kind != "dynamic" {
+			continue
+		}
 		if record.Kind == "dynamic" && !record.Pinned && record.UnreadCount < 3 && (record.StableUntil == nil || !record.StableUntil.After(now)) {
 			continue
 		}
@@ -268,7 +277,7 @@ ORDER BY t.pinned DESC,t.sort_order,t.topic_id`, userID)
 			ID:          record.ID,
 			Name:        record.Name,
 			Kind:        record.Kind,
-			Fixed:       record.Kind == "core",
+			Fixed:       false,
 			Pinned:      record.Pinned,
 			Hidden:      record.Hidden,
 			UnreadCount: record.UnreadCount,

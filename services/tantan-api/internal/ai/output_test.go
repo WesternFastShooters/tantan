@@ -13,6 +13,10 @@ func TestEnrichmentOutputStrictlyFollowsApprovedSchema(t *testing.T) {
 		t.Fatalf("valid output=%#v err=%v", result, err)
 	}
 	invalid := [][]byte{
+		[]byte(`{"version":1,"detectedLanguage":"en","titleZh":null,"contentZh":"正文","summaryZh":"摘要","keyPoints":["要点"]}`),
+		[]byte(`{"version":1,"detectedLanguage":"en","titleZh":"标题","contentZh":null,"summaryZh":"摘要","keyPoints":["要点"]}`),
+		[]byte(`{"version":1,"detectedLanguage":"en","titleZh":" ","contentZh":"正文","summaryZh":"摘要","keyPoints":["要点"]}`),
+		[]byte(`{"version":1,"detectedLanguage":"en","titleZh":"标题","contentZh":" ","summaryZh":"摘要","keyPoints":["要点"]}`),
 		[]byte(`{"version":1,"detectedLanguage":"en","titleZh":null,"contentZh":null,"summaryZh":"摘要","keyPoints":["要点"],"extra":true}`),
 		[]byte(`{"version":1,"detectedLanguage":"en","contentZh":null,"summaryZh":"摘要","keyPoints":["要点"]}`),
 		[]byte(`{"version":1,"detectedLanguage":"invalid_language","titleZh":null,"contentZh":null,"summaryZh":"摘要","keyPoints":["要点"]}`),

@@ -28,7 +28,7 @@ func enrichmentPrompt(input entryInput, language, promptVersion string) ai.Gener
 	return ai.GenerationRequest{
 		SchemaName: ai.EnrichmentSchemaName,
 		SystemPrompt: fmt.Sprintf(
-			"Tantan %s. Return one JSON object only. It must exactly follow AIEnrichmentV1 version 1 with keys version, detectedLanguage, titleZh, contentZh, summaryZh, keyPoints. No Markdown, HTML, URLs, tools, or extra keys.",
+			"Tantan %s. Return one JSON object only. It must exactly follow AIEnrichmentV1 version 1 with keys version, detectedLanguage, titleZh, contentZh, summaryZh, keyPoints. titleZh and contentZh must always be non-empty Simplified Chinese strings; when the input is already Chinese, copy and normalize it instead of returning null. Preserve the complete meaning of the title and article body. No Markdown, HTML, URLs, tools, or extra keys.",
 			promptVersion,
 		),
 		UserPrompt: string(payload),

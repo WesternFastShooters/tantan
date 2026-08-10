@@ -221,7 +221,7 @@ func TestApplicationAuthenticatedHomeTopicsSearchAndStrictAISettings(t *testing.
 			args  []any
 		}{
 			{query: "INSERT INTO feeds(feed_id,title,url,image,view,updated_at) VALUES(?,?,?,?,?,?)", args: []any{"feed_api", "API Source", "https://source.invalid/feed", nil, 0, timestamp}},
-			{query: "INSERT INTO entries(entry_id,feed_id,kind,title,description,content,url,language,media_json,published_at,content_hash,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)", args: []any{"entry_api", "feed_api", "article", "Contract Needle", "description", "searchable body", "https://content.invalid/item", "en", "[]", timestamp, hash, timestamp, timestamp}},
+			{query: "INSERT INTO entries(entry_id,feed_id,kind,title,description,content,url,language,media_json,published_at,content_hash,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)", args: []any{"entry_api", "feed_api", "article", "Contract Needle", "description", "searchable body", "https://content.invalid/item", "zh-CN", "[]", timestamp, hash, timestamp, timestamp}},
 			{query: "INSERT INTO account_entries(user_id,entry_id,last_seen_at) VALUES(?,?,?)", args: []any{"user_api", "entry_api", timestamp}},
 			{query: "INSERT INTO entry_search(entry_id,user_id,title,translation,content,source,topics,tags) VALUES(?,?,?,?,?,?,?,?)", args: []any{"entry_api", "user_api", "Contract Needle", "", "searchable body", "API Source", "", ""}},
 		}

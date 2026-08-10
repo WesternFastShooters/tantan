@@ -106,6 +106,26 @@ WHERE entry_id=? AND provider_fp=? AND language=?`, request.EntryID, active.Fing
 		}
 		if err == nil && state == "ready" && existingHash == contentHash && existingPrompt == service.promptVersion {
 			complete := true
+			if containsField(fields, "translation") {
+				var translations int
+				if err := transaction.QueryRowContext(ctx, `
+SELECT COUNT(*) FROM entry_enrichments
+WHERE entry_id=? AND provider_fp=? AND language=?
+  AND translated_title IS NOT NULL AND translated_content IS NOT NULL`, request.EntryID, active.Fingerprint, request.Language).Scan(&translations); err != nil {
+					return err
+				}
+				complete = complete && translations == 1
+			}
+			if containsField(fields, "summary") || containsField(fields, "keyPoints") {
+				var generated int
+				if err := transaction.QueryRowContext(ctx, `
+SELECT COUNT(*) FROM entry_enrichments
+WHERE entry_id=? AND provider_fp=? AND language=?
+  AND summary_text IS NOT NULL AND json_array_length(key_points_json)>0`, request.EntryID, active.Fingerprint, request.Language).Scan(&generated); err != nil {
+					return err
+				}
+				complete = complete && generated == 1
+			}
 			if containsField(fields, "topics") {
 				var assignments int
 				if err := transaction.QueryRowContext(ctx, `
@@ -181,6 +201,98 @@ WHERE job_id=? AND state IN ('queued','running')`, string(encodedPayload), now.F
 		return Accepted{}, errors.New("queue enrichment failed")
 	}
 	return accepted, nil
+}
+
+func (service *Service) EnsureRecentTranslations(ctx context.Context, userID string, limit int) (int, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" || limit < 1 || limit > 100 {
+		return 0, errors.New("valid translation warmup request is required")
+	}
+	now := service.now().UTC()
+	rows, err := service.store.DB().QueryContext(ctx, `
+SELECT e.entry_id
+FROM account_entries ae
+JOIN entries e ON e.entry_id=ae.entry_id
+WHERE ae.user_id=? AND ae.read_at IS NULL
+  AND julianday(e.published_at)>=julianday(?) AND julianday(e.published_at)<=julianday(?)
+  AND lower(COALESCE(e.language,'')) NOT LIKE 'zh%'
+  AND NOT EXISTS(
+    SELECT 1 FROM entry_enrichments en
+    WHERE en.entry_id=e.entry_id AND en.state='ready' AND en.content_hash=e.content_hash
+      AND en.translated_title IS NOT NULL AND en.translated_content IS NOT NULL
+  )
+ORDER BY e.published_at DESC,e.entry_id
+LIMIT ?`, userID, now.Add(-7*24*time.Hour).Format(time.RFC3339Nano), now.Add(time.Second).Format(time.RFC3339Nano), limit)
+	if err != nil {
+		return 0, errors.New("load translation warmup entries failed")
+	}
+	defer rows.Close()
+	entryIDs := make([]string, 0, limit)
+	for rows.Next() {
+		var entryID string
+		if err := rows.Scan(&entryID); err != nil {
+			return 0, errors.New("scan translation warmup entry failed")
+		}
+		entryIDs = append(entryIDs, entryID)
+	}
+	if err := rows.Err(); err != nil {
+		return 0, errors.New("iterate translation warmup entries failed")
+	}
+	return service.ensureTranslationEntries(ctx, userID, entryIDs)
+}
+
+func (service *Service) EnsureQueueTranslations(ctx context.Context, userID, queueID string, limit int) (int, error) {
+	userID = strings.TrimSpace(userID)
+	queueID = strings.TrimSpace(queueID)
+	if userID == "" || queueID == "" || limit < 1 || limit > 100 {
+		return 0, errors.New("valid queue translation request is required")
+	}
+	rows, err := service.store.DB().QueryContext(ctx, `
+SELECT e.entry_id
+FROM daily_queue_items qi
+JOIN daily_queues q ON q.queue_id=qi.queue_id
+JOIN entries e ON e.entry_id=qi.entry_id
+JOIN account_entries ae ON ae.entry_id=e.entry_id AND ae.user_id=q.user_id
+WHERE q.queue_id=? AND q.user_id=? AND qi.state='unread' AND ae.read_at IS NULL
+  AND lower(COALESCE(e.language,'')) NOT LIKE 'zh%'
+  AND NOT EXISTS(
+    SELECT 1 FROM entry_enrichments en
+    WHERE en.entry_id=e.entry_id AND en.state='ready' AND en.content_hash=e.content_hash
+      AND en.translated_title IS NOT NULL AND en.translated_content IS NOT NULL
+  )
+ORDER BY qi.rank LIMIT ?`, queueID, userID, limit)
+	if err != nil {
+		return 0, errors.New("load queue translation entries failed")
+	}
+	defer rows.Close()
+	entryIDs := make([]string, 0, limit)
+	for rows.Next() {
+		var entryID string
+		if err := rows.Scan(&entryID); err != nil {
+			return 0, errors.New("scan queue translation entry failed")
+		}
+		entryIDs = append(entryIDs, entryID)
+	}
+	if err := rows.Err(); err != nil {
+		return 0, errors.New("iterate queue translation entries failed")
+	}
+	return service.ensureTranslationEntries(ctx, userID, entryIDs)
+}
+
+func (service *Service) ensureTranslationEntries(ctx context.Context, userID string, entryIDs []string) (int, error) {
+	queued := 0
+	for _, entryID := range entryIDs {
+		if _, err := service.Ensure(ctx, EnsureRequest{
+			UserID:   userID,
+			EntryID:  entryID,
+			Language: "zh-CN",
+			Fields:   []string{"translation", "summary", "keyPoints"},
+		}); err != nil {
+			return queued, err
+		}
+		queued++
+	}
+	return queued, nil
 }
 
 func (service *Service) Get(ctx context.Context, userID, entryID, language string) (Result, error) {

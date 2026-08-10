@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"regexp"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -17,7 +16,6 @@ import (
 	"tantan.local/tantan-api/internal/ai"
 	"tantan.local/tantan-api/internal/home"
 	"tantan.local/tantan-api/internal/recommendation"
-	"tantan.local/tantan-api/internal/search"
 	"tantan.local/tantan-api/internal/storage"
 	"tantan.local/tantan-api/internal/topic"
 )
@@ -43,7 +41,6 @@ type Service struct {
 	generator     ai.Generator
 	home          *home.Service
 	topics        *topic.Service
-	indexer       *search.Indexer
 	now           func() time.Time
 	mutationMutex sync.Mutex
 }
@@ -77,7 +74,7 @@ func NewService(config Config) (*Service, error) {
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{store: config.Store, settings: config.Settings, generator: config.Generator, home: config.Home, topics: config.Topics, indexer: search.NewIndexer(config.Store), now: now}, nil
+	return &Service{store: config.Store, settings: config.Settings, generator: config.Generator, home: config.Home, topics: config.Topics, now: now}, nil
 }
 
 func (service *Service) Put(ctx context.Context, request Request) (Mutation, error) {
@@ -134,6 +131,9 @@ func (service *Service) Put(ctx context.Context, request Request) (Mutation, err
 		}
 		spec, canonical, validationErr = recommendation.ValidateFilterSpec(contents)
 	}
+	if validationErr == nil {
+		spec, canonical, validationErr = alignSpecWithPrompt(request.Prompt, spec)
+	}
 	if validationErr != nil || service.validateReferences(ctx, request.UserID, spec) != nil {
 		return Mutation{}, ErrAIOutputInvalid
 	}
@@ -141,18 +141,15 @@ func (service *Service) Put(ctx context.Context, request Request) (Mutation, err
 	if err != nil {
 		return Mutation{}, err
 	}
+	topicSet, err := service.topics.Classify(ctx, request.UserID, planEntryIDs(plan))
+	if err != nil {
+		return Mutation{}, err
+	}
 	now := service.now().UTC()
 	state := State{ID: filterID, Prompt: request.Prompt, CreatedAt: now.Format(time.RFC3339Nano)}
 	var queue home.QueueState
 	err = service.store.Write(ctx, func(transaction *sql.Tx) error {
-		oldEntries, err := filterTopicEntryIDs(ctx, transaction, request.UserID)
-		if err != nil {
-			return err
-		}
 		if _, err := transaction.ExecContext(ctx, "UPDATE home_filters SET status='inactive',updated_at=? WHERE user_id=? AND status='active'", now.Format(time.RFC3339Nano), request.UserID); err != nil {
-			return err
-		}
-		if _, err := transaction.ExecContext(ctx, "DELETE FROM topics WHERE user_id=? AND kind='filter'", request.UserID); err != nil {
 			return err
 		}
 		if _, err := transaction.ExecContext(ctx, `
@@ -164,25 +161,7 @@ VALUES(?,?,?,?,'active',?,?)`, filterID, request.UserID, request.Prompt, string(
 		if err != nil {
 			return err
 		}
-		generated, err := service.topics.EnsureGeneratedTx(ctx, transaction, request.UserID, filterTopicName(request.Prompt, spec), "filter")
-		if err != nil {
-			return err
-		}
-		newEntries := make([]string, 0, len(plan.Items))
-		if generated.Kind == "filter" {
-			for _, item := range plan.Items {
-				result, err := transaction.ExecContext(ctx, `
-INSERT OR IGNORE INTO entry_topics(user_id,entry_id,topic_id,confidence,is_primary,content_hash,created_at)
-SELECT ?,e.entry_id,?,1,0,e.content_hash,? FROM entries e WHERE e.entry_id=?`, request.UserID, generated.ID, now.Format(time.RFC3339Nano), item.EntryID)
-				if err != nil {
-					return err
-				}
-				if affected, _ := result.RowsAffected(); affected > 0 {
-					newEntries = append(newEntries, item.EntryID)
-				}
-			}
-		}
-		return service.indexer.RefreshTx(ctx, transaction, request.UserID, uniqueSorted(append(oldEntries, newEntries...)))
+		return service.topics.ReplaceGeneratedTx(ctx, transaction, request.UserID, "filter", topicSet)
 	})
 	if err != nil {
 		return Mutation{}, err
@@ -192,6 +171,33 @@ SELECT ?,e.entry_id,?,1,0,e.content_hash,? FROM entries e WHERE e.entry_id=?`, r
 		return Mutation{}, err
 	}
 	return Mutation{Filter: &state, Topics: listed.Topics, TopicsRevision: listed.TopicsRevision, QueueID: queue.ID, QueueGeneration: queue.Generation}, nil
+}
+
+func alignSpecWithPrompt(prompt string, spec recommendation.FilterSpecV1) (recommendation.FilterSpecV1, []byte, error) {
+	if spec.WindowDays > 7 {
+		spec.WindowDays = 7
+	}
+	normalized := strings.ToLower(prompt)
+	if !containsPromptSignal(normalized, []string{"英文", "中文", "语言", "english", "chinese", "language"}) {
+		spec.Languages = []string{}
+	}
+	if !containsPromptSignal(normalized, []string{"文章", "帖子", "图片", "视频", "推文", "类型", "形式", "article", "post", "image", "video"}) {
+		spec.ContentStyles = []string{}
+	}
+	encoded, err := json.Marshal(spec)
+	if err != nil {
+		return recommendation.FilterSpecV1{}, nil, errors.New("canonicalize aligned filter output")
+	}
+	return recommendation.ValidateFilterSpec(encoded)
+}
+
+func containsPromptSignal(prompt string, signals []string) bool {
+	for _, signal := range signals {
+		if strings.Contains(prompt, signal) {
+			return true
+		}
+	}
+	return false
 }
 
 func (service *Service) replay(ctx context.Context, request Request, filterID string) (Mutation, bool, error) {
@@ -248,13 +254,13 @@ func (service *Service) Delete(ctx context.Context, userID, timezone string) (Mu
 	if err != nil {
 		return Mutation{}, err
 	}
+	topicSet, err := service.topics.Classify(ctx, userID, planEntryIDs(plan))
+	if err != nil {
+		return Mutation{}, err
+	}
 	now := service.now().UTC()
 	var queue home.QueueState
 	err = service.store.Write(ctx, func(transaction *sql.Tx) error {
-		oldEntries, err := filterTopicEntryIDs(ctx, transaction, userID)
-		if err != nil {
-			return err
-		}
 		queue, err = service.home.EnsurePlanTx(ctx, transaction, plan)
 		if err != nil {
 			return err
@@ -262,18 +268,7 @@ func (service *Service) Delete(ctx context.Context, userID, timezone string) (Mu
 		if _, err := transaction.ExecContext(ctx, "UPDATE home_filters SET status='inactive',updated_at=? WHERE user_id=? AND status='active'", now.Format(time.RFC3339Nano), userID); err != nil {
 			return err
 		}
-		deleted, err := transaction.ExecContext(ctx, "DELETE FROM topics WHERE user_id=? AND kind='filter'", userID)
-		if err != nil {
-			return err
-		}
-		if affected, err := deleted.RowsAffected(); err != nil {
-			return err
-		} else if affected > 0 {
-			if _, err := transaction.ExecContext(ctx, "UPDATE accounts SET topics_revision=topics_revision+1,updated_at=? WHERE user_id=?", now.Format(time.RFC3339Nano), userID); err != nil {
-				return err
-			}
-		}
-		return service.indexer.RefreshTx(ctx, transaction, userID, oldEntries)
+		return service.topics.ReplaceGeneratedTx(ctx, transaction, userID, "dynamic", topicSet)
 	})
 	if err != nil {
 		return Mutation{}, err
@@ -349,55 +344,15 @@ SELECT COUNT(*) FROM feeds f WHERE f.feed_id=? AND EXISTS(
 	return nil
 }
 
-func filterTopicEntryIDs(ctx context.Context, transaction *sql.Tx, userID string) ([]string, error) {
-	rows, err := transaction.QueryContext(ctx, `
-SELECT DISTINCT et.entry_id FROM entry_topics et
-JOIN topics t ON t.topic_id=et.topic_id AND t.user_id=et.user_id
-WHERE t.user_id=? AND t.kind='filter'`, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var result []string
-	for rows.Next() {
-		var entryID string
-		if err := rows.Scan(&entryID); err != nil {
-			return nil, err
-		}
-		result = append(result, entryID)
-	}
-	return result, rows.Err()
-}
-
-func filterTopicName(prompt string, spec recommendation.FilterSpecV1) string {
-	name := prompt
-	if len(spec.IncludeTerms) > 0 {
-		name = spec.IncludeTerms[0]
-	}
-	name = strings.TrimSpace(name)
-	runes := []rune(name)
-	if len(runes) > 20 {
-		name = string(runes[:20])
-	}
-	return name
-}
-
 func filterIDFor(userID, idempotencyKey string) string {
 	digest := sha256.Sum256([]byte(userID + "\x00" + idempotencyKey))
 	return "filter_" + hex.EncodeToString(digest[:16])
 }
 
-func uniqueSorted(values []string) []string {
-	set := make(map[string]struct{}, len(values))
-	for _, value := range values {
-		if value != "" {
-			set[value] = struct{}{}
-		}
+func planEntryIDs(plan home.QueuePlan) []string {
+	result := make([]string, 0, len(plan.Items))
+	for _, item := range plan.Items {
+		result = append(result, item.EntryID)
 	}
-	result := make([]string, 0, len(set))
-	for value := range set {
-		result = append(result, value)
-	}
-	sort.Strings(result)
 	return result
 }

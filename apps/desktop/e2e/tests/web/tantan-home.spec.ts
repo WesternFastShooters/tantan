@@ -37,7 +37,7 @@ const card = (
   source: { id: "source-1", name: "Source", avatar: null },
   publishedAt: "2026-08-09T12:00:00Z",
   topics: [{ id: "topic-ai", name: "AI" }],
-  translated: false,
+  translated: true,
 })
 
 const homePage = (
@@ -86,6 +86,96 @@ const mockSession = async (page: Page) => {
 }
 
 test.describe("Tantan Home", () => {
+  test("REQ:DYNAMIC-TOPIC-LAZY loads a classified feed only after its Tab is clicked", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await mockSession(page)
+    await page.route("**/api/tantan/v1/topics", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          version: 2,
+          topicsRevision: 2,
+          activeFilterId: null,
+          topics: [
+            topic("recommend", "推荐"),
+            topic("topic-claude", "Claude"),
+            topic("topic-sqlite", "SQLite"),
+          ],
+        }),
+      }),
+    )
+    const calls = new Map<string, number>()
+    await page.route("**/api/tantan/v1/home?**", (route) => {
+      const topicId = new URL(route.request().url()).searchParams.get("topicId") ?? "recommend"
+      calls.set(topicId, (calls.get(topicId) ?? 0) + 1)
+      const title =
+        topicId === "topic-claude"
+          ? "Claude 智能体工作流"
+          : topicId === "topic-sqlite"
+            ? "SQLite 文本历史"
+            : "今日中文推荐"
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(
+          homePage([card(`entry-${topicId}`, "article", title)], null, `generation-${topicId}`, 1),
+        ),
+      })
+    })
+
+    await page.goto(buildWebAppURL(resolveDesktopE2EEnv()), { waitUntil: "domcontentloaded" })
+    await expect(page.getByText("今日中文推荐", { exact: true })).toBeVisible()
+    expect(calls.get("topic-claude") ?? 0).toBe(0)
+    expect(calls.get("topic-sqlite") ?? 0).toBe(0)
+
+    await page.getByRole("tab", { name: "Claude" }).click()
+    await expect(page.getByText("Claude 智能体工作流", { exact: true })).toBeVisible()
+    expect(calls.get("topic-claude")).toBe(1)
+    expect(calls.get("topic-sqlite") ?? 0).toBe(0)
+  })
+
+  test("REQ:TRANSLATION-GATE polls a pending queue and never renders the English card", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await mockSession(page)
+    await page.route("**/api/tantan/v1/topics", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          version: 1,
+          topicsRevision: 1,
+          activeFilterId: null,
+          topics: [topic("recommend", "推荐")],
+        }),
+      }),
+    )
+    let homeCalls = 0
+    let translatedReady = false
+    await page.route("**/api/tantan/v1/home?**", (route) => {
+      homeCalls += 1
+      const items = translatedReady ? [card("translated-entry", "article", "已翻译的中文标题")] : []
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(homePage(items, null, "generation-translation", 1)),
+      })
+    })
+
+    await page.goto(buildWebAppURL(resolveDesktopE2EEnv()), { waitUntil: "domcontentloaded" })
+    await expect(page.getByText("正在翻译推荐内容", { exact: true })).toBeVisible()
+    await expect(page.getByText("English title", { exact: true })).toHaveCount(0)
+    translatedReady = true
+    await expect(page.getByText("已翻译的中文标题", { exact: true })).toBeVisible({
+      timeout: 5_000,
+    })
+    expect(homeCalls).toBeGreaterThanOrEqual(2)
+  })
+
   test("AC-03 keeps a two-column Mobile feed stable through a 60-item long scroll", async ({
     page,
   }) => {
@@ -324,7 +414,7 @@ test.describe("Tantan Home", () => {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify(
-          homePage(read ? [] : [card(entryId, "article", "Read me")], null, "generation-read", 1),
+          homePage(read ? [] : [card(entryId, "article", "中文标题")], null, "generation-read", 1),
         ),
       }),
     )
@@ -363,7 +453,18 @@ test.describe("Tantan Home", () => {
       route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ state: "pending", data: null, error: null }),
+        body: JSON.stringify({
+          state: "ready",
+          data: {
+            version: 1,
+            detectedLanguage: "en",
+            titleZh: "中文标题",
+            contentZh: "已经翻译完成的中文正文",
+            summaryZh: "中文摘要",
+            keyPoints: ["要点"],
+          },
+          error: null,
+        }),
       }),
     )
     await page.route("**/api/folo/reads", (route) => {
@@ -376,10 +477,12 @@ test.describe("Tantan Home", () => {
     })
 
     await page.goto(buildWebAppURL(resolveDesktopE2EEnv()), { waitUntil: "domcontentloaded" })
-    await page.getByRole("link", { name: "阅读：Read me" }).click()
+    await page.getByRole("link", { name: "阅读：中文标题" }).click()
     await expect(page).toHaveURL(new RegExp(`/entries/${entryId}$`))
     await expect(page.getByRole("tablist", { name: "主导航" })).toHaveCount(0)
-    await expect(page.getByRole("heading", { name: "Read me" })).toBeVisible()
+    await expect(page.getByRole("heading", { name: "中文标题" })).toBeVisible()
+    await expect(page.getByText("已经翻译完成的中文正文", { exact: true })).toBeVisible()
+    await expect(page.getByText("Entry body", { exact: true })).toHaveCount(0)
 
     await page.getByRole("button", { name: "返回首页" }).click()
     await expect(page).toHaveURL(/\/$/)

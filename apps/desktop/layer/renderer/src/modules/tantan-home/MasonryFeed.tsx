@@ -12,6 +12,7 @@ import { FeedCard } from "./FeedCard"
 
 interface MasonryFeedProps {
   cards: HomeCard[]
+  loadedCount?: number
   queue: QueueState | null
   columns: number
   loading: boolean
@@ -29,6 +30,7 @@ interface MasonryFeedProps {
 
 export function MasonryFeed({
   cards,
+  loadedCount = cards.length,
   queue,
   columns,
   loading,
@@ -113,6 +115,21 @@ export function MasonryFeed({
         </div>
       )
     }
+    if (queue && !queue.finished && queue.unread > 0) {
+      return (
+        <div
+          role="status"
+          className="flex min-h-80 flex-col items-center justify-center px-6 text-center"
+        >
+          <i
+            className="i-mgc-translate-2-cute-re mb-3 size-8 animate-pulse text-orange-400"
+            aria-hidden
+          />
+          <h2 className="font-semibold text-zinc-100">正在翻译推荐内容</h2>
+          <p className="mt-1 text-sm text-zinc-500">翻译完成后会自动出现在瀑布流中。</p>
+        </div>
+      )
+    }
     return (
       <div className="flex min-h-80 flex-col items-center justify-center px-6 text-center">
         <i className="i-mgc-check-circle-cute-re mb-3 size-8 text-orange-400" aria-hidden />
@@ -138,7 +155,11 @@ export function MasonryFeed({
       <div ref={sentinelRef} data-testid="home-pagination-sentinel" className="h-1" />
       {(fetchingNext || (!hasNextPage && (queue?.finished || cards.length > 0))) && (
         <p className="py-5 text-center text-xs text-zinc-500">
-          {fetchingNext ? "加载更多…" : "今天已经看完"}
+          {fetchingNext
+            ? "加载更多…"
+            : queue && loadedCount < queue.unread
+              ? "正在翻译更多内容…"
+              : "今天已经看完"}
         </p>
       )}
     </div>

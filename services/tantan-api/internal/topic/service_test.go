@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -64,8 +65,12 @@ func TestCoreTopicsAreSeededIdempotentlyAndClassificationIsAtomic(t *testing.T) 
 	if err != nil {
 		t.Fatalf("list topics: %v", err)
 	}
-	if list.Version < 1 || list.TopicsRevision < 1 || len(list.Topics) != 7 || list.Topics[0].ID != "recommend" || list.Topics[0].Kind != "virtual" {
+	if list.Version < 1 || list.TopicsRevision < 1 || len(list.Topics) != 1 || list.Topics[0].ID != "recommend" || list.Topics[0].Kind != "virtual" {
 		t.Fatalf("topics=%#v", list)
+	}
+	var internalCoreTopics int
+	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM topics WHERE user_id='user_1' AND kind='core'").Scan(&internalCoreTopics); err != nil || internalCoreTopics != 6 {
+		t.Fatalf("internal core topics=%d err=%v", internalCoreTopics, err)
 	}
 	aiTopicID := topic.CoreID("user_1", "ai")
 	agentTopicID := topic.CoreID("user_1", "agent")
@@ -84,15 +89,107 @@ func TestCoreTopicsAreSeededIdempotentlyAndClassificationIsAtomic(t *testing.T) 
 		t.Fatalf("assignments=%d primary=%d", assignments, primary)
 	}
 	list, err = service.List(ctx, "user_1")
+	if err != nil || len(list.Topics) != 1 {
+		t.Fatalf("legacy core topics became visible: topics=%#v err=%v", list.Topics, err)
+	}
+}
+
+func TestOnlyRecommendIsFixedAndGeneratedTopicsAreVisible(t *testing.T) {
+	ctx := context.Background()
+	store := openTopicStore(t)
+	insertTopicFixture(t, store)
+	service := topic.NewService(store, func() time.Time {
+		return time.Date(2026, 8, 9, 12, 0, 0, 0, time.UTC)
+	})
+	if err := service.EnsureCore(ctx, "user_1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.EnsureDynamic(ctx, "user_1", "AI Agent"); err != nil {
+		t.Fatal(err)
+	}
+
+	list, err := service.List(ctx, "user_1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	unread := map[string]int{}
-	for _, item := range list.Topics {
-		unread[item.ID] = item.UnreadCount
+	if len(list.Topics) != 2 || list.Topics[0].ID != "recommend" || list.Topics[1].Name != "AI Agent" {
+		t.Fatalf("visible topics=%#v", list.Topics)
 	}
-	if unread[aiTopicID] != 1 || unread[agentTopicID] != 1 {
-		t.Fatalf("unread=%v", unread)
+	if !list.Topics[0].Fixed || list.Topics[1].Fixed {
+		t.Fatalf("fixed flags=%#v", list.Topics)
+	}
+}
+
+func TestUnreadClassifierBuildsDeterministicTopicsAndAssignments(t *testing.T) {
+	ctx := context.Background()
+	store := openTopicStore(t)
+	now := time.Date(2026, 8, 9, 12, 0, 0, 0, time.UTC)
+	timestamp := now.Format(time.RFC3339Nano)
+	titles := []string{
+		"Claude Agent workflow guide",
+		"Claude Agent tool calling",
+		"Claude Agent memory patterns",
+		"SQLite text history prototype",
+		"SQLite query planner notes",
+		"SQLite database migration guide",
+	}
+	if err := store.Write(ctx, func(transaction *sql.Tx) error {
+		if _, err := transaction.ExecContext(ctx, "INSERT INTO accounts(user_id,name,timezone,created_at,updated_at) VALUES('user_classifier','Classifier','Asia/Shanghai',?,?)", timestamp, timestamp); err != nil {
+			return err
+		}
+		if _, err := transaction.ExecContext(ctx, "INSERT INTO feeds(feed_id,title,view,updated_at) VALUES('feed_classifier','Engineering',0,?)", timestamp); err != nil {
+			return err
+		}
+		for index, title := range titles {
+			entryID := "entry_classifier_" + string(rune('a'+index))
+			hash := strings.Repeat(string(rune('a'+index)), 64)
+			published := now.Add(-time.Duration(index) * time.Hour).Format(time.RFC3339Nano)
+			if _, err := transaction.ExecContext(ctx, "INSERT INTO entries(entry_id,feed_id,kind,title,description,content,language,media_json,published_at,content_hash,created_at,updated_at) VALUES(?,'feed_classifier','article',?,?,'body','en','[]',?,?,?,?)", entryID, title, title, published, hash, timestamp, timestamp); err != nil {
+				return err
+			}
+			if _, err := transaction.ExecContext(ctx, "INSERT INTO account_entries(user_id,entry_id,last_seen_at) VALUES('user_classifier',?,?)", entryID, timestamp); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	service := topic.NewService(store, func() time.Time { return now })
+	first, err := service.Classify(ctx, "user_classifier", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := service.Classify(ctx, "user_classifier", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(first.Topics) < 2 || len(first.Topics) > 7 || !reflect.DeepEqual(first, second) {
+		t.Fatalf("first=%#v second=%#v", first, second)
+	}
+	visibleNames := make(map[string]bool, len(first.Topics))
+	for _, item := range first.Topics {
+		visibleNames[item.Name] = true
+		for _, forbidden := range []string{"br", "RT", "target blank", "https"} {
+			if item.Name == forbidden {
+				t.Fatalf("markup/navigation token escaped classifier: %#v", first.Topics)
+			}
+		}
+	}
+	if !visibleNames["Agent"] || !visibleNames["编程"] {
+		t.Fatalf("expected semantic topics, got %#v", first.Topics)
+	}
+	if err := service.ReplaceGenerated(ctx, "user_classifier", "dynamic", first); err != nil {
+		t.Fatal(err)
+	}
+	list, err := service.List(ctx, "user_classifier")
+	if err != nil || len(list.Topics) != len(first.Topics)+1 {
+		t.Fatalf("visible=%#v generated=%#v err=%v", list.Topics, first.Topics, err)
+	}
+	for _, item := range list.Topics[1:] {
+		if item.Fixed || item.UnreadCount < 2 {
+			t.Fatalf("dynamic topic=%#v", item)
+		}
 	}
 }
 

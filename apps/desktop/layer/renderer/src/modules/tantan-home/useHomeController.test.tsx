@@ -10,7 +10,7 @@ import type { HomeCard, HomeResponse, SyncStatusResponse } from "~/lib/tantan-ap
 
 import { homeViewStore } from "./home-view-store"
 import { homeQueryKeys } from "./query-keys"
-import { useHomeController } from "./useHomeController"
+import { translationPollInterval, useHomeController } from "./useHomeController"
 
 const homeAPI = vi.hoisted(() => ({
   deleteFilter: vi.fn(),
@@ -163,5 +163,23 @@ describe("useHomeController sync lifecycle", () => {
     await renderController()
 
     await vi.waitFor(() => expect(homeAPI.triggerSync).toHaveBeenCalledOnce())
+  })
+
+  test("REQ:TRANSLATION-GATE keeps polling every loaded page until all unread cards are translated", () => {
+    const first = homeResponse([card])
+    first.queue.total = 3
+    first.queue.unread = 3
+    first.queue.finished = false
+    expect(translationPollInterval({ pages: [first], pageParams: [] })).toBe(1_500)
+
+    const complete = homeResponse([
+      card,
+      { ...card, entryId: "entry-2" },
+      { ...card, entryId: "entry-3" },
+    ])
+    expect(translationPollInterval({ pages: [complete], pageParams: [] })).toBe(false)
+
+    const paginated = { ...first, nextCursor: "next-page" }
+    expect(translationPollInterval({ pages: [paginated], pageParams: [] })).toBe(false)
   })
 })

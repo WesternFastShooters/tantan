@@ -52,6 +52,17 @@ JOIN entries e ON e.entry_id=qi.entry_id
 JOIN account_entries ae ON ae.entry_id=e.entry_id AND ae.user_id=?
 JOIN feeds f ON f.feed_id=e.feed_id
 WHERE qi.queue_id=? AND qi.rank>? AND qi.state='unread' AND ae.read_at IS NULL` + topicClause + `
+  AND (
+    lower(COALESCE(e.language,'')) LIKE 'zh%'
+    OR EXISTS(
+      SELECT 1 FROM entry_enrichments display_enrichment
+      WHERE display_enrichment.entry_id=e.entry_id
+        AND display_enrichment.state='ready'
+        AND display_enrichment.content_hash=e.content_hash
+        AND display_enrichment.translated_title IS NOT NULL
+        AND display_enrichment.translated_content IS NOT NULL
+    )
+  )
 ORDER BY qi.rank LIMIT ?`
 	arguments = append(arguments, limit+1)
 	rows, err := service.store.DB().QueryContext(ctx, statement, arguments...)

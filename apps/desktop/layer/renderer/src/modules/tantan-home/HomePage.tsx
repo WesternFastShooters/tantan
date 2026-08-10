@@ -55,6 +55,7 @@ export function HomePage() {
         ) : (
           <MasonryFeed
             cards={controller.cards}
+            loadedCount={controller.loadedCount}
             queue={controller.queue}
             columns={2}
             loading={controller.homeLoading || controller.topicsLoading}

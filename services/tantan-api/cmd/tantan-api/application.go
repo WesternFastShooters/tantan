@@ -225,7 +225,7 @@ func newApplication(ctx context.Context, config applicationConfig) (*application
 	workerContext, cancel := context.WithCancel(ctx)
 	result := &application{Handler: handler, Store: store, cancel: cancel}
 	if config.StartWorkers {
-		result.startWorkers(workerContext, readiness, enrichmentService, syncService, config.Now, config.Logger)
+		result.startWorkers(workerContext, readiness, enrichmentService, syncService, topics, config.Now, config.Logger)
 	}
 	return result, nil
 }

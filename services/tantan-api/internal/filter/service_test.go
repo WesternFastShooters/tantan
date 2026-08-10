@@ -302,3 +302,42 @@ func TestProviderFailureLeavesExistingFilterUntouched(t *testing.T) {
 		t.Fatalf("filters=%d err=%v", filters, err)
 	}
 }
+
+func TestFilterRebuildsDynamicTopicsFromTheFilteredUnreadCorpus(t *testing.T) {
+	ctx := context.Background()
+	store, settings, homeService, topics, now := openFilterFixture(t)
+	clusteredTitles := []string{
+		"Claude Agent workflow",
+		"Claude Agent memory",
+		"Claude Agent tools",
+		"SQLite Database history",
+		"SQLite Database queries",
+		"SQLite Database migration",
+	}
+	for index, title := range clusteredTitles {
+		if _, err := store.DB().ExecContext(ctx, "UPDATE entries SET title=?,content=? WHERE entry_id=?", title, title, fmt.Sprintf("entry_%02d", index)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	output := []byte(`{"version":1,"windowDays":7,"includeTopics":[],"excludeTopics":[],"includeSources":[],"excludeSources":[],"includeTerms":["Claude","SQLite"],"negativeTerms":[],"languages":["en"],"contentStyles":["article","post","image","video"],"weights":{"freshness":1,"topicMatch":1,"sourceAffinity":1,"quality":1,"diversity":1}}`)
+	generator := &filterGenerator{steps: []filterStep{{output: output}}}
+	service, err := filter.NewService(filter.Config{Store: store, Settings: settings, Generator: generator, Home: homeService, Topics: topics, Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mutation, err := service.Put(ctx, filter.Request{UserID: "user_1", Prompt: "多推 Claude Agent 和 SQLite，不要其他内容", Timezone: "Asia/Shanghai", IdempotencyKey: "filter-dynamic-topics-0001"})
+	if err != nil || mutation.Filter == nil || len(mutation.Topics) < 3 {
+		t.Fatalf("mutation=%#v err=%v", mutation, err)
+	}
+	names := make([]string, 0, len(mutation.Topics))
+	for _, item := range mutation.Topics {
+		names = append(names, item.Name)
+		if item.ID != "recommend" && (item.Fixed || item.Kind != "filter" || item.UnreadCount < 2) {
+			t.Fatalf("topic=%#v", item)
+		}
+	}
+	joined := strings.ToLower(strings.Join(names, " "))
+	if !strings.Contains(joined, "agent") || !strings.Contains(joined, "编程") {
+		t.Fatalf("dynamic topic names=%v", names)
+	}
+}

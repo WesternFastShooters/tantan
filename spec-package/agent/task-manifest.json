@@ -197,7 +197,7 @@
     {
       "id": "TASK-05",
       "title": "交付服务端 Gemini、搜索、翻译摘要和 AI Filter",
-      "status": "in_progress",
+      "status": "completed",
       "dependsOn": ["TASK-04"],
       "allowedWrites": [
         "services/tantan-api/cmd/tantan-api/**",
@@ -239,7 +239,7 @@
     {
       "id": "TASK-06",
       "title": "补齐订阅、发现、设置、详情和状态协同",
-      "status": "pending",
+      "status": "completed",
       "dependsOn": ["TASK-04", "TASK-05"],
       "allowedWrites": [
         "apps/desktop/layer/renderer/src/modules/tantan-subscriptions/**",
@@ -276,7 +276,7 @@
     {
       "id": "TASK-07",
       "title": "安全、运维、容量和恢复硬化",
-      "status": "pending",
+      "status": "completed",
       "dependsOn": ["TASK-02", "TASK-03", "TASK-04", "TASK-05", "TASK-06"],
       "allowedWrites": [
         "services/tantan-api/internal/ops/**",
@@ -312,7 +312,7 @@
     {
       "id": "TASK-08",
       "title": "生产构建、真实手机验收和发布就绪",
-      "status": "pending",
+      "status": "completed",
       "dependsOn": ["TASK-07"],
       "allowedWrites": [
         "apps/desktop/e2e/**",

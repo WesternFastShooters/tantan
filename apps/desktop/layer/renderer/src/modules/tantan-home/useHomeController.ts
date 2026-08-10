@@ -59,6 +59,14 @@ const isQueueGenerationError = (error: unknown) =>
   error instanceof HomeQueueGenerationChangedError ||
   (error instanceof TantanAPIError && error.code === "QUEUE_VERSION_CHANGED")
 
+export const translationPollInterval = (data: InfiniteData<HomeResponse> | undefined) => {
+  const pages = data?.pages ?? []
+  const lastPage = pages.at(-1)
+  if (!lastPage || lastPage.nextCursor !== null) return false
+  const visible = pages.reduce((total, page) => total + page.items.length, 0)
+  return visible < lastPage.queue.unread ? 1_500 : false
+}
+
 export function useHomeController(scrollRef: React.RefObject<HTMLDivElement | null>) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -119,6 +127,9 @@ export function useHomeController(scrollRef: React.RefObject<HTMLDivElement | nu
     initialPageParam: { cursor: null, generation: null } as const,
     getNextPageParam: nextHomePageParam,
     staleTime: 30_000,
+    refetchInterval: (query) => {
+      return translationPollInterval(query.state.data as InfiniteData<HomeResponse> | undefined)
+    },
   })
 
   useEffect(() => {
@@ -134,10 +145,11 @@ export function useHomeController(scrollRef: React.RefObject<HTMLDivElement | nu
       .rememberQueueGeneration(activeTopicId, activeFilterId, returnedGeneration)
   }, [activeFilterId, activeTopicId, homeQuery.data, queryClient, queueGeneration])
 
-  const cards = useMemo(
-    () => dedupeHomeCards(homeQuery.data?.pages.flatMap((page) => page.items) ?? []),
+  const loadedCards = useMemo(
+    () => homeQuery.data?.pages.flatMap((page) => page.items) ?? [],
     [homeQuery.data?.pages],
   )
+  const cards = useMemo(() => dedupeHomeCards(loadedCards), [loadedCards])
   const queue = homeQuery.data?.pages.at(-1)?.queue ?? null
 
   useEffect(() => {
@@ -347,6 +359,7 @@ export function useHomeController(scrollRef: React.RefObject<HTMLDivElement | nu
     topics: topicsQuery.data?.topics ?? [fallbackTopic],
     topicsLoading: topicsQuery.isPending,
     cards,
+    loadedCount: loadedCards.length,
     queue,
     homeLoading: homeQuery.isPending || syncStatusQuery.isPending,
     homeError:

@@ -105,6 +105,10 @@ func (api *localAPI) home(writer stdhttp.ResponseWriter, request *stdhttp.Reques
 		api.writeDomainError(writer, request, err)
 		return
 	}
+	if _, err := api.config.Enrichment.EnsureQueueTranslations(request.Context(), record.User.ID, page.Queue.ID, 60); err != nil {
+		api.writeDomainError(writer, request, err)
+		return
+	}
 	writeLocalJSON(writer, stdhttp.StatusOK, homeResponse(page))
 }
 
@@ -113,14 +117,21 @@ func (api *localAPI) getTopics(writer stdhttp.ResponseWriter, request *stdhttp.R
 	if !ok {
 		return
 	}
-	if err := api.config.Topics.EnsureCore(request.Context(), record.User.ID); err != nil {
-		api.writeDomainError(writer, request, err)
-		return
-	}
 	result, err := api.config.Topics.List(request.Context(), record.User.ID)
 	if err != nil {
 		api.writeDomainError(writer, request, err)
 		return
+	}
+	if result.ActiveFilterID == nil {
+		if err := api.config.Topics.RefreshGenerated(request.Context(), record.User.ID); err != nil {
+			api.writeDomainError(writer, request, err)
+			return
+		}
+		result, err = api.config.Topics.List(request.Context(), record.User.ID)
+		if err != nil {
+			api.writeDomainError(writer, request, err)
+			return
+		}
 	}
 	writeLocalJSON(writer, stdhttp.StatusOK, topicsResponse(result))
 }

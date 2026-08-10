@@ -184,13 +184,14 @@ test.describe("Tantan acceptance Search and Detail", () => {
     await page.goto(buildWebAppURL(resolveDesktopE2EEnv(), `/entries/${entryId}`), {
       waitUntil: "domcontentloaded",
     })
-    await expect(page.getByText("ORIGINAL DETAIL BODY", { exact: true })).toBeVisible()
+    await expect(page.getByText("中文详情正文", { exact: true })).toBeVisible()
+    await expect(page.getByText("ORIGINAL DETAIL BODY", { exact: true })).toHaveCount(0)
     await expect(page.getByText("中文摘要", { exact: true })).toBeVisible()
     await expect(page.getByText("要点一", { exact: true })).toBeVisible()
-    await page.getByRole("button", { name: "显示中文" }).click()
-    await expect(page.getByText("中文详情正文", { exact: true })).toBeVisible()
     await page.getByRole("button", { name: "显示原文" }).click()
     await expect(page.getByText("ORIGINAL DETAIL BODY", { exact: true })).toBeVisible()
+    await page.getByRole("button", { name: "显示中文" }).click()
+    await expect(page.getByText("中文详情正文", { exact: true })).toBeVisible()
     const sourceLink = page.getByRole("link", { name: "原文" })
     await expect(sourceLink).toHaveAttribute("target", "_blank")
     await expect(sourceLink).toHaveAttribute("rel", /noreferrer/)

@@ -2,7 +2,10 @@ import * as React from "react"
 import { act } from "react"
 import type { Root } from "react-dom/client"
 import { createRoot } from "react-dom/client"
+import { MemoryRouter } from "react-router"
 import { afterEach, beforeAll, describe, expect, test, vi } from "vitest"
+
+import type { HomeCard } from "~/lib/tantan-api/gen/types"
 
 import { AIFilterSheet } from "./AIFilterSheet"
 import { HomeHeader } from "./HomeHeader"
@@ -115,6 +118,20 @@ describe("Tantan Home interactions", () => {
     expect(document.activeElement?.getAttribute("aria-label")).toBe("取消")
   })
 
+  test("REQ:AI-DYNAMIC-TOPICS suggested prompts populate the AI Filter input", async () => {
+    const view = await render(
+      <AIFilterSheet open pending={false} error={null} onClose={vi.fn()} onSubmit={vi.fn()} />,
+    )
+
+    expect(view.textContent).toContain("推荐主题")
+    const suggestion = [...view.querySelectorAll<HTMLButtonElement>("button")].find(
+      (button) => button.textContent === "AI Agent",
+    )
+    expect(suggestion).toBeTruthy()
+    await act(async () => suggestion?.click())
+    expect(view.querySelector<HTMLTextAreaElement>("textarea")?.value).toBe("多推 AI Agent")
+  })
+
   test("REQ:JOB-01 empty Home explains that the first Folo sync is still running", async () => {
     const view = await render(
       <MasonryFeed
@@ -169,5 +186,85 @@ describe("Tantan Home interactions", () => {
         ?.click(),
     )
     expect(onRetrySync).toHaveBeenCalledOnce()
+  })
+
+  test("REQ:TRANSLATION-GATE untranslated queue items stay hidden behind a translating state", async () => {
+    const view = await render(
+      <MasonryFeed
+        cards={[]}
+        queue={{
+          id: "queue-translate",
+          version: 1,
+          generation: "queue-translate-v1",
+          total: 4,
+          unread: 4,
+          finished: false,
+          candidateWindowDays: 7,
+          generatedAt: "2026-08-09T12:00:00Z",
+        }}
+        columns={2}
+        loading={false}
+        syncing={false}
+        syncError={null}
+        syncProgress={null}
+        syncRetrying={false}
+        fetchingNext={false}
+        hasNextPage={false}
+        onFetchNext={vi.fn()}
+        onOpenCard={vi.fn()}
+        onFeedback={vi.fn()}
+        onRetrySync={vi.fn()}
+      />,
+    )
+
+    expect(view.textContent).toContain("正在翻译推荐内容")
+    expect(view.textContent).not.toContain("今天已经看完")
+  })
+
+  test("REQ:TRANSLATION-GATE a partial translated page never claims the daily queue is finished", async () => {
+    const translatedCard: HomeCard = {
+      entryId: "entry-translated",
+      type: "article",
+      title: "中文标题",
+      excerpt: "中文简介",
+      cover: null,
+      source: { id: "feed-1", name: "来源", avatar: null },
+      publishedAt: "2026-08-09T12:00:00Z",
+      topics: [],
+      translated: true,
+    }
+    const view = await render(
+      <MemoryRouter>
+        <MasonryFeed
+          cards={[translatedCard]}
+          loadedCount={1}
+          queue={{
+            id: "queue-partial",
+            version: 1,
+            generation: "queue-partial-v1",
+            total: 3,
+            unread: 3,
+            finished: false,
+            candidateWindowDays: 7,
+            generatedAt: "2026-08-09T12:00:00Z",
+          }}
+          columns={2}
+          loading={false}
+          syncing={false}
+          syncError={null}
+          syncProgress={null}
+          syncRetrying={false}
+          fetchingNext={false}
+          hasNextPage={false}
+          onFetchNext={vi.fn()}
+          onOpenCard={vi.fn()}
+          onFeedback={vi.fn()}
+          onRetrySync={vi.fn()}
+        />
+      </MemoryRouter>,
+    )
+
+    expect(view.textContent).toContain("正在翻译更多内容…")
+    expect(view.textContent).not.toContain("今天已经看完")
   })
 })

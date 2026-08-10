@@ -146,6 +146,23 @@ func TestProviderUsesOnlyFixedGeminiOpenAIEndpoint(t *testing.T) {
 	if !ok || responseFormat["type"] != "json_schema" {
 		t.Fatalf("response_format=%#v", observedBody["response_format"])
 	}
+	jsonSchema, ok := responseFormat["json_schema"].(map[string]any)
+	if !ok {
+		t.Fatalf("json_schema=%#v", responseFormat["json_schema"])
+	}
+	providerSchema, ok := jsonSchema["schema"].(map[string]any)
+	if !ok {
+		t.Fatalf("provider schema=%#v", jsonSchema["schema"])
+	}
+	properties, ok := providerSchema["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("provider properties=%#v", providerSchema["properties"])
+	}
+	version := properties["version"].(map[string]any)
+	title := properties["titleZh"].(map[string]any)
+	if version["type"] != "integer" || version["const"] != nil || title["type"] != "string" || title["minLength"] != float64(1) {
+		t.Fatalf("Gemini schema adaptation version=%#v title=%#v", version, title)
+	}
 	encoded, _ := json.Marshal(observedBody)
 	if strings.Contains(string(encoded), aiKeyCanary) {
 		t.Fatal("credential leaked into request body")

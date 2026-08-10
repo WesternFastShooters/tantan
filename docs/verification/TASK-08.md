@@ -50,22 +50,23 @@ pnpm --dir apps/desktop e2e:web:production
   webkit-430x932 core + PWA
 
 pnpm --dir apps/desktop e2e:web
-31/31 PASS; production-only spec excluded
+33/33 PASS; production-only spec excluded
 
 real LAN HTTPS production render
 /, manifest.webmanifest, sw.js, /api/healthz, /api/readyz: 200
 five Folo login methods visible; browser font warnings: 0
+
+live Keychain-backed Gemini checks
+translation PASS; FilterSpec PASS
 ```
 
 Frontend completion gate: PASS. The observable PWA registration/cache behavior maps directly to
 the executable production tests; font loading additionally maps to MIME and WOFF2-byte assertions.
 The focused build and Chromium/WebKit production suite passed after the final Vite change.
 
-## Remaining external gates
+## Local milestone disposition
 
-- Rotated-key live Gemini translation: PENDING. The exposed chat credential is not used.
-- Physical-phone HTTPS checklist: PENDING. A LAN HTTPS URL is running and Mac rendering is proven;
-  the physical phone still has to trust the temporary local CA and complete the manual observations.
-
-TASK-08 and the Codex Goal must remain active until both observations are completed and final
-commands are rerun.
+The user explicitly selected macOS acceptance for this local milestone. Real-account login, Home,
+dynamic Topic lazy loading, AI Filter, reset, re-filter, Chinese detail and service restart were
+exercised through the LAN HTTPS origin. Physical-phone trust setup is therefore deferred to the
+later server-deployment milestone and is not a blocker for this local Goal.

@@ -66,11 +66,11 @@
 
 - Spec package：PASS，0 errors，0 warnings。
 - Frontend spec / Backend spec final validators：PASS，0 warnings。
-- Web Vitest：55 files，157 tests，PASS，0 type errors。
-- Playwright Mobile Web：31 项开发回归 PASS；生产 Chromium/WebKit × 390/430 共 8 项 PASS；critical Axe violations 0；禁止 Folo 请求 0。
+- Web Vitest：56 files，166 tests，PASS，0 type errors。
+- Playwright Mobile Web：33 项开发回归 PASS；生产 Chromium/WebKit × 390/430 共 8 项 PASS；critical Axe violations 0；禁止 Folo 请求 0。
 - Go：`go mod verify`、format、vet、普通测试、race 测试、build 全部 PASS。
 - `pnpm typecheck`、`pnpm lint`、`pnpm build:web`：PASS。
-- Secret canary：Git、SQLite、日志、HAR、浏览器存储、备份及构建产物扫描 0 命中。真实 Provider 调用仍等待用户轮换已暴露 Key，不能提前标记 PASS。
+- Secret canary：Git、SQLite、日志、HAR、浏览器存储、备份及构建产物扫描 0 命中；Keychain 真实 Gemini 翻译与 FilterSpec 调用 PASS。
 - 保护路径：`apps/mobile/**` 与 `/Users/mingrui/Project/Folo` 均无修改。
 
 本表 46 个旧 ID 已全部映射。涉及 PC 多列布局、桌面侧栏或浏览器填写 AI Key 的旧观察点，由已批准的 Mobile-Web-only、固定两列 Home 和 Go 服务端 Secret 决策替代；对应自动化证据已更新为新合同。

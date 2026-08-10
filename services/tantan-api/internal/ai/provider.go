@@ -209,6 +209,10 @@ func fixedResponseFormat(schemaName string) (map[string]any, error) {
 	if err := json.Unmarshal(contents, &document); err != nil {
 		return nil, errors.New("approved AI output schema is invalid")
 	}
+	normalizeProviderSchema(document)
+	if schemaName == EnrichmentSchemaName {
+		requireProviderTranslation(document)
+	}
 	return map[string]any{
 		"type": "json_schema",
 		"json_schema": map[string]any{
@@ -217,4 +221,50 @@ func fixedResponseFormat(schemaName string) (map[string]any, error) {
 			"schema": document,
 		},
 	}, nil
+}
+
+// Gemini's OpenAI-compatible structured-output implementation needs an
+// explicit primitive type for constant values. Keep the byte-for-byte approved
+// schema snapshots untouched and adapt only the schema sent to the fixed
+// provider endpoint.
+func normalizeProviderSchema(value any) {
+	switch typed := value.(type) {
+	case map[string]any:
+		if constant, ok := typed["const"]; ok {
+			delete(typed, "const")
+			typed["enum"] = []any{constant}
+			if _, present := typed["type"]; !present {
+				switch constant.(type) {
+				case float64:
+					typed["type"] = "integer"
+				case string:
+					typed["type"] = "string"
+				case bool:
+					typed["type"] = "boolean"
+				}
+			}
+		}
+		for _, child := range typed {
+			normalizeProviderSchema(child)
+		}
+	case []any:
+		for _, child := range typed {
+			normalizeProviderSchema(child)
+		}
+	}
+}
+
+func requireProviderTranslation(document map[string]any) {
+	properties, ok := document["properties"].(map[string]any)
+	if !ok {
+		return
+	}
+	for _, field := range []string{"titleZh", "contentZh"} {
+		property, ok := properties[field].(map[string]any)
+		if !ok {
+			continue
+		}
+		property["type"] = "string"
+		property["minLength"] = float64(1)
+	}
 }

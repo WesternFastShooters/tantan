@@ -27,4 +27,4 @@
 - Mobile Playwright: search/debounce/state preservation, AI Filter atomic apply/edit/reset, fixed server AI settings, search cursor fields and enrichment retry/original content: PASS at 390x844.
 - Spec package validation and `git diff --check`: PASS.
 - `TestLiveKeyLoaderFallsBackToServerKeychain`: PASS; the opt-in live test can use the local Go-service Keychain without exporting or printing the credential.
-- Live translation is intentionally not claimed: the credential pasted into chat is exposed and was not copied into a command, file, fixture, Keychain, log or Git. The opt-in test requires an operator-rotated Key in the local Go-service Keychain item or `TANTAN_GEMINI_API_KEY_FILE` with mode `0600`.
+- Keychain-backed live translation and FilterSpec generation both pass against the fixed Gemini endpoint/model. The credential value is never exported or printed by the harness and remains absent from commands, SQLite, browser storage, logs, HAR, fixtures, Git and build output.

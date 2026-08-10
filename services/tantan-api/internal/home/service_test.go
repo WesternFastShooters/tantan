@@ -52,7 +52,7 @@ func insertHomeFixture(t *testing.T, store *storage.Store, now time.Time, count 
 			media := fmt.Sprintf(`[{"url":"https://media.invalid/%s.jpg"}]`, entryID)
 			if _, err := transaction.ExecContext(ctx, `
 INSERT INTO entries(entry_id,feed_id,kind,title,description,content,language,media_json,published_at,content_hash,created_at,updated_at)
-VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, entryID, fmt.Sprintf("feed_%02d", index%12), []string{"article", "post", "image", "video"}[index%4], "Title "+entryID, "Excerpt "+entryID, "Body "+entryID, "en", media, published, hash, createdAt.Format(time.RFC3339Nano), createdAt.Format(time.RFC3339Nano)); err != nil {
+VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, entryID, fmt.Sprintf("feed_%02d", index%12), []string{"article", "post", "image", "video"}[index%4], "Title "+entryID, "Excerpt "+entryID, "Body "+entryID, "zh-CN", media, published, hash, createdAt.Format(time.RFC3339Nano), createdAt.Format(time.RFC3339Nano)); err != nil {
 				return err
 			}
 			var readAt any
@@ -150,6 +150,48 @@ func TestDailyQueueIsStableBoundedAndCursorBound(t *testing.T) {
 	}
 	if _, err := service.Get(ctx, home.Query{UserID: "user_1", TopicID: "recommend", Timezone: "Asia/Shanghai", Limit: 20, Cursor: oldCursor}); !errors.Is(err, home.ErrQueueVersionChanged) {
 		t.Fatalf("old-generation cursor error=%v", err)
+	}
+}
+
+func TestEnglishCardIsHiddenUntilChineseTranslationIsReady(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 8, 9, 12, 0, 0, 0, time.UTC)
+	timestamp := now.Format(time.RFC3339Nano)
+	hash := strings.Repeat("d", 64)
+	store := openHomeStore(t)
+	if err := store.Write(ctx, func(transaction *sql.Tx) error {
+		statements := []string{
+			"INSERT INTO accounts(user_id,name,timezone,created_at,updated_at) VALUES('user_translate','Translate','Asia/Shanghai','" + timestamp + "','" + timestamp + "')",
+			"INSERT INTO feeds(feed_id,title,view,updated_at) VALUES('feed_translate','Source',0,'" + timestamp + "')",
+			"INSERT INTO entries(entry_id,feed_id,kind,title,description,content,language,media_json,published_at,content_hash,created_at,updated_at) VALUES('entry_translate','feed_translate','article','English title','English excerpt','English body','en','[]','" + timestamp + "','" + hash + "','" + timestamp + "','" + timestamp + "')",
+			"INSERT INTO account_entries(user_id,entry_id,last_seen_at) VALUES('user_translate','entry_translate','" + timestamp + "')",
+		}
+		for _, statement := range statements {
+			if _, err := transaction.ExecContext(ctx, statement); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	service, err := home.NewService(home.Config{Store: store, CursorKey: []byte("translation-gate-cursor-key-32bytes"), Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	query := home.Query{UserID: "user_translate", TopicID: "recommend", Timezone: "Asia/Shanghai", Limit: 20}
+	pending, err := service.Get(ctx, query)
+	if err != nil || len(pending.Items) != 0 || pending.Queue.Unread != 1 || pending.Queue.Finished {
+		t.Fatalf("pending=%#v err=%v", pending, err)
+	}
+	if _, err := store.DB().ExecContext(ctx, `
+INSERT INTO entry_enrichments(entry_id,provider_fp,language,state,translated_title,translated_content,summary_text,key_points_json,tags_json,quality_score,content_hash,prompt_version,created_at,updated_at)
+VALUES('entry_translate','123456789012','zh-CN','ready','中文标题','中文正文','中文摘要','[]','[]',10,?,'prompt-v1',?,?)`, hash, timestamp, timestamp); err != nil {
+		t.Fatal(err)
+	}
+	ready, err := service.Get(ctx, query)
+	if err != nil || len(ready.Items) != 1 || ready.Items[0].Title != "中文标题" || ready.Items[0].Excerpt == nil || *ready.Items[0].Excerpt != "中文正文" || !ready.Items[0].Translated {
+		t.Fatalf("ready=%#v err=%v", ready, err)
 	}
 }
 

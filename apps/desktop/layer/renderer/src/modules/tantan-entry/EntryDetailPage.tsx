@@ -49,7 +49,10 @@ export function EntryDetailPage() {
     enabled: entryId.length > 0,
     staleTime: 5 * 60_000,
   })
-  const resolvedEntry = entry ?? detailQuery.data
+  // A Home card may seed the Folo store with only its excerpt. Prefer the
+  // dedicated detail response so the original body remains available when AI
+  // is missing or fails.
+  const resolvedEntry = detailQuery.data ?? entry
   const enrichment = useEntryEnrichment(entryId)
   const storeStarred = useIsEntryStarred(entryId)
   const collectionStatusQuery = useQuery({
@@ -62,7 +65,7 @@ export function EntryDetailPage() {
   const [readError, setReadError] = useState<string | null>(null)
   const [collectionError, setCollectionError] = useState<string | null>(null)
   const [collectionPending, setCollectionPending] = useState(false)
-  const [showTranslation, setShowTranslation] = useState(false)
+  const [showOriginal, setShowOriginal] = useState(false)
   const attemptedEntryIdRef = useRef<string | null>(null)
   const collectionMutationLocked = useRef(false)
 
@@ -85,11 +88,10 @@ export function EntryDetailPage() {
   }, [entry, entryId, queryClient, resolvedEntry])
 
   const sourceURL = safeURL(resolvedEntry?.url)
-  const content = useMemo(
+  const originalContent = useMemo(
     () => resolvedEntry?.content || resolvedEntry?.description || card?.excerpt || "正文暂不可用。",
     [card?.excerpt, resolvedEntry?.content, resolvedEntry?.description],
   )
-  const title = resolvedEntry?.title || card?.title || "内容详情"
   const publishedAt =
     card?.publishedAt ||
     (resolvedEntry?.publishedAt instanceof Date
@@ -97,7 +99,19 @@ export function EntryDetailPage() {
       : resolvedEntry?.publishedAt) ||
     null
   const enrichmentData = enrichment.data?.data
-  const translatedContent = enrichmentData?.contentZh || enrichmentData?.titleZh
+  const translationAvailable =
+    enrichment.data?.state === "ready" ||
+    (enrichment.data?.state !== "failed" && Boolean(card?.translated))
+  const translatedContent = translationAvailable
+    ? enrichmentData?.contentZh || card?.excerpt || null
+    : null
+  const translatedTitle = translationAvailable
+    ? enrichmentData?.titleZh || card?.title || null
+    : null
+  const title = showOriginal
+    ? resolvedEntry?.title || card?.title || "内容详情"
+    : translatedTitle || resolvedEntry?.title || "内容详情"
+  const content = showOriginal ? originalContent : translatedContent || originalContent
   const collectionView =
     card?.type === "image"
       ? FeedViewType.Pictures
@@ -208,10 +222,10 @@ export function EntryDetailPage() {
             {translatedContent && (
               <button
                 type="button"
-                onClick={() => setShowTranslation((value) => !value)}
+                onClick={() => setShowOriginal((value) => !value)}
                 className="min-h-9 rounded-lg bg-white/10 px-3 text-xs outline-none hover:bg-white/15 focus-visible:ring-2 focus-visible:ring-orange-500"
               >
-                {showTranslation ? "显示原文" : "显示中文"}
+                {showOriginal ? "显示中文" : "显示原文"}
               </button>
             )}
           </div>
@@ -260,7 +274,7 @@ export function EntryDetailPage() {
           )}
         </section>
         <div className="mt-7 whitespace-pre-wrap break-words text-[15px] leading-8 text-zinc-200">
-          {showTranslation && translatedContent ? translatedContent : content}
+          {content}
         </div>
       </div>
     </article>

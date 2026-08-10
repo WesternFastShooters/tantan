@@ -1,3 +1,5 @@
+import { AISparklesIcon } from "./AISparklesIcon"
+
 interface HomeHeaderProps {
   onSearch: () => void
   onOpenAIFilter: () => void
@@ -25,7 +27,7 @@ export function HomeHeader({ onSearch, onOpenAIFilter }: HomeHeaderProps) {
           onClick={onOpenAIFilter}
           className="flex size-11 items-center justify-center rounded-full text-orange-400 outline-none hover:bg-orange-500/10 focus-visible:ring-2 focus-visible:ring-orange-500"
         >
-          <i className="i-mgc-sparkles-2-cute-re size-5" aria-hidden />
+          <AISparklesIcon />
         </button>
       </div>
     </header>

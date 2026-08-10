@@ -257,5 +257,12 @@ test.describe("Tantan acceptance Home actions", () => {
     await expect(page.getByTestId("active-ai-filter")).toHaveCount(0)
     await expect(page.getByText("Default queue", { exact: true })).toBeVisible()
     await expect(page).toHaveURL(/\/$/)
+
+    await page.getByRole("button", { name: "AI 智能筛选" }).click()
+    await page.getByLabel("筛选要求").fill("重置后多推 Agent")
+    await page.getByRole("button", { name: "生成信息流" }).click()
+    await expect(page.getByTestId("active-ai-filter")).toContainText("重置后多推 Agent")
+    await expect(page.getByRole("tab", { name: "动态" })).toBeVisible()
+    await expect(page.getByText("Default queue", { exact: true })).toHaveCount(0)
   })
 })

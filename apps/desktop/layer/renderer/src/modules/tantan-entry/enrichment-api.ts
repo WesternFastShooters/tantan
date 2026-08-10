@@ -18,7 +18,7 @@ export const ensureEntryEnrichment = (entryId: string) =>
       method: "POST",
       headers: { "Idempotency-Key": idempotencyKey() },
       body: JSON.stringify({
-        fields: ["translation", "summary", "keyPoints", "topics"],
+        fields: ["translation", "summary", "keyPoints"],
         language: "zh-CN",
       }),
     },

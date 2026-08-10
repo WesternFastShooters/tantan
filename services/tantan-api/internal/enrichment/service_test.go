@@ -154,6 +154,38 @@ func validTopicOutput() []byte {
 	return []byte(fmt.Sprintf(`{"version":1,"topics":[{"topicId":"%s","confidence":0.98,"reason":"AI"},{"topicId":"%s","confidence":0.92,"reason":"Agent"}]}`, topic.CoreID("user_1", "ai"), topic.CoreID("user_1", "agent")))
 }
 
+func TestRecentTranslationWarmupQueuesOnlyNonChineseUnreadEntries(t *testing.T) {
+	ctx := context.Background()
+	store, settings, topics, now, _ := openEnrichmentFixture(t)
+	timestamp := now.Format(time.RFC3339Nano)
+	if err := store.Write(ctx, func(transaction *sql.Tx) error {
+		hash := strings.Repeat("b", 64)
+		if _, err := transaction.ExecContext(ctx, "INSERT INTO entries(entry_id,feed_id,kind,title,content,language,media_json,published_at,content_hash,created_at,updated_at) VALUES('entry_zh','feed_1','article','中文标题','中文正文','zh-CN','[]',?,?,?,?)", timestamp, hash, timestamp, timestamp); err != nil {
+			return err
+		}
+		_, err := transaction.ExecContext(ctx, "INSERT INTO account_entries(user_id,entry_id,last_seen_at) VALUES('user_1','entry_zh',?)", timestamp)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	service, err := enrichment.NewService(enrichment.Config{Store: store, Settings: settings, Topics: topics, Now: func() time.Time { return now }, PromptVersion: "prompt-v1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	queued, err := service.EnsureRecentTranslations(ctx, "user_1", 60)
+	if err != nil || queued != 1 {
+		t.Fatalf("queued=%d err=%v", queued, err)
+	}
+	var jobCount int
+	var payload string
+	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*),MAX(payload_json) FROM jobs WHERE kind='enrich'").Scan(&jobCount, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if jobCount != 1 || !strings.Contains(payload, `"fields":["keyPoints","summary","translation"]`) || !strings.Contains(payload, `"entryId":"entry_1"`) {
+		t.Fatalf("jobCount=%d payload=%s", jobCount, payload)
+	}
+}
+
 func TestWorkerRepairsJSONOnceThenAtomicallyCommitsEnrichmentTopicsAndFTS(t *testing.T) {
 	ctx := context.Background()
 	store, settings, topics, now, _ := openEnrichmentFixture(t)

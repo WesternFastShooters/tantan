@@ -13,11 +13,12 @@ import (
 	"tantan.local/tantan-api/internal/ops"
 	"tantan.local/tantan-api/internal/storage"
 	syncer "tantan.local/tantan-api/internal/sync"
+	"tantan.local/tantan-api/internal/topic"
 )
 
 const workerPollInterval = 500 * time.Millisecond
 
-func (application *application) startWorkers(ctx context.Context, readiness *ops.Readiness, enrichmentService *enrichment.Service, syncService *syncer.Service, now func() time.Time, logger *slog.Logger) {
+func (application *application) startWorkers(ctx context.Context, readiness *ops.Readiness, enrichmentService *enrichment.Service, syncService *syncer.Service, topics *topic.Service, now func() time.Time, logger *slog.Logger) {
 	application.workers.Add(1)
 	go func() {
 		defer application.workers.Done()
@@ -36,7 +37,7 @@ func (application *application) startWorkers(ctx context.Context, readiness *ops
 					logger.ErrorContext(ctx, "worker_failed", slog.String("module", "enrichment"), slog.String("errorCode", "LOCAL_STORAGE_ERROR"))
 					nextReadiness = time.Time{}
 				}
-				if err := runOneSyncJob(ctx, application.Store, syncService, now); err != nil && !errors.Is(err, context.Canceled) {
+				if err := runOneSyncJob(ctx, application.Store, syncService, topics, now); err != nil && !errors.Is(err, context.Canceled) {
 					logger.ErrorContext(ctx, "worker_failed", slog.String("module", "sync"), slog.String("errorCode", "LOCAL_STORAGE_ERROR"))
 					nextReadiness = time.Time{}
 				}
@@ -50,7 +51,7 @@ func (application *application) startWorkers(ctx context.Context, readiness *ops
 	}()
 }
 
-func runOneSyncJob(ctx context.Context, store *storage.Store, service *syncer.Service, now func() time.Time) error {
+func runOneSyncJob(ctx context.Context, store *storage.Store, service *syncer.Service, topics *topic.Service, now func() time.Time) error {
 	current := now().UTC()
 	job, found, err := jobs.ClaimNext(ctx, store, "sync", current, 90*time.Second, 3)
 	if err != nil || !found {
@@ -74,6 +75,9 @@ func runOneSyncJob(ctx context.Context, store *storage.Store, service *syncer.Se
 	}
 	_, runErr := service.Run(ctx, account, syncer.RunOptions{Mode: syncer.ModeAuto})
 	if runErr == nil {
+		if err := topics.RefreshGenerated(ctx, account.ID); err != nil {
+			return err
+		}
 		return jobs.Succeed(ctx, store, job.ID, now().UTC())
 	}
 	_, retryErr := jobs.Retry(ctx, store, job, payload, "FOLO_UNAVAILABLE", now().UTC(), 3)
