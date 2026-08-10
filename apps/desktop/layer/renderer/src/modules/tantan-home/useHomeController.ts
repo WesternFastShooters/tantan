@@ -14,9 +14,11 @@ import type {
 import {
   deleteActiveFilter,
   getHome,
+  getSyncStatus,
   getTopics,
   postRecommendationFeedback,
   putActiveFilter,
+  triggerFullSync,
 } from "./api"
 import { removeEntryFromAllHomeQueries } from "./home-cache"
 import {
@@ -72,11 +74,27 @@ export function useHomeController(scrollRef: React.RefObject<HTMLDivElement | nu
   const [feedbackError, setFeedbackError] = useState<string | null>(null)
   const [queueRefreshNotice, setQueueRefreshNotice] = useState<string | null>(null)
   const filterTriggerRef = useRef<HTMLElement | null>(null)
+  const initialSyncRequestedRef = useRef(false)
+  const refreshedSyncRef = useRef<string | null>(null)
 
   const topicsQuery = useQuery({
     queryKey: homeQueryKeys.topics,
     queryFn: ({ signal }) => getTopics(signal),
     staleTime: 30_000,
+  })
+
+  const syncStatusQuery = useQuery({
+    queryKey: homeQueryKeys.sync,
+    queryFn: ({ signal }) => getSyncStatus(signal),
+    refetchInterval: (query) => {
+      const state = query.state.data?.state
+      return state === "queued" || state === "running" ? 1_000 : false
+    },
+  })
+
+  const syncMutation = useMutation({
+    mutationFn: triggerFullSync,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: homeQueryKeys.sync }),
   })
 
   useEffect(() => {
@@ -121,6 +139,28 @@ export function useHomeController(scrollRef: React.RefObject<HTMLDivElement | nu
     [homeQuery.data?.pages],
   )
   const queue = homeQuery.data?.pages.at(-1)?.queue ?? null
+
+  useEffect(() => {
+    if (
+      syncStatusQuery.data?.state !== "idle" ||
+      homeQuery.isPending ||
+      initialSyncRequestedRef.current
+    ) {
+      return
+    }
+    initialSyncRequestedRef.current = true
+    syncMutation.mutate()
+  }, [homeQuery.isPending, syncMutation, syncStatusQuery.data?.state])
+
+  useEffect(() => {
+    const status = syncStatusQuery.data
+    if (status?.state !== "succeeded" || refreshedSyncRef.current === status.updatedAt) return
+    refreshedSyncRef.current = status.updatedAt
+    void Promise.all([
+      queryClient.invalidateQueries({ queryKey: homeQueryKeys.all }),
+      queryClient.invalidateQueries({ queryKey: homeQueryKeys.topics }),
+    ])
+  }, [queryClient, syncStatusQuery.data])
 
   const saveCurrentScroll = useCallback(() => {
     homeViewStore.getState().saveScroll(activeTopicId, scrollRef.current?.scrollTop ?? 0)
@@ -308,12 +348,25 @@ export function useHomeController(scrollRef: React.RefObject<HTMLDivElement | nu
     topicsLoading: topicsQuery.isPending,
     cards,
     queue,
-    homeLoading: homeQuery.isPending,
+    homeLoading: homeQuery.isPending || syncStatusQuery.isPending,
     homeError:
       homeQuery.error instanceof Error && !isQueueGenerationError(homeQuery.error)
         ? homeQuery.error.message
         : null,
     refetchHome: homeQuery.refetch,
+    syncing:
+      syncStatusQuery.data?.state === "queued" ||
+      syncStatusQuery.data?.state === "running" ||
+      syncMutation.isPending,
+    syncError:
+      syncStatusQuery.data?.state === "failed"
+        ? (syncStatusQuery.data.error?.message ?? "同步任务未完成，请稍后重试")
+        : syncMutation.error instanceof Error
+          ? syncMutation.error.message
+          : null,
+    syncProgress: syncStatusQuery.data?.counts ?? null,
+    syncRetrying: syncMutation.isPending,
+    retrySync: () => syncMutation.mutate(),
     hasNextPage: Boolean(homeQuery.hasNextPage),
     fetchingNext: homeQuery.isFetchingNextPage,
     fetchNext,

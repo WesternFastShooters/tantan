@@ -3,6 +3,8 @@ import type {
   FeedbackRequest,
   FilterMutationResponse,
   HomeResponse,
+  JobAcceptedResponse,
+  SyncStatusResponse,
   TopicsResponse,
 } from "~/lib/tantan-api/gen/types"
 
@@ -30,6 +32,15 @@ export const getHome = ({
 
 export const getTopics = (signal?: AbortSignal) =>
   tantanRequest<TopicsResponse>("/api/tantan/v1/topics", { signal })
+
+export const getSyncStatus = (signal?: AbortSignal) =>
+  tantanRequest<SyncStatusResponse>("/api/tantan/v1/sync/status", { signal })
+
+export const triggerFullSync = () =>
+  tantanRequest<JobAcceptedResponse>("/api/tantan/v1/sync", {
+    method: "POST",
+    body: JSON.stringify({ scope: "all" }),
+  })
 
 export const putActiveFilter = (prompt: string) =>
   tantanRequest<FilterMutationResponse>("/api/tantan/v1/filter", {

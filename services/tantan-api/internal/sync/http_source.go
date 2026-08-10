@@ -16,6 +16,7 @@ import (
 const (
 	maxFoloJSONResponseBytes = 16 * 1024 * 1024
 	defaultFoloTimeout       = 30 * time.Second
+	maxFoloContentBatchIDs   = 30
 )
 
 type TokenProvider func(ctx context.Context, userID string) (string, error)
@@ -170,6 +171,22 @@ func (source *HTTPSource) StreamContents(ctx context.Context, userID string, ent
 		}
 		seen[entryID] = struct{}{}
 	}
+	readers := make([]io.Reader, 0, (len(entryIDs)+maxFoloContentBatchIDs-1)/maxFoloContentBatchIDs)
+	closers := make([]io.Closer, 0, cap(readers))
+	for start := 0; start < len(entryIDs); start += maxFoloContentBatchIDs {
+		end := min(start+maxFoloContentBatchIDs, len(entryIDs))
+		stream, err := source.streamContentBatch(ctx, userID, entryIDs[start:end])
+		if err != nil {
+			closeAll(closers)
+			return nil, err
+		}
+		readers = append(readers, stream)
+		closers = append(closers, stream)
+	}
+	return &multiReadCloser{Reader: io.MultiReader(readers...), closers: closers}, nil
+}
+
+func (source *HTTPSource) streamContentBatch(ctx context.Context, userID string, entryIDs []string) (io.ReadCloser, error) {
 	body, err := json.Marshal(struct {
 		IDs []string `json:"ids"`
 	}{IDs: entryIDs})
@@ -185,6 +202,27 @@ func (source *HTTPSource) StreamContents(ctx context.Context, userID string, ent
 		return nil, statusError(response.StatusCode)
 	}
 	return response.Body, nil
+}
+
+type multiReadCloser struct {
+	io.Reader
+	closers []io.Closer
+}
+
+func (stream *multiReadCloser) Close() error {
+	var closeErr error
+	for _, closer := range stream.closers {
+		if err := closer.Close(); err != nil && closeErr == nil {
+			closeErr = err
+		}
+	}
+	return closeErr
+}
+
+func closeAll(closers []io.Closer) {
+	for _, closer := range closers {
+		_ = closer.Close()
+	}
 }
 
 type httpEntryItem struct {

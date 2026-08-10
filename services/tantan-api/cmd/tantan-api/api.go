@@ -415,33 +415,37 @@ func (api *localAPI) triggerSync(writer stdhttp.ResponseWriter, request *stdhttp
 		writeLocalError(writer, request, stdhttp.StatusBadRequest, gen.ErrorCodeValidationError, "同步范围无效", nil)
 		return
 	}
-	now := api.config.Now().UTC()
+	job, state, err := enqueueSync(request.Context(), api.config.Store, record.User.ID, body.Scope, api.config.Now().UTC())
+	if err != nil {
+		api.writeDomainError(writer, request, err)
+		return
+	}
+	writeLocalJSON(writer, stdhttp.StatusAccepted, gen.JobAcceptedResponse{JobID: gen.Identifier(job.ID), State: state})
+}
+
+func enqueueSync(ctx context.Context, store *storage.Store, userID, scope string, now time.Time) (jobs.Job, string, error) {
 	var job jobs.Job
 	var state string
-	err := api.config.Store.Write(request.Context(), func(transaction *sql.Tx) error {
+	err := store.Write(ctx, func(transaction *sql.Tx) error {
 		var err error
-		job, err = jobs.EnqueueTx(request.Context(), transaction, jobs.EnqueueRequest{UserID: record.User.ID, Kind: "sync", DedupeKey: "sync:" + record.User.ID + ":" + body.Scope, Payload: map[string]string{"scope": body.Scope}, Now: now})
+		job, err = jobs.EnqueueTx(ctx, transaction, jobs.EnqueueRequest{UserID: userID, Kind: "sync", DedupeKey: "sync:" + userID + ":" + scope, Payload: map[string]string{"scope": scope}, Now: now})
 		if err != nil {
 			return err
 		}
-		if err := transaction.QueryRowContext(request.Context(), "SELECT state FROM jobs WHERE job_id=?", job.ID).Scan(&state); err != nil {
+		if err := transaction.QueryRowContext(ctx, "SELECT state FROM jobs WHERE job_id=?", job.ID).Scan(&state); err != nil {
 			return err
 		}
-		_, err = transaction.ExecContext(request.Context(), `
+		_, err = transaction.ExecContext(ctx, `
 INSERT INTO sync_state(user_id,state,scope,total,processed,failed,updated_at)
 VALUES(?, ?, ?,0,0,0,?)
 ON CONFLICT(user_id) DO UPDATE SET
   state=excluded.state,
   scope=excluded.scope,
   error_code=NULL,
-  updated_at=excluded.updated_at`, record.User.ID, state, body.Scope, now.Format(time.RFC3339Nano))
+	updated_at=excluded.updated_at`, userID, state, scope, now.UTC().Format(time.RFC3339Nano))
 		return err
 	})
-	if err != nil {
-		api.writeDomainError(writer, request, err)
-		return
-	}
-	writeLocalJSON(writer, stdhttp.StatusAccepted, gen.JobAcceptedResponse{JobID: gen.Identifier(job.ID), State: state})
+	return job, state, err
 }
 
 func (api *localAPI) readSyncStatus(ctx context.Context, userID string) (gen.SyncStatusResponse, error) {

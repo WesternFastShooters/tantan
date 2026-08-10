@@ -141,7 +141,20 @@ func newApplication(ctx context.Context, config applicationConfig) (*application
 	if err != nil {
 		return fail(err)
 	}
-	bridge, err := auth.NewBridge(auth.Config{PublicOrigin: config.PublicOrigin, FoloWebURL: config.FoloWebURL.String(), Logger: config.Logger, Sessions: sessions, Secrets: foloSecrets, Replays: replays, Folo: foloAuth, Now: config.Now})
+	bridge, err := auth.NewBridge(auth.Config{
+		PublicOrigin: config.PublicOrigin,
+		FoloWebURL:   config.FoloWebURL.String(),
+		Logger:       config.Logger,
+		Sessions:     sessions,
+		Secrets:      foloSecrets,
+		Replays:      replays,
+		Folo:         foloAuth,
+		Now:          config.Now,
+		OnSessionCreated: func(sessionContext context.Context, record session.Record) error {
+			_, _, enqueueErr := enqueueSync(sessionContext, store, record.User.ID, "all", config.Now().UTC())
+			return enqueueErr
+		},
+	})
 	if err != nil {
 		return fail(err)
 	}

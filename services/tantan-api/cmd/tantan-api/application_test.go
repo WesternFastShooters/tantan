@@ -111,6 +111,65 @@ func TestApplicationStartsMigratedReadyAndRoutesLocalAPI(t *testing.T) {
 	}
 }
 
+func TestApplicationQueuesInitialSyncAfterFoloLogin(t *testing.T) {
+	const upstreamToken = "upstream-session-token-1234567890"
+	upstream := httptest.NewServer(stdhttp.HandlerFunc(func(writer stdhttp.ResponseWriter, request *stdhttp.Request) {
+		switch request.URL.Path {
+		case "/better-auth/one-time-token/apply":
+			stdhttp.SetCookie(writer, &stdhttp.Cookie{Name: "__Secure-better-auth.session_token", Value: upstreamToken})
+			_, _ = io.WriteString(writer, `{"ok":true}`)
+		case "/better-auth/get-session":
+			_, _ = io.WriteString(writer, `{"user":{"id":"user_login_sync","name":"Sync User","email":null,"image":null}}`)
+		default:
+			t.Fatalf("unexpected upstream path %s", request.URL.Path)
+		}
+	}))
+	defer upstream.Close()
+	upstreamURL, _ := url.Parse(upstream.URL)
+	secrets := &applicationSecrets{values: map[string]string{}}
+	now := func() time.Time { return time.Date(2026, 8, 10, 1, 0, 0, 0, time.UTC) }
+	application, err := newApplication(context.Background(), applicationConfig{
+		DataDir:       t.TempDir(),
+		PublicOrigin:  "http://127.0.0.1:3000",
+		Upstream:      upstreamURL,
+		FoloWebURL:    upstreamURL,
+		Client:        upstream.Client(),
+		FoloSecrets:   secrets,
+		AISecrets:     secrets,
+		ProbeKeychain: secrets,
+		CursorSecrets: secrets,
+		Logger:        slog.New(slog.NewJSONHandler(io.Discard, nil)),
+		Now:           now,
+		StartWorkers:  false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer application.Close()
+
+	request := httptest.NewRequest(stdhttp.MethodPost, "http://127.0.0.1:3000/api/auth/folo/token", strings.NewReader(`{"token":"folo://auth?token=one-time-token-1234567890","returnTo":"/"}`))
+	request.Host = "127.0.0.1:3000"
+	request.Header.Set("Origin", "http://127.0.0.1:3000")
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	application.Handler.ServeHTTP(response, request)
+	if response.Code != stdhttp.StatusOK {
+		t.Fatalf("login status=%d body=%s", response.Code, response.Body.String())
+	}
+
+	var jobsCount int
+	if err := application.Store.DB().QueryRow("SELECT COUNT(*) FROM jobs WHERE user_id=? AND kind='sync' AND state='queued'", "user_login_sync").Scan(&jobsCount); err != nil {
+		t.Fatal(err)
+	}
+	var syncState, syncScope string
+	if err := application.Store.DB().QueryRow("SELECT state,scope FROM sync_state WHERE user_id=?", "user_login_sync").Scan(&syncState, &syncScope); err != nil {
+		t.Fatal(err)
+	}
+	if jobsCount != 1 || syncState != "queued" || syncScope != "all" {
+		t.Fatalf("jobs=%d syncState=%q syncScope=%q", jobsCount, syncState, syncScope)
+	}
+}
+
 func TestApplicationAuthenticatedHomeTopicsSearchAndStrictAISettings(t *testing.T) {
 	ctx := context.Background()
 	upstream := httptest.NewServer(stdhttp.HandlerFunc(func(writer stdhttp.ResponseWriter, request *stdhttp.Request) {

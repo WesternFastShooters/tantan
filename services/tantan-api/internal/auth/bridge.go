@@ -46,14 +46,15 @@ type TokenReplayStore interface {
 }
 
 type Config struct {
-	PublicOrigin string
-	FoloWebURL   string
-	Now          func() time.Time
-	Logger       *slog.Logger
-	Sessions     *session.Store
-	Secrets      session.SecretStore
-	Replays      TokenReplayStore
-	Folo         FoloAuth
+	PublicOrigin     string
+	FoloWebURL       string
+	Now              func() time.Time
+	Logger           *slog.Logger
+	Sessions         *session.Store
+	Secrets          session.SecretStore
+	Replays          TokenReplayStore
+	Folo             FoloAuth
+	OnSessionCreated func(context.Context, session.Record) error
 }
 
 type pendingTwoFactor struct {
@@ -64,14 +65,15 @@ type pendingTwoFactor struct {
 }
 
 type Bridge struct {
-	publicOrigin *url.URL
-	foloWebURL   *url.URL
-	now          func() time.Time
-	logger       *slog.Logger
-	sessions     *session.Store
-	secrets      session.SecretStore
-	replays      TokenReplayStore
-	folo         FoloAuth
+	publicOrigin     *url.URL
+	foloWebURL       *url.URL
+	now              func() time.Time
+	logger           *slog.Logger
+	sessions         *session.Store
+	secrets          session.SecretStore
+	replays          TokenReplayStore
+	folo             FoloAuth
+	onSessionCreated func(context.Context, session.Record) error
 
 	mu        sync.Mutex
 	twoFactor map[string]pendingTwoFactor
@@ -101,16 +103,17 @@ func NewBridge(config Config) (*Bridge, error) {
 		logger = slog.New(slog.NewJSONHandler(io.Discard, nil))
 	}
 	return &Bridge{
-		publicOrigin: publicOrigin,
-		foloWebURL:   foloWebURL,
-		now:          now,
-		logger:       logger,
-		sessions:     config.Sessions,
-		secrets:      config.Secrets,
-		replays:      config.Replays,
-		folo:         config.Folo,
-		twoFactor:    make(map[string]pendingTwoFactor),
-		attempts:     make(map[string][]time.Time),
+		publicOrigin:     publicOrigin,
+		foloWebURL:       foloWebURL,
+		now:              now,
+		logger:           logger,
+		sessions:         config.Sessions,
+		secrets:          config.Secrets,
+		replays:          config.Replays,
+		folo:             config.Folo,
+		onSessionCreated: config.OnSessionCreated,
+		twoFactor:        make(map[string]pendingTwoFactor),
+		attempts:         make(map[string][]time.Time),
 	}, nil
 }
 
@@ -305,6 +308,13 @@ func (bridge *Bridge) createSession(writer http.ResponseWriter, request *http.Re
 	if err != nil {
 		_ = bridge.secrets.Delete(request.Context(), idHash)
 		return err
+	}
+	if bridge.onSessionCreated != nil {
+		if err := bridge.onSessionCreated(request.Context(), record); err != nil {
+			_ = bridge.sessions.DeleteHash(request.Context(), idHash)
+			_ = bridge.secrets.Delete(request.Context(), idHash)
+			return err
+		}
 	}
 	http.SetCookie(writer, &http.Cookie{
 		Name:     session.LocalCookieName,

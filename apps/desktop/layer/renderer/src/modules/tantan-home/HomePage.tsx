@@ -58,11 +58,16 @@ export function HomePage() {
             queue={controller.queue}
             columns={2}
             loading={controller.homeLoading || controller.topicsLoading}
+            syncing={controller.syncing}
+            syncError={controller.syncError}
+            syncProgress={controller.syncProgress}
+            syncRetrying={controller.syncRetrying}
             fetchingNext={controller.fetchingNext}
             hasNextPage={controller.hasNextPage}
             onFetchNext={controller.fetchNext}
             onOpenCard={controller.saveCurrentScroll}
             onFeedback={controller.sendFeedback}
+            onRetrySync={controller.retrySync}
           />
         )}
         <AIFilterSheet

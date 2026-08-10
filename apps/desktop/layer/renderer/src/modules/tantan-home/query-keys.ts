@@ -4,4 +4,5 @@ export const homeQueryKeys = {
   feed: (topicId: string, filterId: string | null, generation: string | null) =>
     ["home", topicId, filterId, generation] as const,
   topics: ["topics"] as const,
+  sync: ["sync", "status"] as const,
 }

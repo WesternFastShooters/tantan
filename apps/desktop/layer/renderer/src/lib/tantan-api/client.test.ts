@@ -34,6 +34,39 @@ describe("Tantan same-origin API client", () => {
     expect(headers.has("Authorization")).toBe(false)
   })
 
+  test("REQ:JOB-01 refreshes the in-memory CSRF token before an early local mutation", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            user: { id: "user-1", name: "Test", email: null, image: null },
+            timezone: "Asia/Shanghai",
+            csrfToken: "csrf-restored-session-1234567890",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ jobId: "job-1", state: "queued" }), {
+          status: 202,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+    vi.stubGlobal("fetch", fetchMock)
+
+    await tantanRequest("/api/tantan/v1/sync", {
+      method: "POST",
+      body: JSON.stringify({ scope: "all" }),
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/tantan/v1/session")
+    const [input, init] = fetchMock.mock.calls[1] as [string, RequestInit]
+    expect(input).toBe("/api/tantan/v1/sync")
+    expect(new Headers(init.headers).get("X-CSRF-Token")).toBe("csrf-restored-session-1234567890")
+  })
+
   test("FR-08 stores session CSRF only in memory and attaches it to mutations", async () => {
     const fetchMock = vi
       .fn()

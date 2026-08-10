@@ -1,7 +1,12 @@
 import { Masonry } from "@follow/components/ui/masonry/index.js"
 import { useEffect, useRef } from "react"
 
-import type { FeedbackRequest, HomeCard, QueueState } from "~/lib/tantan-api/gen/types"
+import type {
+  FeedbackRequest,
+  HomeCard,
+  QueueState,
+  SyncStatusResponse,
+} from "~/lib/tantan-api/gen/types"
 
 import { FeedCard } from "./FeedCard"
 
@@ -10,11 +15,16 @@ interface MasonryFeedProps {
   queue: QueueState | null
   columns: number
   loading: boolean
+  syncing: boolean
+  syncError: string | null
+  syncProgress: SyncStatusResponse["counts"] | null
+  syncRetrying: boolean
   fetchingNext: boolean
   hasNextPage: boolean
   onFetchNext: () => void
   onOpenCard: () => void
   onFeedback: (card: HomeCard, action: FeedbackRequest["action"], topicId?: string) => void
+  onRetrySync: () => void
 }
 
 export function MasonryFeed({
@@ -22,11 +32,16 @@ export function MasonryFeed({
   queue,
   columns,
   loading,
+  syncing,
+  syncError,
+  syncProgress,
+  syncRetrying,
   fetchingNext,
   hasNextPage,
   onFetchNext,
   onOpenCard,
   onFeedback,
+  onRetrySync,
 }: MasonryFeedProps) {
   const sentinelRef = useRef<HTMLDivElement>(null)
 
@@ -58,6 +73,46 @@ export function MasonryFeed({
   }
 
   if (cards.length === 0) {
+    if (syncing) {
+      const hasTotal = Boolean(syncProgress?.total)
+      return (
+        <div
+          role="status"
+          className="flex min-h-80 flex-col items-center justify-center px-6 text-center"
+        >
+          <i
+            className="i-mgc-loading-3-cute-re mb-3 size-8 animate-spin text-orange-400"
+            aria-hidden
+          />
+          <h2 className="font-semibold text-zinc-100">正在同步 Folo 内容</h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            {hasTotal
+              ? `${syncProgress?.processed ?? 0} / ${syncProgress?.total ?? 0}`
+              : "正在读取你的订阅和最近未读内容…"}
+          </p>
+        </div>
+      )
+    }
+    if (syncError) {
+      return (
+        <div
+          role="alert"
+          className="flex min-h-80 flex-col items-center justify-center px-6 text-center"
+        >
+          <i className="i-mgc-alert-cute-re mb-3 size-8 text-red-300" aria-hidden />
+          <h2 className="font-semibold text-zinc-100">内容同步失败</h2>
+          <p className="mt-1 text-sm text-zinc-500">{syncError}</p>
+          <button
+            type="button"
+            disabled={syncRetrying}
+            onClick={onRetrySync}
+            className="mt-4 min-h-11 rounded-xl bg-orange-500 px-4 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-orange-300 disabled:opacity-50"
+          >
+            {syncRetrying ? "正在重试…" : "重试同步"}
+          </button>
+        </div>
+      )
+    }
     return (
       <div className="flex min-h-80 flex-col items-center justify-center px-6 text-center">
         <i className="i-mgc-check-circle-cute-re mb-3 size-8 text-orange-400" aria-hidden />

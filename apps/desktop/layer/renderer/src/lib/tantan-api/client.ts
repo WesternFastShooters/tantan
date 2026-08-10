@@ -12,6 +12,7 @@ import type {
 } from "~/lib/tantan-api/gen/types"
 
 let csrfToken: string | null = null
+let csrfRefreshPromise: Promise<string> | null = null
 
 export const getSessionCSRFToken = () => csrfToken
 
@@ -22,6 +23,9 @@ const timezone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
 
 const isMutation = (method: string) =>
   method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE"
+
+const needsSessionCSRF = (path: string) =>
+  path.startsWith("/api/tantan/") || path === "/api/auth/logout"
 
 const isSafeAPIPath = (path: string) =>
   path.startsWith("/api/") &&
@@ -48,6 +52,19 @@ export const tantanRequest = async <T>(path: string, init: RequestInit = {}): Pr
     throw new Error("Tantan browser requests require a relative /api path")
   }
   const method = (init.method ?? "GET").toUpperCase()
+  if (isMutation(method) && needsSessionCSRF(path) && !csrfToken) {
+    csrfRefreshPromise ??= tantanRequest<SessionResponse>("/api/tantan/v1/session").then(
+      (session) => {
+        csrfToken = session.csrfToken
+        return session.csrfToken
+      },
+    )
+    try {
+      await csrfRefreshPromise
+    } finally {
+      csrfRefreshPromise = null
+    }
+  }
   const headers = new Headers(init.headers)
   headers.set("Accept", "application/json")
   headers.set("X-Request-Id", requestId())

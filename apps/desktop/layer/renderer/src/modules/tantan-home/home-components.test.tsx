@@ -6,6 +6,7 @@ import { afterEach, beforeAll, describe, expect, test, vi } from "vitest"
 
 import { AIFilterSheet } from "./AIFilterSheet"
 import { HomeHeader } from "./HomeHeader"
+import { MasonryFeed } from "./MasonryFeed"
 import { TopicTabs } from "./TopicTabs"
 
 let container: HTMLDivElement | null = null
@@ -112,5 +113,61 @@ describe("Tantan Home interactions", () => {
       generate.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true })),
     )
     expect(document.activeElement?.getAttribute("aria-label")).toBe("取消")
+  })
+
+  test("REQ:JOB-01 empty Home explains that the first Folo sync is still running", async () => {
+    const view = await render(
+      <MasonryFeed
+        cards={[]}
+        queue={null}
+        columns={2}
+        loading={false}
+        syncing
+        syncError={null}
+        syncProgress={{ processed: 2, total: 10, failed: 0 }}
+        syncRetrying={false}
+        fetchingNext={false}
+        hasNextPage={false}
+        onFetchNext={vi.fn()}
+        onOpenCard={vi.fn()}
+        onFeedback={vi.fn()}
+        onRetrySync={vi.fn()}
+      />,
+    )
+
+    expect(view.textContent).toContain("正在同步 Folo 内容")
+    expect(view.textContent).toContain("2 / 10")
+    expect(view.textContent).not.toContain("今天已经看完")
+  })
+
+  test("REQ:JOB-01 failed first sync offers a retry instead of a finished queue", async () => {
+    const onRetrySync = vi.fn()
+    const view = await render(
+      <MasonryFeed
+        cards={[]}
+        queue={null}
+        columns={2}
+        loading={false}
+        syncing={false}
+        syncError="同步任务未完成，请稍后重试"
+        syncProgress={null}
+        syncRetrying={false}
+        fetchingNext={false}
+        hasNextPage={false}
+        onFetchNext={vi.fn()}
+        onOpenCard={vi.fn()}
+        onFeedback={vi.fn()}
+        onRetrySync={onRetrySync}
+      />,
+    )
+
+    expect(view.textContent).toContain("内容同步失败")
+    expect(view.textContent).not.toContain("今天已经看完")
+    await act(async () =>
+      [...view.querySelectorAll<HTMLButtonElement>("button")]
+        .find((button) => button.textContent?.includes("重试同步"))
+        ?.click(),
+    )
+    expect(onRetrySync).toHaveBeenCalledOnce()
   })
 })

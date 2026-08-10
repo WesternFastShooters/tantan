@@ -3,6 +3,7 @@ package sync_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -89,6 +90,58 @@ func TestHTTPSourceUsesLockedSDKRoutesAndDecodesResponses(t *testing.T) {
 	}
 	if len(requests) != 3 || requests[0] != "GET /subscriptions" || requests[1] != "POST /entries" || requests[2] != "POST /entries/stream" {
 		t.Fatalf("requests=%v", requests)
+	}
+}
+
+func TestHTTPSourceSplitsContentStreamAtFoloThirtyIDLimit(t *testing.T) {
+	const tokenCanary = "folo-session-canary-content-batch"
+	var batchSizes []int
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/entries/stream" || request.Method != http.MethodPost {
+			t.Fatalf("unexpected request %s %s", request.Method, request.URL.Path)
+		}
+		var body struct {
+			IDs []string `json:"ids"`
+		}
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		batchSizes = append(batchSizes, len(body.IDs))
+		if len(body.IDs) > 30 {
+			writer.WriteHeader(http.StatusUnprocessableEntity)
+			return
+		}
+		writer.Header().Set("Content-Type", "application/x-ndjson")
+		for _, id := range body.IDs {
+			_, _ = fmt.Fprintf(writer, "{\"id\":%q,\"content\":%q}\n", id, "content for "+id)
+		}
+	}))
+	defer server.Close()
+	upstream, _ := url.Parse(server.URL)
+	source, err := syncer.NewHTTPSource(syncer.HTTPSourceConfig{
+		Upstream: upstream,
+		Token: func(context.Context, string) (string, error) {
+			return tokenCanary, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids := make([]string, 50)
+	for index := range ids {
+		ids[index] = fmt.Sprintf("entry_%02d", index)
+	}
+	stream, err := source.StreamContents(context.Background(), "user_1", ids)
+	if err != nil {
+		t.Fatalf("stream content: %v", err)
+	}
+	contents, missing, _, parseErr := syncer.ParseContentStream(stream, ids)
+	closeErr := stream.Close()
+	if parseErr != nil || closeErr != nil || len(contents) != 50 || len(missing) != 0 {
+		t.Fatalf("contents=%d missing=%v parseErr=%v closeErr=%v", len(contents), missing, parseErr, closeErr)
+	}
+	if len(batchSizes) != 2 || batchSizes[0] != 30 || batchSizes[1] != 20 {
+		t.Fatalf("batch sizes=%v", batchSizes)
 	}
 }
 
