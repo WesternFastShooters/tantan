@@ -65,12 +65,12 @@
     {
       "path": "10-frontend.md",
       "role": "frontend-domain-spec",
-      "sha256": "89e227243cde29c66407027fddcc50d075937462124f6ff7a829b4c5a7670894"
+      "sha256": "d2415672643fc2c89569e566d636cedc9c2c3bfb11709f5f64eb966887db77b7"
     },
     {
       "path": "20-backend.md",
       "role": "backend-domain-spec",
-      "sha256": "b04b75cf4f8521681cb8ce39bf2f2f471800dce4014e0291385cb58c10a69b90"
+      "sha256": "65c9c38fc0eb017afd4f4b119e6f3911f9a8eddcb6d280a1b75828ec0106cb55"
     },
     {
       "path": "80-cross-domain.md",
