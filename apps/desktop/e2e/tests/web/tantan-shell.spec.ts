@@ -164,18 +164,22 @@ test.describe("Tantan Mobile Web shell", () => {
 
   test("SEC-03 every browser API request is same-origin under /api", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
-    const APIRequests: string[] = []
+    const browserRequests: string[] = []
     page.on("request", (request) => {
-      if (["fetch", "xhr"].includes(request.resourceType())) APIRequests.push(request.url())
+      if (["fetch", "xhr"].includes(request.resourceType())) browserRequests.push(request.url())
     })
     await mockSession(page)
     await page.goto(`${appURL()}discover`, { waitUntil: "networkidle" })
 
     const origin = new URL(appURL()).origin
-    expect(APIRequests.length).toBeGreaterThan(0)
-    for (const requestURL of APIRequests) {
+    expect(browserRequests.length).toBeGreaterThan(0)
+    for (const requestURL of browserRequests) {
       const url = new URL(requestURL)
       expect(url.origin).toBe(origin)
+      const isSQLiteWasmAsset =
+        url.pathname.endsWith("/wa-sqlite-async.wasm") ||
+        /^\/assets\/wa-sqlite-async[.-][\w-]+\.wasm$/u.test(url.pathname)
+      if (isSQLiteWasmAsset) continue
       expect(url.pathname.startsWith("/api/")).toBe(true)
     }
   })
