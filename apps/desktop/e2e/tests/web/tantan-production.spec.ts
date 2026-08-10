@@ -1,6 +1,8 @@
 import type { Page, Route } from "@playwright/test"
 import { expect, test } from "@playwright/test"
 
+import { expectDialogToSpanViewport, expectVisibleIconGlyph } from "../../support/visual-assertions"
+
 const topic = (id: string, name: string) => ({
   id,
   name,
@@ -249,6 +251,8 @@ test("production Mobile PWA covers login and every phase-one route across restar
   expect(page.viewportSize()).toEqual(testInfo.project.use.viewport)
   await expect(page.getByRole("tablist", { name: "主导航" }).getByRole("tab")).toHaveCount(4)
   await expect(page.getByText("Production card", { exact: true })).toBeVisible()
+  await expectVisibleIconGlyph(page.getByRole("button", { name: "搜索内容" }))
+  await expectVisibleIconGlyph(page.getByRole("button", { name: "AI 智能筛选" }))
   await page.getByRole("tab", { name: "AI" }).click()
   await expect(page.getByRole("tab", { name: "AI" })).toHaveAttribute("aria-selected", "true")
 
@@ -258,12 +262,15 @@ test("production Mobile PWA covers login and every phase-one route across restar
   await page.getByRole("button", { name: "返回" }).click()
 
   await page.getByRole("button", { name: "AI 智能筛选" }).click()
+  await expectDialogToSpanViewport(page, page.getByRole("dialog", { name: "AI 智能筛选" }))
   await page.getByLabel("筛选要求").fill("多推 AI 工具")
   await page.getByRole("button", { name: "生成信息流" }).click()
   await expect(page.getByText("Filtered production card", { exact: true })).toBeVisible()
   await page.getByRole("link", { name: "阅读：Filtered production card" }).click()
   await expect(page.getByText("Production detail body", { exact: true })).toBeVisible()
-  await page.getByRole("button", { name: "返回首页" }).click()
+  const entryBackButton = page.getByRole("button", { name: "返回首页" })
+  await expectVisibleIconGlyph(entryBackButton)
+  await entryBackButton.click()
 
   await page.getByRole("tab", { name: /订阅/ }).click()
   await expect(page.getByText("Production RSS", { exact: true })).toBeVisible()

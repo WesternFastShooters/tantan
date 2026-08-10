@@ -208,7 +208,7 @@ export function DiscoverPage() {
       )}
       {!pending && searched && !error && results.length === 0 && (
         <div className="flex min-h-64 flex-col items-center justify-center text-center">
-          <i className="i-mgc-rss-cute-re size-10 text-zinc-400" aria-hidden />
+          <i className="i-mgc-rss-cute-fi size-10 text-zinc-400" aria-hidden />
           <h2 className="mt-3 font-semibold">没有找到可订阅的 Source</h2>
           <p className="mt-1 text-sm text-zinc-500">可以尝试粘贴完整的 RSS 地址。</p>
         </div>

@@ -12,7 +12,7 @@ export function ActiveAIFilterBar({ prompt, onEdit, onReset, resetting }: Active
       data-testid="active-ai-filter"
       className="mx-3 mt-2 flex min-h-10 items-center gap-2 rounded-xl border border-orange-500/25 bg-orange-500/10 px-3 text-xs text-orange-100 sm:mx-4"
     >
-      <i className="i-mgc-sparkles-2-cute-re size-4 shrink-0 text-orange-400" aria-hidden />
+      <i className="i-mgc-magic-2-cute-re size-4 shrink-0 text-orange-400" aria-hidden />
       <span className="min-w-0 flex-1 truncate">{prompt}</span>
       <button
         type="button"

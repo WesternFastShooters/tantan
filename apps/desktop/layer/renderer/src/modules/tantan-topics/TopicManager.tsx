@@ -90,7 +90,7 @@ export function TopicManager() {
                   }
                   className="flex size-11 items-center justify-center rounded-lg text-zinc-400 outline-none hover:bg-white/10 hover:text-zinc-100 focus-visible:ring-2 focus-visible:ring-orange-500 disabled:opacity-30"
                 >
-                  <i className="i-mgc-down-cute-re size-4" aria-hidden />
+                  <i className="i-mgc-sort-descending-cute-re size-4" aria-hidden />
                 </button>
                 <button
                   type="button"
@@ -101,7 +101,7 @@ export function TopicManager() {
                   }
                   className="flex size-11 items-center justify-center rounded-lg text-zinc-400 outline-none hover:bg-white/10 hover:text-zinc-100 focus-visible:ring-2 focus-visible:ring-orange-500 disabled:opacity-30"
                 >
-                  <i className="i-mgc-pin-cute-re size-4" aria-hidden />
+                  <i className="i-mgc-bookmark-cute-re size-4" aria-hidden />
                 </button>
                 <button
                   type="button"
@@ -114,7 +114,7 @@ export function TopicManager() {
                 >
                   <i
                     className={
-                      topic.hidden ? "i-mgc-eye-cute-re size-4" : "i-mgc-eye-close-cute-re size-4"
+                      topic.hidden ? "i-mgc-eye-2-cute-re size-4" : "i-mgc-eye-close-cute-re size-4"
                     }
                     aria-hidden
                   />

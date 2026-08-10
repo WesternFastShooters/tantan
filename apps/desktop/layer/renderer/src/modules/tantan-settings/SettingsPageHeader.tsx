@@ -9,7 +9,7 @@ export function SettingsPageHeader({ children }: PropsWithChildren) {
         aria-label="返回设置"
         className="flex size-11 items-center justify-center rounded-full text-zinc-300 outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-orange-500"
       >
-        <i className="i-mgc-left-cute-re size-5" aria-hidden />
+        <i className="i-mgc-arrow-left-cute-re size-5" aria-hidden />
       </Link>
       <h1 className="text-xl font-bold tracking-tight text-zinc-50">{children}</h1>
     </header>

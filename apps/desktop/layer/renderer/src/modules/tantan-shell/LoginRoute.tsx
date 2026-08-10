@@ -23,9 +23,9 @@ const providerLabels: Record<FoloAuthProvider, string> = {
 }
 
 const providerIcons: Record<FoloAuthProvider, string> = {
-  google: "i-mgc-google-fill",
-  github: "i-mgc-github-fill",
-  apple: "i-mgc-apple-fill",
+  google: "i-mgc-google-cute-fi",
+  github: "i-mgc-github-cute-fi",
+  apple: "i-mgc-apple-cute-fi",
   credential: "i-mgc-mail-cute-re",
   token: "i-mgc-key-2-cute-re",
 }
@@ -171,7 +171,7 @@ export function LoginRoute() {
       <section className="w-full max-w-sm">
         <div className="mb-7 text-center">
           <div className="mx-auto mb-5 flex size-16 items-center justify-center rounded-[20px] bg-orange-500 shadow-lg shadow-orange-500/20">
-            <i className="i-mgc-radar-2-cute-fi size-9 text-white" aria-hidden />
+            <i className="i-mgc-rada-cute-fi size-9 text-white" aria-hidden />
           </div>
           <h1 className="text-[28px] font-bold tracking-tight">欢迎使用 Tantan</h1>
           <p className="mt-2 text-sm leading-6 text-zinc-400">使用 Folo 账号同步订阅与阅读状态</p>

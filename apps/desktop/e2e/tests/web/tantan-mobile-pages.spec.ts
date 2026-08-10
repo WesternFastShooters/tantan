@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test"
 
 import { buildWebAppURL, resolveDesktopE2EEnv } from "../../support/env"
+import { expectVisibleIconGlyph } from "../../support/visual-assertions"
 
 const appURL = () => buildWebAppURL(resolveDesktopE2EEnv())
 
@@ -290,6 +291,7 @@ test.describe("Tantan Folo-Mobile secondary pages", () => {
     await page.goto(`${appURL()}subscriptions`, { waitUntil: "domcontentloaded" })
     await page.getByRole("link", { name: /Pool RSS/ }).click()
 
+    await expectVisibleIconGlyph(page.getByRole("link", { name: "返回订阅" }))
     await expect(page.getByText("这是已经翻译好的标题")).toBeVisible()
     await expect(page.getByText("这是已经翻译好的正文摘要。")).toBeVisible()
     await expect(page.getByText("还有 1 条内容正在翻译")).toBeVisible()

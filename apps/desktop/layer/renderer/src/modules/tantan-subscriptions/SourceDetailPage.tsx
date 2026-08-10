@@ -115,7 +115,7 @@ export function SourceDetailPage() {
           aria-label="返回订阅"
           className="flex size-11 items-center justify-center rounded-full text-zinc-300 outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-orange-500"
         >
-          <i className="i-mgc-left-cute-re size-5" aria-hidden />
+          <i className="i-mgc-arrow-left-cute-re size-5" aria-hidden />
         </Link>
         <h1 className="min-w-0 flex-1 truncate text-xl font-bold text-zinc-50">
           {feed?.title || "Source"}

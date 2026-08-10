@@ -120,13 +120,13 @@ export function SettingsRoute() {
         items={[
           {
             to: "/settings/ai",
-            icon: "i-mgc-sparkles-2-cute-re",
+            icon: "i-mgc-magic-2-cute-re",
             label: "服务端 AI",
             description: "Gemini 预设与服务端密钥状态",
           },
           {
             to: "/settings/topics",
-            icon: "i-mgc-tag-cute-re",
+            icon: "i-mgc-bookmark-cute-re",
             label: "频道管理",
             description: "固定、隐藏和调整首页 Topic",
           },

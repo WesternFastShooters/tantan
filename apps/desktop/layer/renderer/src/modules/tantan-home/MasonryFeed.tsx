@@ -101,7 +101,7 @@ export function MasonryFeed({
           role="alert"
           className="flex min-h-80 flex-col items-center justify-center px-6 text-center"
         >
-          <i className="i-mgc-alert-cute-re mb-3 size-8 text-red-300" aria-hidden />
+          <i className="i-mgc-alert-cute-fi mb-3 size-8 text-red-300" aria-hidden />
           <h2 className="font-semibold text-zinc-100">内容同步失败</h2>
           <p className="mt-1 text-sm text-zinc-500">{syncError}</p>
           <button
