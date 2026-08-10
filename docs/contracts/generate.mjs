@@ -265,6 +265,18 @@ type HomeResponse struct {
 	QueueGeneration Identifier \`json:"queueGeneration"\`
 }
 
+type ContentPoolState struct {
+	Total   int \`json:"total"\`
+	Ready   int \`json:"ready"\`
+	Pending int \`json:"pending"\`
+}
+
+type ContentPoolResponse struct {
+	Items      []HomeCard      \`json:"items"\`
+	NextCursor *string         \`json:"nextCursor"\`
+	Pool       ContentPoolState \`json:"pool"\`
+}
+
 type SearchResponse struct {
 	Items       []HomeCard \`json:"items"\`
 	NextCursor  *string    \`json:"nextCursor"\`
@@ -522,6 +534,12 @@ export interface HomeResponse {
   nextCursor: string | null
   queue: QueueState
   queueGeneration: Identifier
+}
+
+export interface ContentPoolResponse {
+  items: HomeCard[]
+  nextCursor: string | null
+  pool: { total: number; ready: number; pending: number }
 }
 
 export interface SearchResponse {

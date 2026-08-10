@@ -224,7 +224,8 @@ def validate_openapi
   expected_paths = %w[
     /api/healthz /api/readyz /api/auth/folo/providers /api/auth/folo/social-start
     /api/auth/folo/email /api/auth/folo/token /api/auth/folo/two-factor /api/auth/logout
-    /api/tantan/v1/session /api/tantan/v1/home /api/tantan/v1/topics /api/tantan/v1/filter
+    /api/tantan/v1/session /api/tantan/v1/home /api/tantan/v1/content-pool
+    /api/tantan/v1/topics /api/tantan/v1/filter
     /api/tantan/v1/recommendation/feedback /api/tantan/v1/recommendation/blocks/sources
     /api/tantan/v1/recommendation/blocks/sources/{sourceId} /api/tantan/v1/search
     /api/tantan/v1/entries/{entryId}/enrichment /api/tantan/v1/settings/ai-provider

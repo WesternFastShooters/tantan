@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"time"
 
+	"tantan.local/tantan-api/internal/ai"
 	"tantan.local/tantan-api/internal/enrichment"
 	"tantan.local/tantan-api/internal/jobs"
 	"tantan.local/tantan-api/internal/ops"
@@ -16,7 +17,11 @@ import (
 	"tantan.local/tantan-api/internal/topic"
 )
 
-const workerPollInterval = 500 * time.Millisecond
+const (
+	workerPollInterval     = 500 * time.Millisecond
+	poolWarmupInterval     = 5 * time.Second
+	poolWarmupBatchPerUser = 20
+)
 
 func (application *application) startWorkers(ctx context.Context, readiness *ops.Readiness, enrichmentService *enrichment.Service, syncService *syncer.Service, topics *topic.Service, now func() time.Time, logger *slog.Logger) {
 	application.workers.Add(1)
@@ -26,6 +31,7 @@ func (application *application) startWorkers(ctx context.Context, readiness *ops
 		defer ticker.Stop()
 		ready := false
 		nextReadiness := time.Time{}
+		nextPoolWarmup := time.Time{}
 		for {
 			current := time.Now().UTC()
 			if !current.Before(nextReadiness) {
@@ -37,9 +43,20 @@ func (application *application) startWorkers(ctx context.Context, readiness *ops
 					logger.ErrorContext(ctx, "worker_failed", slog.String("module", "enrichment"), slog.String("errorCode", "LOCAL_STORAGE_ERROR"))
 					nextReadiness = time.Time{}
 				}
+				if _, err := syncService.RunOneContentJob(ctx); err != nil && !errors.Is(err, context.Canceled) {
+					logger.ErrorContext(ctx, "worker_failed", slog.String("module", "content-sync"), slog.String("errorCode", "LOCAL_STORAGE_ERROR"))
+					nextReadiness = time.Time{}
+				}
 				if err := runOneSyncJob(ctx, application.Store, syncService, topics, now); err != nil && !errors.Is(err, context.Canceled) {
 					logger.ErrorContext(ctx, "worker_failed", slog.String("module", "sync"), slog.String("errorCode", "LOCAL_STORAGE_ERROR"))
 					nextReadiness = time.Time{}
+				}
+				if !current.Before(nextPoolWarmup) {
+					if err := queuePoolTranslations(ctx, application.Store, enrichmentService, poolWarmupBatchPerUser); err != nil && !errors.Is(err, context.Canceled) {
+						logger.ErrorContext(ctx, "worker_failed", slog.String("module", "content-pool"), slog.String("errorCode", "LOCAL_STORAGE_ERROR"))
+						nextReadiness = time.Time{}
+					}
+					nextPoolWarmup = current.Add(poolWarmupInterval)
 				}
 			}
 			select {
@@ -49,6 +66,34 @@ func (application *application) startWorkers(ctx context.Context, readiness *ops
 			}
 		}
 	}()
+}
+
+func queuePoolTranslations(ctx context.Context, store *storage.Store, service *enrichment.Service, limit int) error {
+	rows, err := store.DB().QueryContext(ctx, "SELECT user_id FROM accounts ORDER BY user_id")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	userIDs := make([]string, 0)
+	for rows.Next() {
+		var userID string
+		if err := rows.Scan(&userID); err != nil {
+			return err
+		}
+		userIDs = append(userIDs, userID)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, userID := range userIDs {
+		if _, err := service.EnsurePoolTranslations(ctx, userID, "", limit); err != nil {
+			if errors.Is(err, ai.ErrNotConfigured) {
+				return nil
+			}
+			return err
+		}
+	}
+	return nil
 }
 
 func runOneSyncJob(ctx context.Context, store *storage.Store, service *syncer.Service, topics *topic.Service, now func() time.Time) error {

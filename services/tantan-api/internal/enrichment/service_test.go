@@ -186,6 +186,57 @@ func TestRecentTranslationWarmupQueuesOnlyNonChineseUnreadEntries(t *testing.T) 
 	}
 }
 
+func TestContentPoolTranslationWarmupIncludesOldReadEntriesAndDeduplicates(t *testing.T) {
+	ctx := context.Background()
+	store, settings, topics, now, _ := openEnrichmentFixture(t)
+	timestamp := now.Format(time.RFC3339Nano)
+	oldPublished := now.Add(-30 * 24 * time.Hour).Format(time.RFC3339Nano)
+	if err := store.Write(ctx, func(transaction *sql.Tx) error {
+		statements := []struct {
+			query string
+			args  []any
+		}{
+			{query: "INSERT INTO entries(entry_id,feed_id,kind,title,content,language,media_json,published_at,content_hash,created_at,updated_at) VALUES('entry_old','feed_1','article','Old English','Old English body','en','[]',?,?,?,?)", args: []any{oldPublished, strings.Repeat("b", 64), timestamp, timestamp}},
+			{query: "INSERT INTO account_entries(user_id,entry_id,read_at,last_seen_at) VALUES('user_1','entry_old',?,?)", args: []any{timestamp, timestamp}},
+			{query: "INSERT INTO entries(entry_id,feed_id,kind,title,content,language,media_json,published_at,content_hash,created_at,updated_at) VALUES('entry_zh','feed_1','article','中文标题','中文正文','zh-CN','[]',?,?,?,?)", args: []any{timestamp, strings.Repeat("c", 64), timestamp, timestamp}},
+			{query: "INSERT INTO account_entries(user_id,entry_id,last_seen_at) VALUES('user_1','entry_zh',?)", args: []any{timestamp}},
+		}
+		for _, statement := range statements {
+			if _, err := transaction.ExecContext(ctx, statement.query, statement.args...); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	service, err := enrichment.NewService(enrichment.Config{Store: store, Settings: settings, Topics: topics, Now: func() time.Time { return now }, PromptVersion: "prompt-v1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	queued, err := service.EnsurePoolTranslations(ctx, "user_1", "feed_1", 100)
+	if err != nil || queued != 2 {
+		t.Fatalf("queued=%d err=%v", queued, err)
+	}
+	queuedAgain, err := service.EnsurePoolTranslations(ctx, "user_1", "feed_1", 100)
+	if err != nil || queuedAgain != 0 {
+		t.Fatalf("queued again=%d err=%v", queuedAgain, err)
+	}
+	var jobCount, oldJobCount, ChineseJobCount int
+	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM jobs WHERE kind='enrich'").Scan(&jobCount); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM jobs WHERE kind='enrich' AND payload_json LIKE '%entry_old%'").Scan(&oldJobCount); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM jobs WHERE kind='enrich' AND payload_json LIKE '%entry_zh%'").Scan(&ChineseJobCount); err != nil {
+		t.Fatal(err)
+	}
+	if jobCount != 2 || oldJobCount != 1 || ChineseJobCount != 0 {
+		t.Fatalf("jobs=%d old=%d Chinese=%d", jobCount, oldJobCount, ChineseJobCount)
+	}
+}
+
 func TestWorkerRepairsJSONOnceThenAtomicallyCommitsEnrichmentTopicsAndFTS(t *testing.T) {
 	ctx := context.Background()
 	store, settings, topics, now, _ := openEnrichmentFixture(t)

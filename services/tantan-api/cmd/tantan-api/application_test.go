@@ -90,6 +90,7 @@ func TestApplicationStartsMigratedReadyAndRoutesLocalAPI(t *testing.T) {
 		{path: "/api/healthz", status: stdhttp.StatusOK},
 		{path: "/api/readyz", status: stdhttp.StatusOK},
 		{path: "/api/tantan/v1/home?topicId=recommend", status: stdhttp.StatusUnauthorized},
+		{path: "/api/tantan/v1/content-pool?sourceId=feed_api", status: stdhttp.StatusUnauthorized},
 	} {
 		request := httptest.NewRequest(stdhttp.MethodGet, "http://127.0.0.1:3000"+test.path, nil)
 		request.Host = "127.0.0.1:3000"
@@ -270,6 +271,10 @@ func TestApplicationAuthenticatedHomeTopicsSearchAndStrictAISettings(t *testing.
 		t.Fatalf("home response=%s err=%v", homeResponse.Body.String(), err)
 	}
 	queueID := homeBody.Queue.ID
+	poolResponse := do(stdhttp.MethodGet, "/api/tantan/v1/content-pool?sourceId=feed_api&limit=20", nil)
+	if poolResponse.Code != stdhttp.StatusOK || !strings.Contains(poolResponse.Body.String(), `"entryId":"entry_api"`) || !strings.Contains(poolResponse.Body.String(), `"pool":{"total":1,"ready":1,"pending":0}`) {
+		t.Fatalf("content pool status=%d body=%s", poolResponse.Code, poolResponse.Body.String())
+	}
 	if response := do(stdhttp.MethodGet, "/api/tantan/v1/home?topicId=recommend&limit=21", nil); response.Code != stdhttp.StatusBadRequest {
 		t.Fatalf("home accepted limit=21: status=%d body=%s", response.Code, response.Body.String())
 	}

@@ -1,21 +1,80 @@
 import { FeedViewType } from "@follow/constants"
-import { useEntriesQuery, useEntryList } from "@follow/store/entry/hooks"
 import { useFeedById, usePrefetchFeed } from "@follow/store/feed/hooks"
 import { useSubscriptionByFeedId } from "@follow/store/subscription/hooks"
 import { subscriptionSyncService } from "@follow/store/subscription/store"
-import { useRef, useState } from "react"
+import { useInfiniteQuery } from "@tanstack/react-query"
+import { useMemo, useRef, useState } from "react"
 import { Link, useParams } from "react-router"
 
-import { EntryListRow } from "~/modules/tantan-entry/EntryListRow"
+import type { HomeCard } from "~/lib/tantan-api/gen/types"
+import { EntryLink } from "~/modules/tantan-entry/EntryLink"
+
+import { getContentPoolPage } from "./content-pool-api"
+
+const TranslatedPoolRow = ({ card }: { card: HomeCard }) => (
+  <article className="overflow-hidden rounded-xl border border-white/[0.06] bg-[#17181b]">
+    <EntryLink
+      card={card}
+      className="flex min-h-28 gap-3 rounded-xl p-3 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange-500"
+      aria-label={`阅读：${card.title}`}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+          <span className="rounded bg-white/5 px-1.5 py-0.5 uppercase">{card.type}</span>
+          <span>{card.translated ? "已翻译" : "中文原文"}</span>
+        </div>
+        <h3 className="mt-2 line-clamp-2 font-semibold leading-6 text-zinc-100">{card.title}</h3>
+        {card.excerpt && (
+          <p className="mt-1 line-clamp-2 text-sm leading-6 text-zinc-400">{card.excerpt}</p>
+        )}
+        <footer className="mt-2 flex gap-2 text-xs text-zinc-500">
+          <span className="min-w-0 flex-1 truncate">{card.source.name}</span>
+          <time dateTime={card.publishedAt}>
+            {new Date(card.publishedAt).toLocaleDateString("zh-CN")}
+          </time>
+        </footer>
+      </div>
+      {card.cover && (
+        <img
+          src={card.cover}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className="h-24 w-20 shrink-0 rounded-lg bg-zinc-900 object-cover"
+          onError={(event) => {
+            event.currentTarget.hidden = true
+          }}
+        />
+      )}
+    </EntryLink>
+  </article>
+)
 
 export function SourceDetailPage() {
   const { sourceId = "" } = useParams()
   const feed = useFeedById(sourceId)
   const feedQuery = usePrefetchFeed(sourceId, { enabled: !feed })
   const subscription = useSubscriptionByFeedId(sourceId)
-  const view = subscription?.view ?? FeedViewType.Articles
-  const entriesQuery = useEntriesQuery({ feedId: sourceId, view, limit: 20 })
-  const entries = useEntryList(entriesQuery.entriesIds).filter((entry) => entry !== null)
+  const poolQuery = useInfiniteQuery({
+    queryKey: ["content-pool", sourceId],
+    queryFn: ({ pageParam, signal }) => getContentPoolPage({ sourceId, cursor: pageParam, signal }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    enabled: sourceId.length > 0,
+    staleTime: 30_000,
+    refetchInterval: (query) => (query.state.data?.pages.at(-1)?.pool.pending ? 3_000 : false),
+  })
+  const entries = useMemo(() => {
+    const seen = new Set<string>()
+    return (poolQuery.data?.pages ?? [])
+      .flatMap((page) => page.items)
+      .filter((entry) => {
+        if (seen.has(entry.entryId)) return false
+        seen.add(entry.entryId)
+        return true
+      })
+  }, [poolQuery.data?.pages])
+  const pool = poolQuery.data?.pages.at(-1)?.pool
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const mutationLocked = useRef(false)
@@ -87,30 +146,37 @@ export function SourceDetailPage() {
         <h2 className="font-semibold text-zinc-100">历史内容</h2>
         <span className="text-xs text-zinc-500">已读与未读均可查看</span>
       </div>
-      {entriesQuery.isLoading && (
+      {poolQuery.isPending && (
         <div aria-busy="true" className="mt-3 h-52 animate-pulse rounded-xl bg-[#17181b]" />
       )}
-      {entriesQuery.error && (
+      {poolQuery.error && (
         <p role="alert" className="mt-3 text-sm text-red-300">
-          {entriesQuery.error.message}
+          {poolQuery.error.message}
+        </p>
+      )}
+      {pool && pool.pending > 0 && (
+        <p role="status" className="mt-3 rounded-xl bg-orange-500/10 p-3 text-sm text-orange-200">
+          还有 {pool.pending} 条内容正在翻译
         </p>
       )}
       <div className="mt-3 space-y-2">
         {entries.map((entry) => (
-          <EntryListRow key={entry.id} entry={entry} feed={feed} view={view} />
+          <TranslatedPoolRow key={entry.entryId} card={entry} />
         ))}
       </div>
-      {!entriesQuery.isLoading && entries.length === 0 && (
-        <p className="py-16 text-center text-sm text-zinc-500">暂无历史内容</p>
+      {!poolQuery.isPending && !poolQuery.isError && entries.length === 0 && (
+        <p className="py-16 text-center text-sm text-zinc-500">
+          {pool?.pending ? "内容翻译完成后会显示在这里" : "暂无历史内容"}
+        </p>
       )}
-      {entriesQuery.hasNextPage && (
+      {poolQuery.hasNextPage && (
         <button
           type="button"
-          disabled={entriesQuery.isFetchingNextPage}
-          onClick={() => entriesQuery.fetchNextPage()}
+          disabled={poolQuery.isFetchingNextPage}
+          onClick={() => poolQuery.fetchNextPage()}
           className="mx-auto mt-4 flex min-h-11 items-center rounded-xl bg-white/10 px-4 text-sm disabled:opacity-50"
         >
-          {entriesQuery.isFetchingNextPage ? "加载中…" : "加载更多"}
+          {poolQuery.isFetchingNextPage ? "加载中…" : "加载更多"}
         </button>
       )}
     </section>

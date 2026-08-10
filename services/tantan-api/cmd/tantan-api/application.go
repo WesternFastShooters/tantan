@@ -14,6 +14,7 @@ import (
 
 	"tantan.local/tantan-api/internal/ai"
 	"tantan.local/tantan-api/internal/auth"
+	"tantan.local/tantan-api/internal/contentpool"
 	"tantan.local/tantan-api/internal/enrichment"
 	"tantan.local/tantan-api/internal/filter"
 	"tantan.local/tantan-api/internal/folo"
@@ -121,6 +122,10 @@ func newApplication(ctx context.Context, config applicationConfig) (*application
 	if err != nil {
 		return fail(err)
 	}
+	contentPoolService, err := contentpool.NewService(contentpool.Config{Store: store, CursorKey: cursorKey})
+	if err != nil {
+		return fail(err)
+	}
 	searchService, err := search.NewService(search.Config{Store: store, CursorKey: cursorKey})
 	if err != nil {
 		return fail(err)
@@ -175,14 +180,15 @@ func newApplication(ctx context.Context, config applicationConfig) (*application
 		return fail(err)
 	}
 	local, err := newLocalAPI(localAPIConfig{
-		Store:      store,
-		Home:       homeService,
-		Topics:     topics,
-		Filter:     filterService,
-		Feedback:   feedbackService,
-		Search:     searchService,
-		Enrichment: enrichmentService,
-		AISettings: settings,
+		Store:       store,
+		Home:        homeService,
+		ContentPool: contentPoolService,
+		Topics:      topics,
+		Filter:      filterService,
+		Feedback:    feedbackService,
+		Search:      searchService,
+		Enrichment:  enrichmentService,
+		AISettings:  settings,
 		ProviderTester: func(providerContext context.Context) (ai.ConnectionTestResult, error) {
 			_, apiKey, credentialErr := settings.Credential(providerContext, ai.DefaultPromptVersion)
 			if credentialErr != nil {

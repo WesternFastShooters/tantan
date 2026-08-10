@@ -4,7 +4,7 @@ package gen
 
 import "encoding/json"
 
-const ContractSHA256 = "1b3c4c80ce80c5a50504a609d97479c02fb8573551670a00dd875fbf0a756882"
+const ContractSHA256 = "ca68cd53a6d304ec8bb3a0520c6ea834a343ebd542ba35f13c0496de67e89202"
 
 type Identifier string
 type EntryType string
@@ -243,6 +243,18 @@ type HomeResponse struct {
 	NextCursor      *string    `json:"nextCursor"`
 	Queue           QueueState `json:"queue"`
 	QueueGeneration Identifier `json:"queueGeneration"`
+}
+
+type ContentPoolState struct {
+	Total   int `json:"total"`
+	Ready   int `json:"ready"`
+	Pending int `json:"pending"`
+}
+
+type ContentPoolResponse struct {
+	Items      []HomeCard       `json:"items"`
+	NextCursor *string          `json:"nextCursor"`
+	Pool       ContentPoolState `json:"pool"`
 }
 
 type SearchResponse struct {

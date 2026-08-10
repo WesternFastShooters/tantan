@@ -17,6 +17,7 @@ import (
 
 	"tantan.local/tantan-api/internal/ai"
 	"tantan.local/tantan-api/internal/api/gen"
+	"tantan.local/tantan-api/internal/contentpool"
 	"tantan.local/tantan-api/internal/enrichment"
 	"tantan.local/tantan-api/internal/filter"
 	"tantan.local/tantan-api/internal/home"
@@ -41,6 +42,7 @@ type providerTester func(context.Context) (ai.ConnectionTestResult, error)
 type localAPIConfig struct {
 	Store          *storage.Store
 	Home           *home.Service
+	ContentPool    *contentpool.Service
 	Topics         *topic.Service
 	Filter         *filter.Service
 	Feedback       *recommendation.FeedbackService
@@ -59,7 +61,7 @@ type localAPI struct {
 }
 
 func newLocalAPI(config localAPIConfig) (*localhttp.LocalMux, error) {
-	if config.Store == nil || config.Home == nil || config.Topics == nil || config.Filter == nil || config.Feedback == nil || config.Search == nil || config.Enrichment == nil || config.AISettings == nil || config.ProviderTester == nil || config.Diagnostics == nil {
+	if config.Store == nil || config.Home == nil || config.ContentPool == nil || config.Topics == nil || config.Filter == nil || config.Feedback == nil || config.Search == nil || config.Enrichment == nil || config.AISettings == nil || config.ProviderTester == nil || config.Diagnostics == nil {
 		return nil, errors.New("all local API services are required")
 	}
 	if config.Now == nil {
@@ -68,6 +70,7 @@ func newLocalAPI(config localAPIConfig) (*localhttp.LocalMux, error) {
 	api := &localAPI{config: config, providerRuns: make(map[string][]time.Time)}
 	mux := localhttp.NewLocalMux()
 	mux.HandleFunc(stdhttp.MethodGet, "/tantan/v1/home", api.home)
+	mux.HandleFunc(stdhttp.MethodGet, "/tantan/v1/content-pool", api.contentPool)
 	mux.HandleFunc(stdhttp.MethodGet, "/tantan/v1/topics", api.getTopics)
 	mux.HandleFunc(stdhttp.MethodPatch, "/tantan/v1/topics", api.patchTopics)
 	mux.HandleFunc(stdhttp.MethodPut, "/tantan/v1/filter", api.putFilter)
@@ -84,6 +87,39 @@ func newLocalAPI(config localAPIConfig) (*localhttp.LocalMux, error) {
 	mux.HandleFunc(stdhttp.MethodPost, "/tantan/v1/sync", api.triggerSync)
 	mux.Handle(stdhttp.MethodGet, "/tantan/v1/diagnostics", config.Diagnostics)
 	return mux, nil
+}
+
+func (api *localAPI) contentPool(writer stdhttp.ResponseWriter, request *stdhttp.Request) {
+	record, ok := api.record(writer, request)
+	if !ok {
+		return
+	}
+	if !onlyQueryKeys(request.URL.Query(), "sourceId", "cursor", "limit") {
+		writeLocalError(writer, request, stdhttp.StatusBadRequest, gen.ErrorCodeValidationError, "内容池查询参数无效", nil)
+		return
+	}
+	sourceID := request.URL.Query().Get("sourceId")
+	if sourceID != "" && !validIdentifier(sourceID) {
+		writeLocalError(writer, request, stdhttp.StatusBadRequest, gen.ErrorCodeValidationError, "Source ID 无效", nil)
+		return
+	}
+	limit, err := queryLimit(request.URL.Query().Get("limit"))
+	if err != nil {
+		writeLocalError(writer, request, stdhttp.StatusBadRequest, gen.ErrorCodeValidationError, "limit 必须为 1 到 20", nil)
+		return
+	}
+	if _, err := api.config.Enrichment.EnsurePoolTranslations(request.Context(), record.User.ID, sourceID, 100); err != nil && !errors.Is(err, ai.ErrNotConfigured) {
+		api.writeDomainError(writer, request, err)
+		return
+	}
+	page, err := api.config.ContentPool.List(request.Context(), contentpool.Query{
+		UserID: record.User.ID, SourceID: sourceID, Limit: limit, Cursor: request.URL.Query().Get("cursor"),
+	})
+	if err != nil {
+		api.writeDomainError(writer, request, err)
+		return
+	}
+	writeLocalJSON(writer, stdhttp.StatusOK, contentPoolResponse(page))
 }
 
 func (api *localAPI) home(writer stdhttp.ResponseWriter, request *stdhttp.Request) {
@@ -508,7 +544,7 @@ func (api *localAPI) allowProviderTest(sessionID string) (time.Duration, bool) {
 
 func (api *localAPI) writeDomainError(writer stdhttp.ResponseWriter, request *stdhttp.Request, err error) {
 	switch {
-	case errors.Is(err, home.ErrCursorMismatch), errors.Is(err, home.ErrCursorInvalid), errors.Is(err, search.ErrCursorInvalid), errors.Is(err, search.ErrCursorMismatch):
+	case errors.Is(err, home.ErrCursorMismatch), errors.Is(err, home.ErrCursorInvalid), errors.Is(err, search.ErrCursorInvalid), errors.Is(err, search.ErrCursorMismatch), errors.Is(err, contentpool.ErrCursorInvalid), errors.Is(err, contentpool.ErrCursorMismatch):
 		writeLocalError(writer, request, stdhttp.StatusBadRequest, gen.ErrorCodeCursorMismatch, "分页游标与当前请求不匹配", nil)
 	case errors.Is(err, home.ErrQueueVersionChanged):
 		writeLocalError(writer, request, stdhttp.StatusConflict, gen.ErrorCodeQueueVersionChanged, "首页队列已更新，请从第一页重新加载", nil)
@@ -618,6 +654,18 @@ func homeResponse(page home.Page) gen.HomeResponse {
 		items = append(items, homeCard(item.EntryID, item.Type, item.Title, item.Excerpt, safeAPIURL(item.Cover), item.Source.ID, item.Source.Name, safeAPIURL(item.Source.Avatar), item.PublishedAt, homeTopics(item.Topics), item.Translated))
 	}
 	return gen.HomeResponse{Items: items, NextCursor: page.NextCursor, Queue: gen.QueueState{ID: gen.Identifier(page.Queue.ID), Version: page.Queue.Version, Generation: gen.Identifier(page.Queue.Generation), Total: page.Queue.Total, Unread: page.Queue.Unread, Finished: page.Queue.Finished, CandidateWindowDays: page.Queue.CandidateWindowDays, GeneratedAt: page.Queue.GeneratedAt}, QueueGeneration: gen.Identifier(page.QueueGeneration)}
+}
+
+func contentPoolResponse(page contentpool.Page) gen.ContentPoolResponse {
+	items := make([]gen.HomeCard, 0, len(page.Items))
+	for _, item := range page.Items {
+		items = append(items, homeCard(item.EntryID, item.Type, item.Title, item.Excerpt, safeAPIURL(item.Cover), item.Source.ID, item.Source.Name, safeAPIURL(item.Source.Avatar), item.PublishedAt, homeTopics(item.Topics), item.Translated))
+	}
+	return gen.ContentPoolResponse{
+		Items:      items,
+		NextCursor: page.NextCursor,
+		Pool:       gen.ContentPoolState{Total: page.Pool.Total, Ready: page.Pool.Ready, Pending: page.Pool.Pending},
+	}
 }
 
 func searchResponse(page search.Page) gen.SearchResponse {

@@ -3,7 +3,7 @@
   "packageVersion": "2.0.0",
   "status": "approved",
   "approvedAt": "2026-08-10",
-  "approvalRecord": "User approved a Mobile-Web/PWA-only implementation, Folo Mobile parity outside Home, all Folo login methods, and a Go-server-owned Gemini secret configuration; the Codex Goal must continue through coding, tests, and mobile acceptance.",
+  "approvalRecord": "User approved a Mobile-Web/PWA-only implementation, Folo Mobile parity outside Home, all Folo login methods, a Go-server-owned Gemini secret configuration, and a unified translated subscription-content pool consumed by Home and subscription history.",
   "phase": {
     "name": "phase-one-mobile-web",
     "clients": ["mobile-web-pwa"],
@@ -51,6 +51,7 @@
     "The Gemini API key is loaded only by Go from an operator-controlled secret file or local Keychain; no browser API accepts it and SQLite does not store it.",
     "Folo paid AI, membership, plan, power, wallet, payment, upgrade CTA and AI Chat are absent and denied by proxy policy; RSS subscription storage is preserved.",
     "Home uses a persisted seven-day unread daily queue with initial size 50 and same-day hard limit 60; pagination never reranks.",
+    "All synced subscription entries form a raw local pool; original Chinese or successfully translated current content forms the only displayable pool used by Home, dynamic Topics, subscription history, and entry details.",
     "Normal search navigates to /search without mutating Home; the AI icon opens an in-place filter sheet and commit changes Filter, Topics, and Queue atomically.",
     "OpenAPI, JSON Schema, SQLite migrations and Folo route policy require an approved spec amendment before implementation changes."
   ],
@@ -64,12 +65,12 @@
     {
       "path": "10-frontend.md",
       "role": "frontend-domain-spec",
-      "sha256": "98d001ce6d815f05098388cc796cd2331da2ef7bf1b4980b37a06719a14a7143"
+      "sha256": "89e227243cde29c66407027fddcc50d075937462124f6ff7a829b4c5a7670894"
     },
     {
       "path": "20-backend.md",
       "role": "backend-domain-spec",
-      "sha256": "3828c6040aaeb49cde4a16a826f861d6c007deb1fc3fc03e8f84cc2bb4fe8137"
+      "sha256": "b04b75cf4f8521681cb8ce39bf2f2f471800dce4014e0291385cb58c10a69b90"
     },
     {
       "path": "80-cross-domain.md",
@@ -114,7 +115,7 @@
     {
       "path": "api/openapi.json",
       "role": "public-http-contract",
-      "sha256": "50f81ab2c11a269a12d98aa552b134254079fc94fdc0568c01a758e16dd7d9a4"
+      "sha256": "74827a06833f83ecaf2a7a1dc7958296256b3fa1a0ceb03417f50b832ca0d873"
     },
     {
       "path": "db/0001_core.sql",
@@ -179,7 +180,7 @@
     {
       "path": "scripts/validate-package.rb",
       "role": "offline-contract-validator",
-      "sha256": "baf83f5d4f5e7407867684655ec44f474c92625559d02c42332a1a124fb114d2"
+      "sha256": "7eaf798b41df5d1785cf51c91301052535f74e5bd77bdb8b03fe413f6271abbf"
     },
     {
       "path": "scripts/validate-package.sh",

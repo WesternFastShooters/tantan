@@ -97,6 +97,7 @@ Filter 提交在一个 SQLite `BEGIN IMMEDIATE` 中写新 Filter、Topics、read
 | API-12 | Go/AI             | GET、POST `/api/tantan/v1/entries/:entryId/enrichment`                                                | cookie+CSRF POST                         | kind translation/summary、locale                                                            | 200 ready/202 queued                                             | AI_NOT_CONFIGURED/AI_PROVIDER_UNAVAILABLE                                                                                    | entry+kind+locale unique             | poll Retry-After       | schemaVersion           |
 | API-13 | Go/Sync           | POST `/api/tantan/v1/sync`、GET `/status`                                                             | cookie+CSRF POST                         | force=false 默认                                                                            | 202 job/status                                                   | SYNC_ALREADY_RUNNING/UPSTREAM                                                                                                | per-user singleflight                | 2/min                  | v1                      |
 | API-14 | Go/Ops            | GET `/api/healthz`、`/api/readyz`、`/api/tantan/v1/diagnostics`                                       | health public；diagnostics authenticated | 无                                                                                          | status/diagnostics                                               | 503 fail-closed                                                                                                              | read                                 | 60/min                 | secret-free             |
+| API-15 | Go/Content Pool   | GET `/api/tantan/v1/content-pool`                                                                     | cookie                                   | optional sourceId、signed cursor、limit≤20                                                  | Chinese-ready cards + total/ready/pending                        | CURSOR_MISMATCH；never returns untranslated raw text                                                                         | read                                 | 60/min                 | current content hash    |
 
 ### 3.2 事件与 Webhook
 
@@ -104,12 +105,13 @@ Filter 提交在一个 SQLite `BEGIN IMMEDIATE` 中写新 Filter、Topics、read
 
 ### 3.3 任务与调度
 
-| JOB ID | 触发/调度                | 输入                                   | Owner  | 超时/取消             | 幂等/并发                          | 结果/失败/重试                             | 状态/观测                      |
-| ------ | ------------------------ | -------------------------------------- | ------ | --------------------- | ---------------------------------- | ------------------------------------------ | ------------------------------ |
-| JOB-01 | 登录后、手动、每 15min   | user、checkpoint                       | MOD-07 | 2min；shutdown cancel | 每用户单实例；page+checkpoint 事务 | 指数 5s～15min，最多 8；401 暂停           | sync status、counts、requestId |
-| JOB-02 | 新 Entry 或用户触发      | entry、kind、locale、provider revision | MOD-10 | 单次 60s              | unique key；最多 2 worker/用户     | 429 respect Retry-After；schema 失败最多 2 | queued/running/ready/failed    |
-| JOB-03 | local midnight/Home 首访 | user/date/timezone/topic/filter        | MOD-09 | 30s                   | generation unique                  | 规则排序总能降级；AI 失败不阻塞规则队列    | generation/count/duration      |
-| JOB-04 | 每日 03:30               | expiry thresholds                      | MOD-11 | 5min                  | 全局锁                             | 清 session/job/queue；失败次日重试         | deleted counts only            |
+| JOB ID | 触发/调度                 | 输入                                   | Owner  | 超时/取消             | 幂等/并发                          | 结果/失败/重试                             | 状态/观测                      |
+| ------ | ------------------------- | -------------------------------------- | ------ | --------------------- | ---------------------------------- | ------------------------------------------ | ------------------------------ |
+| JOB-01 | 登录后、手动、每 15min    | user、checkpoint                       | MOD-07 | 2min；shutdown cancel | 每用户单实例；page+checkpoint 事务 | 指数 5s～15min，最多 8；401 暂停           | sync status、counts、requestId |
+| JOB-02 | 新 Entry 或用户触发       | entry、kind、locale、provider revision | MOD-10 | 单次 60s              | unique key；最多 2 worker/用户     | 429 respect Retry-After；schema 失败最多 2 | queued/running/ready/failed    |
+| JOB-03 | local midnight/Home 首访  | user/date/timezone/topic/filter        | MOD-09 | 30s                   | generation unique                  | 规则排序总能降级；AI 失败不阻塞规则队列    | generation/count/duration      |
+| JOB-04 | 每日 03:30                | expiry thresholds                      | MOD-11 | 5min                  | 全局锁                             | 清 session/job/queue；失败次日重试         | deleted counts only            |
+| JOB-05 | sync 后、每 5s、Pool 首访 | user、optional source、current content | MOD-10 | 单次 60s              | durable dedupe；active backlog≤100 | provider backoff；完成前保持 hidden        | total/ready/pending only       |
 
 ## 4. 可靠性与失败行为
 
@@ -140,7 +142,7 @@ Gemini 内置 preset：`providerId=google-gemini-openai`，endpoint 固定 `http
 
 ### 4.3 部分失败、重复、乱序与对账
 
-同步先写页面内容再 checkpoint，同 entry upsert；重复任务不产生重复行。Folo 已读成功而本地更新失败时记录无 secret repair job，下次 sync 对账；Folo 失败则不乐观永久删除 Home card。AI 完成携带 provider revision，旧 revision 结果可保存历史但不覆盖新请求状态。Filter 事务失败不暴露半写 Topic/Queue。每天 doctor 比较 Folo mirror 计数、孤儿 FK、active Filter 和 ready Queue 引用。
+同步先写原始页面内容再 checkpoint，同 entry upsert；重复任务不产生重复行。非中文条目按最新 content hash 进入有界持久翻译队列，只有标题和完整正文都成功后才对 Home、Topic 与订阅历史可见。Folo 已读成功而本地更新失败时记录无 secret repair job，下次 sync 对账；Folo 失败则不乐观永久删除 Home card。AI 完成携带 provider revision，旧 revision 结果可保存历史但不覆盖新请求状态。Filter 事务失败不暴露半写 Topic/Queue。每天 doctor 比较 Folo mirror 计数、孤儿 FK、active Filter 和 ready Queue 引用。
 
 ## 5. 安全与隐私
 

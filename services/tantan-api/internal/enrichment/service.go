@@ -28,6 +28,8 @@ var allowedFields = map[string]struct{}{
 	"topics":      {},
 }
 
+const maximumActivePoolTranslations = 100
+
 type Service struct {
 	store         *storage.Store
 	settings      *ai.SettingsService
@@ -237,6 +239,81 @@ LIMIT ?`, userID, now.Add(-7*24*time.Hour).Format(time.RFC3339Nano), now.Add(tim
 	}
 	if err := rows.Err(); err != nil {
 		return 0, errors.New("iterate translation warmup entries failed")
+	}
+	return service.ensureTranslationEntries(ctx, userID, entryIDs)
+}
+
+// EnsurePoolTranslations incrementally fills the displayable Chinese content pool.
+// It considers every synced subscription entry, including old and read entries, but
+// only schedules a bounded batch so a large account cannot flood the provider.
+func (service *Service) EnsurePoolTranslations(ctx context.Context, userID, sourceID string, limit int) (int, error) {
+	userID = strings.TrimSpace(userID)
+	sourceID = strings.TrimSpace(sourceID)
+	if userID == "" || limit < 1 || limit > 100 {
+		return 0, errors.New("valid content pool translation request is required")
+	}
+	active, _, err := service.settings.Credential(ctx, service.promptVersion)
+	if err != nil {
+		return 0, err
+	}
+	var activeCount int
+	if err := service.store.DB().QueryRowContext(ctx, `
+SELECT COUNT(*)
+FROM entry_enrichments en
+JOIN account_entries ae ON ae.entry_id=en.entry_id
+JOIN entries e ON e.entry_id=en.entry_id
+WHERE ae.user_id=? AND en.provider_fp=? AND en.language='zh-CN'
+  AND en.content_hash=e.content_hash AND en.prompt_version=?
+  AND en.state IN ('queued','processing')`, userID, active.Fingerprint, service.promptVersion).Scan(&activeCount); err != nil {
+		return 0, errors.New("count active content pool translations failed")
+	}
+	available := maximumActivePoolTranslations - activeCount
+	if available <= 0 {
+		return 0, nil
+	}
+	if limit > available {
+		limit = available
+	}
+	arguments := []any{userID}
+	sourceClause := ""
+	if sourceID != "" {
+		sourceClause = " AND e.feed_id=?"
+		arguments = append(arguments, sourceID)
+	}
+	retryCutoff := service.now().UTC().Add(-15 * time.Minute).Format(time.RFC3339Nano)
+	arguments = append(arguments, active.Fingerprint, service.promptVersion, retryCutoff, limit)
+	rows, err := service.store.DB().QueryContext(ctx, `
+SELECT e.entry_id
+FROM account_entries ae
+JOIN entries e ON e.entry_id=ae.entry_id
+WHERE ae.user_id=?`+sourceClause+`
+  AND lower(COALESCE(e.language,'')) NOT LIKE 'zh%'
+  AND NOT EXISTS(
+    SELECT 1 FROM entry_enrichments en
+    WHERE en.entry_id=e.entry_id AND en.provider_fp=? AND en.language='zh-CN'
+      AND en.content_hash=e.content_hash AND en.prompt_version=?
+      AND (
+        en.state IN ('queued','processing')
+        OR (en.state='ready' AND en.translated_title IS NOT NULL AND en.translated_content IS NOT NULL)
+        OR (en.state='failed' AND en.updated_at>=?)
+      )
+  )
+ORDER BY e.published_at DESC,e.entry_id
+LIMIT ?`, arguments...)
+	if err != nil {
+		return 0, errors.New("load content pool translation entries failed")
+	}
+	defer rows.Close()
+	entryIDs := make([]string, 0, limit)
+	for rows.Next() {
+		var entryID string
+		if err := rows.Scan(&entryID); err != nil {
+			return 0, errors.New("scan content pool translation entry failed")
+		}
+		entryIDs = append(entryIDs, entryID)
+	}
+	if err := rows.Err(); err != nil {
+		return 0, errors.New("iterate content pool translation entries failed")
 	}
 	return service.ensureTranslationEntries(ctx, userID, entryIDs)
 }

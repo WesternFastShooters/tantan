@@ -129,7 +129,7 @@ MobileWebApp
 | CMP-04 | 瀑布流                | HomePage/FeedCard     | pages、queue            | loadNext/open/read                                    | React Query      | API-04         | loading/empty/error/end             | 两列、稳定尺寸                               | `tantan-home/MasonryFeed.tsx`                | TC-05、TC-06 |
 | CMP-05 | AI Filter Sheet       | ModalLayer            | active filter           | submit/reset/close                                    | Sheet form       | API-06         | edit/pending/error                  | dialog/focus trap/safe area                  | `tantan-home/AIFilterSheet.tsx`              | TC-07        |
 | CMP-06 | 普通搜索              | stack                 | q                       | open result                                           | URL + query      | API-07         | empty/loading/results/error         | search semantics                             | `tantan-search/SearchPage.tsx`               | TC-08        |
-| CMP-07 | 订阅 Tab              | MainTabs              | view                    | add/remove/open                                       | URL/search state | API-08         | anonymous/loading/groups/error      | Folo Mobile pager/list                       | `tantan-subscriptions/SubscriptionsPage.tsx` | TC-09        |
+| CMP-07 | 订阅 Tab/中文历史池   | MainTabs              | view、sourceId          | add/remove/open/load translated page                  | URL/query state  | API-08、API-15 | anonymous/loading/translating/error | Folo Mobile pager/list                       | `tantan-subscriptions/SubscriptionsPage.tsx` | TC-09        |
 | CMP-08 | 发现 Tab              | MainTabs              | q                       | subscribe/open                                        | page             | API-09         | discover/search/error               | Folo Mobile header/cards                     | `tantan-discover/DiscoverPage.tsx`           | TC-10        |
 | CMP-09 | 设置列表              | MainTabs              | user/settings           | push section/logout                                   | Router           | API-10         | anonymous/ready/error               | grouped cards                                | `tantan-settings/SettingsHomePage.tsx`       | TC-11        |
 | CMP-10 | 详情/AI 操作          | stack                 | entryId                 | read/favorite/translate/summary                       | query + server   | API-11、API-12 | loading/reader/error                | heading、reader typography                   | `tantan-entry/EntryDetailPage.tsx`           | TC-12        |
@@ -154,10 +154,11 @@ MobileWebApp
 | ST-06    | client session    | 每 Tab scroll 和 Home topic         | shell/pages               | scroll listeners    | 内存 + `history.state`；不含秘密                        |
 | ST-07    | server            | Provider/model/configured           | AI Settings/entry actions | Go settings status  | Key 永不进入浏览器；配置变化由服务端重启或安全重载生效  |
 | ST-08    | upstream mirrored | subscriptions/entries/read/favorite | subscription/detail/store | Go proxy/sync       | mutation success invalidates relevant queries           |
+| ST-09    | server            | translated content pool             | Home/Topic/source detail  | Go sync/AI worker   | raw non-Chinese content is hidden until ready           |
 
 ### 5.2 数据流
 
-Home：同源 API → 运行时 DTO 校验 → React Query page cache → `entryId` 去重和尺寸映射 → MasonryFeed → 用户打开详情 → Go 标记已读成功 → 全部 Home cache 删除。AI Filter：prompt → Go → AI Schema → DB 事务写 Filter/Topics/Queue → revision response → React batch 更新 → 新 query key。浏览器不持有也不提交 Folo token、AI Key 或 Provider endpoint。
+同步内容先进入 Go 原始池；中文原文或完成标题/正文翻译的当前版本才进入可展示池。Home、动态 Topic 和订阅源历史只消费可展示池；详情默认消费同一条完整中文译文。Home：同源 API → 运行时 DTO 校验 → React Query page cache → `entryId` 去重和尺寸映射 → MasonryFeed → 用户打开详情 → Go 标记已读成功 → 全部 Home cache 删除。AI Filter：prompt → Go → AI Schema → DB 事务写 Filter/Topics/Queue → revision response → React batch 更新 → 新 query key。浏览器不持有也不提交 Folo token、AI Key 或 Provider endpoint。
 
 ### 5.3 API、订阅与回调消费
 
@@ -175,6 +176,7 @@ Home：同源 API → 运行时 DTO 校验 → React Query page cache → `entry
 | API-10 | CMP-09 | Go       | GET `/api/tantan/v1/settings/ai-provider`；POST `/test`                                               | test 无 body                                                   | 固定 provider/model/configured metadata 或测试延迟                | server-secret/provider errors                          | cookie；test 带 CSRF     | 30s，无自动重试           | status 短缓存                     |
 | API-11 | CMP-10 | Go/Folo  | GET `/api/folo/entries/:id`、collections mutation                                                     | id                                                             | entry/read/favorite                                               | 404/error                                              | cookie                   | 15s                       | entry                             |
 | API-12 | CMP-10 | Go       | GET/POST `/api/tantan/v1/entries/:id/enrichment`                                                      | kind/locale                                                    | translation/summary/status                                        | missing-key/queued/failed                              | cookie+CSRF POST         | GET poll 有界             | entry enrichment                  |
+| API-15 | CMP-07 | Go       | GET `/api/tantan/v1/content-pool`                                                                     | sourceId、cursor、limit≤20                                     | only Chinese-ready cards、nextCursor、total/ready/pending         | cursor mismatch；pending progress                      | cookie                   | 15s；pending 时 3s poll   | source-scoped 30s                 |
 
 ### 5.4 表单与校验
 
