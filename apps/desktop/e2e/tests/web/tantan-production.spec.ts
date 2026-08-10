@@ -243,7 +243,7 @@ test("production Mobile PWA covers login and every phase-one route across restar
     "使用 Email 继续",
     "输入授权令牌继续",
   ]) {
-    await expect(page.getByRole("button", { name })).toBeVisible()
+    await expectVisibleIconGlyph(page.getByRole("button", { name }))
   }
 
   state.authenticate()

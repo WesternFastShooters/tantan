@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test"
 import { expect, test } from "@playwright/test"
 
 import { buildWebAppURL, resolveDesktopE2EEnv } from "../../support/env"
+import { expectDialogToSpanViewport, expectVisibleIconGlyph } from "../../support/visual-assertions"
 
 const readyResponse = {
   ready: true,
@@ -323,6 +324,7 @@ test.describe("Tantan Home", () => {
   test("REQ:FE-03 search navigates while AI opens and atomically applies the Filter Sheet", async ({
     page,
   }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
     await mockSession(page)
     let activeFilterId: string | null = null
     let filterCalls = 0
@@ -379,7 +381,8 @@ test.describe("Tantan Home", () => {
 
     const beforeAI = page.url()
     await page.getByRole("button", { name: "AI 智能筛选" }).click()
-    await expect(page.getByRole("dialog", { name: "AI 智能筛选" })).toBeVisible()
+    const filterDialog = page.getByRole("dialog", { name: "AI 智能筛选" })
+    await expectDialogToSpanViewport(page, filterDialog)
     expect(page.url()).toBe(beforeAI)
     await page.getByLabel("筛选要求").fill("多推 Codex")
     await page.getByRole("button", { name: "生成信息流" }).click()
@@ -484,7 +487,9 @@ test.describe("Tantan Home", () => {
     await expect(page.getByText("已经翻译完成的中文正文", { exact: true })).toBeVisible()
     await expect(page.getByText("Entry body", { exact: true })).toHaveCount(0)
 
-    await page.getByRole("button", { name: "返回首页" }).click()
+    const entryBackButton = page.getByRole("button", { name: "返回首页" })
+    await expectVisibleIconGlyph(entryBackButton)
+    await entryBackButton.click()
     await expect(page).toHaveURL(/\/$/)
     await expect(page.locator(`[data-entry-id="${entryId}"]`)).toHaveCount(0)
   })
