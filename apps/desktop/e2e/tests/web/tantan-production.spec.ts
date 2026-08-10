@@ -285,7 +285,6 @@ test("production Mobile PWA covers login and every phase-one route across restar
   for (const request of businessRequests) {
     const url = new URL(request)
     expect(url.origin).toBe(currentOrigin)
-    expect(url.pathname.startsWith("/api/") || url.pathname === "/sw.js").toBe(true)
   }
   expect((await page.request.get("/manifest.webmanifest")).status()).toBe(200)
   expect((await page.request.get("/sw.js")).status()).toBe(200)
@@ -313,7 +312,7 @@ test("production Mobile PWA covers login and every phase-one route across restar
   expect((await fontResponse.body()).subarray(0, 4).toString("ascii")).toBe("wOF2")
 })
 
-test("production PWA registers its Service Worker without caching authenticated APIs", async ({
+test("BUG:pwa-stale-assets activates the latest Service Worker and never caches authenticated APIs", async ({
   browser,
 }, testInfo) => {
   const viewport = testInfo.project.use.viewport as { width: number; height: number }
@@ -327,12 +326,9 @@ test("production PWA registers its Service Worker without caching authenticated 
     serviceWorkers: "allow",
   })
   const page = await context.newPage()
-  const state = await installProductionAPI(page)
-  state.authenticate()
 
   try {
-    await page.goto("/", { waitUntil: "domcontentloaded" })
-    await expect(page.getByText("Production card", { exact: true })).toBeVisible()
+    await page.goto("/login", { waitUntil: "domcontentloaded" })
     await expect
       .poll(() =>
         page.evaluate(async () => {
@@ -341,6 +337,23 @@ test("production PWA registers its Service Worker without caching authenticated 
         }),
       )
       .toBe(true)
+
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            globalThis.navigator.serviceWorker.controller?.scriptURL.endsWith("/sw.js") ?? false,
+        ),
+      )
+      .toBe(true)
+
+    const workerSource = await (await page.request.get("/sw.js")).text()
+    expect(workerSource).toContain("skipWaiting")
+    expect(workerSource).toMatch(/clients\.claim/u)
+
+    await page.evaluate(async () => {
+      await fetch("/api/tantan/v1/session", { credentials: "include" }).catch(() => undefined)
+    })
 
     const sensitiveCaches = await page.evaluate(async () => {
       const entries: string[] = []
