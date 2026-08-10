@@ -152,7 +152,21 @@ export function EntryDetailPage() {
           onClick={() => navigate(-1)}
           className="flex size-11 items-center justify-center rounded-full text-zinc-200 outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-orange-500"
         >
-          <i className="i-mgc-left-cute-re size-5" aria-hidden />
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            className="size-5"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path
+              d="m15 18-6-6 6-6"
+              stroke="currentColor"
+              strokeWidth="2.25"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         </button>
         <span className="min-w-0 flex-1 truncate text-sm text-zinc-400">{card?.source.name}</span>
         <button
