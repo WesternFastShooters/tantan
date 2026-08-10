@@ -101,6 +101,16 @@ type fakeReplays struct {
 	values map[string]time.Time
 }
 
+type fakeOwners struct {
+	user  session.User
+	bound bool
+	err   error
+}
+
+func (store *fakeOwners) FindOwner(context.Context) (session.User, bool, error) {
+	return store.user, store.bound, store.err
+}
+
 func (store *fakeReplays) Reserve(_ context.Context, tokenHash string, expiresAt time.Time) (bool, error) {
 	store.mu.Lock()
 	defer store.mu.Unlock()
@@ -131,6 +141,28 @@ func newBridge(t *testing.T, foloAuth *fakeFoloAuth, secrets *fakeSecrets, logs 
 		Secrets:      secrets,
 		Replays:      &fakeReplays{values: map[string]time.Time{}},
 		Folo:         foloAuth,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return bridge, sessions
+}
+
+func newSingleUserBridge(t *testing.T, foloAuth *fakeFoloAuth, secrets *fakeSecrets, owners *fakeOwners, logs *bytes.Buffer) (*auth.Bridge, *session.Store) {
+	t.Helper()
+	now := time.Date(2026, 8, 10, 2, 0, 0, 0, time.UTC)
+	sessions := session.NewStore(func() time.Time { return now })
+	bridge, err := auth.NewBridge(auth.Config{
+		PublicOrigin: "http://127.0.0.1:3000",
+		FoloWebURL:   "https://app.folo.is",
+		Now:          func() time.Time { return now },
+		Logger:       slog.New(slog.NewJSONHandler(logs, nil)),
+		Sessions:     sessions,
+		Secrets:      secrets,
+		Replays:      &fakeReplays{values: map[string]time.Time{}},
+		Folo:         foloAuth,
+		SingleUser:   true,
+		Owners:       owners,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -212,6 +244,119 @@ func TestTokenLoginNormalizesFoloURLCreatesOpaqueSessionAndRejectsReplay(t *test
 	bridge.Token(replay, postRequest("/api/auth/folo/token", requestBody))
 	if replay.Code != http.StatusConflict || foloAuth.applyCalls != 1 {
 		t.Fatalf("replay status=%d calls=%d", replay.Code, foloAuth.applyCalls)
+	}
+}
+
+func TestSingleUserTokenBindsOneServerSecretAndAutoProvisionsNewBrowser(t *testing.T) {
+	logs := &bytes.Buffer{}
+	secrets := &fakeSecrets{values: map[string]string{}}
+	owner := session.User{ID: "owner_1", Name: "Owner"}
+	owners := &fakeOwners{}
+	foloAuth := &fakeFoloAuth{applyToken: "upstream-owner-session-123456", applyUser: owner}
+	bridge, sessions := newSingleUserBridge(t, foloAuth, secrets, owners, logs)
+
+	bindResponse := httptest.NewRecorder()
+	bindRequest := postRequest("/api/auth/folo/token", `{"token":"one-time-owner-token-123456"}`)
+	bindRequest = bindRequest.WithContext(auth.WithTrustedSingleUserAccess(bindRequest.Context()))
+	bridge.Token(bindResponse, bindRequest)
+	if bindResponse.Code != http.StatusOK || secrets.values[auth.SingleUserSecretRef] != foloAuth.applyToken {
+		t.Fatalf("bind status=%d secrets=%#v body=%s", bindResponse.Code, secrets.values, bindResponse.Body.String())
+	}
+	var boundCookie *http.Cookie
+	for _, cookie := range bindResponse.Result().Cookies() {
+		if cookie.Name == session.LocalCookieName {
+			boundCookie = cookie
+		}
+	}
+	if boundCookie == nil {
+		t.Fatal("binding did not create a browser cookie")
+	}
+	boundRecord, ok, err := sessions.LookupRaw(context.Background(), boundCookie.Value)
+	if err != nil || !ok || boundRecord.SecretRef != auth.SingleUserSecretRef {
+		t.Fatalf("bound record=%#v ok=%v err=%v", boundRecord, ok, err)
+	}
+
+	owners.user = owner
+	owners.bound = true
+	autoRequest := httptest.NewRequest(http.MethodGet, "/api/tantan/v1/session", nil)
+	autoRequest = autoRequest.WithContext(auth.WithTrustedSingleUserAccess(autoRequest.Context()))
+	autoResponse := httptest.NewRecorder()
+	bridge.CurrentSession(autoResponse, autoRequest)
+	if autoResponse.Code != http.StatusOK || sessions.Len() != 2 {
+		t.Fatalf("automatic session status=%d sessions=%d body=%s", autoResponse.Code, sessions.Len(), autoResponse.Body.String())
+	}
+	var autoCookie *http.Cookie
+	for _, cookie := range autoResponse.Result().Cookies() {
+		if cookie.Name == session.LocalCookieName {
+			autoCookie = cookie
+		}
+	}
+	if autoCookie == nil || autoCookie.Value == boundCookie.Value {
+		t.Fatalf("new browser did not receive an independent cookie: %#v", autoCookie)
+	}
+	autoRecord, ok, err := sessions.LookupRaw(context.Background(), autoCookie.Value)
+	if err != nil || !ok || autoRecord.SecretRef != auth.SingleUserSecretRef {
+		t.Fatalf("automatic record=%#v ok=%v err=%v", autoRecord, ok, err)
+	}
+}
+
+func TestSingleUserAutoProvisionRequiresTrustedGatewayAndDeviceLogoutKeepsBinding(t *testing.T) {
+	secrets := &fakeSecrets{values: map[string]string{auth.SingleUserSecretRef: "upstream-owner-session-123456"}}
+	owner := session.User{ID: "owner_1", Name: "Owner"}
+	foloAuth := &fakeFoloAuth{}
+	bridge, sessions := newSingleUserBridge(t, foloAuth, secrets, &fakeOwners{user: owner, bound: true}, &bytes.Buffer{})
+
+	untrusted := httptest.NewRecorder()
+	bridge.CurrentSession(untrusted, httptest.NewRequest(http.MethodGet, "/api/tantan/v1/session", nil))
+	if untrusted.Code != http.StatusUnauthorized || sessions.Len() != 0 {
+		t.Fatalf("untrusted status=%d sessions=%d", untrusted.Code, sessions.Len())
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "/api/tantan/v1/session", nil)
+	request = request.WithContext(auth.WithTrustedSingleUserAccess(request.Context()))
+	response := httptest.NewRecorder()
+	bridge.CurrentSession(response, request)
+	var cookie *http.Cookie
+	for _, candidate := range response.Result().Cookies() {
+		if candidate.Name == session.LocalCookieName {
+			cookie = candidate
+		}
+	}
+	if cookie == nil {
+		t.Fatal("trusted request did not receive a browser session")
+	}
+	record, ok, err := sessions.LookupRaw(context.Background(), cookie.Value)
+	if err != nil || !ok {
+		t.Fatalf("record=%#v ok=%v err=%v", record, ok, err)
+	}
+	logout := httptest.NewRecorder()
+	bridge.Logout(logout, httptest.NewRequest(http.MethodPost, "/api/auth/logout", nil).WithContext(session.WithRecord(context.Background(), record)))
+	if logout.Code != http.StatusNoContent || sessions.Len() != 0 || secrets.values[auth.SingleUserSecretRef] == "" || foloAuth.signOutCalls != 0 {
+		t.Fatalf("logout=%d sessions=%d secrets=%#v signouts=%d", logout.Code, sessions.Len(), secrets.values, foloAuth.signOutCalls)
+	}
+}
+
+func TestSingleUserRebindAcceptsOnlyTheExistingFoloOwner(t *testing.T) {
+	owner := session.User{ID: "owner_1", Name: "Owner"}
+	secrets := &fakeSecrets{values: map[string]string{auth.SingleUserSecretRef: "old-upstream-session-123456"}}
+	foloAuth := &fakeFoloAuth{applyToken: "new-upstream-session-123456", applyUser: owner}
+	bridge, _ := newSingleUserBridge(t, foloAuth, secrets, &fakeOwners{user: owner, bound: true}, &bytes.Buffer{})
+	request := postRequest("/api/auth/folo/token", `{"token":"new-one-time-token-123456"}`)
+	request = request.WithContext(auth.WithTrustedSingleUserAccess(request.Context()))
+	response := httptest.NewRecorder()
+	bridge.Token(response, request)
+	if response.Code != http.StatusOK || secrets.values[auth.SingleUserSecretRef] != foloAuth.applyToken {
+		t.Fatalf("rebind status=%d secret=%q", response.Code, secrets.values[auth.SingleUserSecretRef])
+	}
+
+	otherFolo := &fakeFoloAuth{applyToken: "attacker-upstream-session-123456", applyUser: session.User{ID: "other_user", Name: "Other"}}
+	otherBridge, _ := newSingleUserBridge(t, otherFolo, secrets, &fakeOwners{user: owner, bound: true}, &bytes.Buffer{})
+	otherRequest := postRequest("/api/auth/folo/token", `{"token":"other-one-time-token-123456"}`)
+	otherRequest = otherRequest.WithContext(auth.WithTrustedSingleUserAccess(otherRequest.Context()))
+	otherResponse := httptest.NewRecorder()
+	otherBridge.Token(otherResponse, otherRequest)
+	if otherResponse.Code == http.StatusOK || secrets.values[auth.SingleUserSecretRef] != foloAuth.applyToken || otherFolo.signedOutToken != otherFolo.applyToken {
+		t.Fatalf("owner replacement status=%d secret=%q signedOut=%q", otherResponse.Code, secrets.values[auth.SingleUserSecretRef], otherFolo.signedOutToken)
 	}
 }
 

@@ -1,0 +1,42 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "tantan-single-user",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-10",
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "tantan.example.com",
+      "custom_domain": true,
+    },
+  ],
+  "vars": {
+    "TEAM_DOMAIN": "https://YOUR-TEAM.cloudflareaccess.com",
+    "POLICY_AUD": "REPLACE_WITH_ACCESS_APPLICATION_AUD",
+    "OWNER_EMAIL": "REPLACE_WITH_YOUR_EMAIL",
+    "TANTAN_PUBLIC_ORIGIN": "https://tantan.example.com",
+    "R2_ACCOUNT_ID": "REPLACE_WITH_CLOUDFLARE_ACCOUNT_ID",
+    "R2_BUCKET_NAME": "tantan-data",
+  },
+  "containers": [
+    {
+      "class_name": "TantanContainer",
+      "image": "../../Dockerfile",
+      "max_instances": 1,
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "TANTAN_CONTAINER",
+        "class_name": "TantanContainer",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["TantanContainer"],
+    },
+  ],
+}

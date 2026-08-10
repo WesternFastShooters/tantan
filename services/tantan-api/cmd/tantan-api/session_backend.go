@@ -120,6 +120,37 @@ func (backend *sqliteSessionBackend) DeleteSession(ctx context.Context, idHash s
 	})
 }
 
+func (backend *sqliteSessionBackend) FindOwner(ctx context.Context) (session.User, bool, error) {
+	if backend == nil || backend.store == nil {
+		return session.User{}, false, errors.New("SQLite owner storage is required")
+	}
+	var count int
+	if err := backend.store.DB().QueryRowContext(ctx, "SELECT count(*) FROM accounts").Scan(&count); err != nil {
+		return session.User{}, false, errors.New("read single-user owner count failed")
+	}
+	if count == 0 {
+		return session.User{}, false, nil
+	}
+	if count != 1 {
+		return session.User{}, false, errors.New("single-user deployment contains multiple accounts")
+	}
+	var user session.User
+	var avatar, email sql.NullString
+	if err := backend.store.DB().QueryRowContext(ctx, `
+SELECT user_id,name,avatar,email
+FROM accounts
+LIMIT 1`).Scan(&user.ID, &user.Name, &avatar, &email); err != nil {
+		return session.User{}, false, errors.New("read single-user owner failed")
+	}
+	if avatar.Valid {
+		user.Image = &avatar.String
+	}
+	if email.Valid {
+		user.Email = &email.String
+	}
+	return user, true, nil
+}
+
 func (store *sqliteTokenReplayStore) Reserve(ctx context.Context, tokenHash string, expiresAt time.Time) (bool, error) {
 	if store == nil || store.store == nil || len(tokenHash) != 64 || !expiresAt.After(time.Now().UTC().Add(-time.Minute)) {
 		return false, errors.New("valid token replay reservation is required")

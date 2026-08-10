@@ -38,3 +38,26 @@ func TestBackupCommandRequiresExplicitNonExistingOutputAndEmitsJSON(t *testing.T
 		t.Fatalf("unknown handled=%v err=%v", handled, err)
 	}
 }
+
+func TestMigrateCommandInitializesStorageBeforeReplication(t *testing.T) {
+	dataDirectory := t.TempDir()
+	handled, err := runManagementCommand(
+		context.Background(),
+		[]string{"migrate", "--data-dir", dataDirectory},
+		&bytes.Buffer{},
+	)
+	if err != nil || !handled {
+		t.Fatalf("handled=%v err=%v", handled, err)
+	}
+	store, err := storage.Open(context.Background(), storage.Config{DataDir: dataDirectory})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if integrity, err := store.Integrity(context.Background()); err != nil || integrity != "ok" {
+		t.Fatalf("integrity=%q err=%v", integrity, err)
+	}
+	if handled, err := runManagementCommand(context.Background(), []string{"migrate", "extra"}, &bytes.Buffer{}); !handled || err == nil {
+		t.Fatalf("invalid migrate handled=%v err=%v", handled, err)
+	}
+}

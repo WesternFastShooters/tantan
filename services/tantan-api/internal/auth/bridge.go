@@ -25,7 +25,10 @@ const (
 	maximumAuthBodyBytes = 8 * 1024
 	twoFactorTTL         = 5 * time.Minute
 	tokenReplayTTL       = 24 * time.Hour
+	SingleUserSecretRef  = "c6b1bfe35cd38e539970f9b9f7553660cfb84b7290952b6fb5fd422535257161"
 )
+
+var ErrSingleUserOwnerMismatch = errors.New("single-user Folo owner does not match")
 
 var (
 	emailPattern    = regexp.MustCompile(`^[^\s@]+@[^\s@]+$`)
@@ -45,6 +48,21 @@ type TokenReplayStore interface {
 	Release(ctx context.Context, tokenHash string) error
 }
 
+type OwnerStore interface {
+	FindOwner(ctx context.Context) (session.User, bool, error)
+}
+
+type trustedSingleUserAccessKey struct{}
+
+func WithTrustedSingleUserAccess(ctx context.Context) context.Context {
+	return context.WithValue(ctx, trustedSingleUserAccessKey{}, true)
+}
+
+func trustedSingleUserAccess(ctx context.Context) bool {
+	trusted, _ := ctx.Value(trustedSingleUserAccessKey{}).(bool)
+	return trusted
+}
+
 type Config struct {
 	PublicOrigin     string
 	FoloWebURL       string
@@ -54,6 +72,8 @@ type Config struct {
 	Secrets          session.SecretStore
 	Replays          TokenReplayStore
 	Folo             FoloAuth
+	SingleUser       bool
+	Owners           OwnerStore
 	OnSessionCreated func(context.Context, session.Record) error
 }
 
@@ -73,6 +93,8 @@ type Bridge struct {
 	secrets          session.SecretStore
 	replays          TokenReplayStore
 	folo             FoloAuth
+	singleUser       bool
+	owners           OwnerStore
 	onSessionCreated func(context.Context, session.Record) error
 
 	mu        sync.Mutex
@@ -81,7 +103,7 @@ type Bridge struct {
 }
 
 func NewBridge(config Config) (*Bridge, error) {
-	if config.Sessions == nil || config.Secrets == nil || config.Replays == nil || config.Folo == nil {
+	if config.Sessions == nil || config.Secrets == nil || config.Replays == nil || config.Folo == nil || (config.SingleUser && config.Owners == nil) {
 		return nil, errors.New("auth session, secret, replay and Folo dependencies are required")
 	}
 	publicOrigin, err := url.Parse(config.PublicOrigin)
@@ -111,6 +133,8 @@ func NewBridge(config Config) (*Bridge, error) {
 		secrets:          config.Secrets,
 		replays:          config.Replays,
 		folo:             config.Folo,
+		singleUser:       config.SingleUser,
+		owners:           config.Owners,
 		onSessionCreated: config.OnSessionCreated,
 		twoFactor:        make(map[string]pendingTwoFactor),
 		attempts:         make(map[string][]time.Time),
@@ -118,6 +142,10 @@ func NewBridge(config Config) (*Bridge, error) {
 }
 
 func (bridge *Bridge) Providers(writer http.ResponseWriter, request *http.Request) {
+	if bridge.singleUser {
+		writeJSON(writer, http.StatusOK, gen.FoloAuthProvidersResponse{Providers: []gen.FoloAuthProvider{gen.FoloAuthProviderToken}})
+		return
+	}
 	writeJSON(writer, http.StatusOK, gen.FoloAuthProvidersResponse{Providers: []gen.FoloAuthProvider{
 		gen.FoloAuthProviderGoogle,
 		gen.FoloAuthProviderGithub,
@@ -128,6 +156,10 @@ func (bridge *Bridge) Providers(writer http.ResponseWriter, request *http.Reques
 }
 
 func (bridge *Bridge) SocialStart(writer http.ResponseWriter, request *http.Request) {
+	if bridge.singleUser {
+		writeError(writer, request, http.StatusGone, gen.ErrorCodeAuthProviderInvalid, "单用户部署只允许管理员令牌绑定", false)
+		return
+	}
 	if !bridge.allowAuthRequest(writer, request) {
 		return
 	}
@@ -184,6 +216,10 @@ func (bridge *Bridge) Token(writer http.ResponseWriter, request *http.Request) {
 }
 
 func (bridge *Bridge) Email(writer http.ResponseWriter, request *http.Request) {
+	if bridge.singleUser {
+		writeError(writer, request, http.StatusGone, gen.ErrorCodeAuthProviderInvalid, "单用户部署只允许管理员令牌绑定", false)
+		return
+	}
 	if !bridge.allowAuthRequest(writer, request) {
 		return
 	}
@@ -222,6 +258,10 @@ func (bridge *Bridge) Email(writer http.ResponseWriter, request *http.Request) {
 }
 
 func (bridge *Bridge) TwoFactor(writer http.ResponseWriter, request *http.Request) {
+	if bridge.singleUser {
+		writeError(writer, request, http.StatusGone, gen.ErrorCodeAuthProviderInvalid, "单用户部署不提供两步登录流程", false)
+		return
+	}
 	if !bridge.allowAuthRequest(writer, request) {
 		return
 	}
@@ -252,9 +292,12 @@ func (bridge *Bridge) TwoFactor(writer http.ResponseWriter, request *http.Reques
 func (bridge *Bridge) Logout(writer http.ResponseWriter, request *http.Request) {
 	record, ok := session.FromContext(request.Context())
 	if ok {
-		upstreamToken, _ := bridge.secrets.Get(request.Context(), record.SecretRef)
-		if err := bridge.secrets.Delete(request.Context(), record.SecretRef); err != nil {
-			bridge.logger.ErrorContext(request.Context(), "auth_secret_delete_failed", slog.String("errorCode", "LOCAL_STORAGE_ERROR"))
+		var upstreamToken string
+		if record.SecretRef != SingleUserSecretRef {
+			upstreamToken, _ = bridge.secrets.Get(request.Context(), record.SecretRef)
+			if err := bridge.secrets.Delete(request.Context(), record.SecretRef); err != nil {
+				bridge.logger.ErrorContext(request.Context(), "auth_secret_delete_failed", slog.String("errorCode", "LOCAL_STORAGE_ERROR"))
+			}
 		}
 		if err := bridge.sessions.DeleteHash(request.Context(), record.IDHash); err != nil {
 			bridge.logger.ErrorContext(request.Context(), "auth_session_delete_failed", slog.String("errorCode", "LOCAL_STORAGE_ERROR"))
@@ -272,7 +315,23 @@ func (bridge *Bridge) Logout(writer http.ResponseWriter, request *http.Request) 
 func (bridge *Bridge) CurrentSession(writer http.ResponseWriter, request *http.Request) {
 	record, ok := session.FromContext(request.Context())
 	if !ok {
-		writeError(writer, request, http.StatusUnauthorized, gen.ErrorCodeAuthRequired, "请先登录", false)
+		if !bridge.singleUser || !trustedSingleUserAccess(request.Context()) {
+			writeError(writer, request, http.StatusUnauthorized, gen.ErrorCodeAuthRequired, "请先登录", false)
+			return
+		}
+		var csrf string
+		var err error
+		record, csrf, err = bridge.provisionSingleUserSession(writer, request)
+		if errors.Is(err, session.ErrSecretNotFound) {
+			writeError(writer, request, http.StatusUnauthorized, gen.ErrorCodeAuthRequired, "服务器尚未绑定 Folo，请由管理员在电脑上完成初始化", false)
+			return
+		}
+		if err != nil {
+			bridge.logger.ErrorContext(request.Context(), "auth_single_user_provision_failed", slog.String("errorCode", "LOCAL_STORAGE_ERROR"))
+			writeError(writer, request, http.StatusInternalServerError, gen.ErrorCodeLocalStorageError, "无法创建安全会话", true)
+			return
+		}
+		writeSession(writer, record, csrf)
 		return
 	}
 	csrf, err := session.NewCSRFToken()
@@ -301,21 +360,87 @@ func (bridge *Bridge) createSession(writer http.ResponseWriter, request *http.Re
 		return err
 	}
 	idHash := session.HashToken(localToken)
-	if err := bridge.secrets.Set(request.Context(), idHash, upstreamToken); err != nil {
+	secretRef := idHash
+	var previousToken string
+	var hadPreviousToken bool
+	if bridge.singleUser {
+		owner, bound, ownerErr := bridge.owners.FindOwner(request.Context())
+		if ownerErr != nil {
+			return ownerErr
+		}
+		if bound && owner.ID != user.ID {
+			return ErrSingleUserOwnerMismatch
+		}
+		secretRef = SingleUserSecretRef
+		previousToken, hadPreviousToken = bridge.previousSecret(request.Context(), secretRef)
+	}
+	if err := bridge.secrets.Set(request.Context(), secretRef, upstreamToken); err != nil {
 		return err
 	}
-	record, err := bridge.sessions.CreateWithCSRF(request.Context(), localToken, csrf, user, bridge.now().UTC().Add(30*24*time.Hour))
+	record, err := bridge.sessions.CreateWithCSRFAndSecretRef(request.Context(), localToken, csrf, secretRef, user, bridge.now().UTC().Add(30*24*time.Hour))
 	if err != nil {
-		_ = bridge.secrets.Delete(request.Context(), idHash)
+		bridge.restoreSecret(request.Context(), secretRef, previousToken, hadPreviousToken)
 		return err
 	}
 	if bridge.onSessionCreated != nil {
 		if err := bridge.onSessionCreated(request.Context(), record); err != nil {
+			if bridge.singleUser {
+				bridge.logger.ErrorContext(request.Context(), "auth_initial_sync_enqueue_failed", slog.String("errorCode", "LOCAL_STORAGE_ERROR"))
+				bridge.setSessionCookie(writer, localToken)
+				writeSession(writer, record, csrf)
+				return nil
+			}
 			_ = bridge.sessions.DeleteHash(request.Context(), idHash)
 			_ = bridge.secrets.Delete(request.Context(), idHash)
 			return err
 		}
 	}
+	bridge.setSessionCookie(writer, localToken)
+	writeSession(writer, record, csrf)
+	return nil
+}
+
+func (bridge *Bridge) provisionSingleUserSession(writer http.ResponseWriter, request *http.Request) (session.Record, string, error) {
+	owner, ok, err := bridge.owners.FindOwner(request.Context())
+	if err != nil {
+		return session.Record{}, "", err
+	}
+	if !ok {
+		return session.Record{}, "", session.ErrSecretNotFound
+	}
+	if _, err := bridge.secrets.Get(request.Context(), SingleUserSecretRef); err != nil {
+		return session.Record{}, "", err
+	}
+	localToken, err := session.NewToken()
+	if err != nil {
+		return session.Record{}, "", err
+	}
+	csrf, err := session.NewCSRFToken()
+	if err != nil {
+		return session.Record{}, "", err
+	}
+	record, err := bridge.sessions.CreateWithCSRFAndSecretRef(request.Context(), localToken, csrf, SingleUserSecretRef, owner, bridge.now().UTC().Add(30*24*time.Hour))
+	if err != nil {
+		return session.Record{}, "", err
+	}
+	bridge.setSessionCookie(writer, localToken)
+	return record, csrf, nil
+}
+
+func (bridge *Bridge) previousSecret(ctx context.Context, secretRef string) (string, bool) {
+	value, err := bridge.secrets.Get(ctx, secretRef)
+	return value, err == nil
+}
+
+func (bridge *Bridge) restoreSecret(ctx context.Context, secretRef, previousToken string, hadPreviousToken bool) {
+	if hadPreviousToken {
+		_ = bridge.secrets.Set(ctx, secretRef, previousToken)
+		return
+	}
+	_ = bridge.secrets.Delete(ctx, secretRef)
+}
+
+func (bridge *Bridge) setSessionCookie(writer http.ResponseWriter, localToken string) {
 	http.SetCookie(writer, &http.Cookie{
 		Name:     session.LocalCookieName,
 		Value:    localToken,
@@ -325,8 +450,6 @@ func (bridge *Bridge) createSession(writer http.ResponseWriter, request *http.Re
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int((30 * 24 * time.Hour).Seconds()),
 	})
-	writeSession(writer, record, csrf)
-	return nil
 }
 
 func (bridge *Bridge) writeSessionError(writer http.ResponseWriter, request *http.Request, upstreamToken string, err error) {
@@ -351,6 +474,10 @@ func (bridge *Bridge) writeUpstreamAuthError(writer http.ResponseWriter, request
 func (bridge *Bridge) allowAuthRequest(writer http.ResponseWriter, request *http.Request) bool {
 	if request.Header.Get("Origin") != bridge.publicOrigin.String() || request.Host != bridge.publicOrigin.Host {
 		writeError(writer, request, http.StatusForbidden, gen.ErrorCodeOriginRejected, "请求来源不受信任", false)
+		return false
+	}
+	if bridge.singleUser && !trustedSingleUserAccess(request.Context()) {
+		writeError(writer, request, http.StatusForbidden, gen.ErrorCodeOriginRejected, "管理员绑定请求未经过受信访问入口", false)
 		return false
 	}
 	if !bridge.allowAttempt(request.RemoteAddr) {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,6 +38,47 @@ func TestServerSecretFilesRequireAbsolutePrivateRegularFiles(t *testing.T) {
 	}
 }
 
+func TestServerMasterKeyProvidesContainerCompatibleRuntimeStores(t *testing.T) {
+	master := []byte("0123456789abcdef0123456789abcdef")
+	first, err := newDerivedCursorSecretStore(master)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := newDerivedCursorSecretStore(master)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstValue, err := first.Get(context.Background(), cursorKeyAccount)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondValue, err := second.Get(context.Background(), cursorKeyAccount)
+	if err != nil || secondValue != firstValue {
+		t.Fatalf("derived cursor secret is not stable err=%v", err)
+	}
+	decoded, err := base64.RawURLEncoding.DecodeString(firstValue)
+	if err != nil || len(decoded) != 32 || string(decoded) == string(master) {
+		t.Fatalf("invalid derived cursor secret length=%d err=%v", len(decoded), err)
+	}
+	if _, err := first.Get(context.Background(), "other"); err != keyring.ErrNotFound {
+		t.Fatalf("unexpected derived store lookup err=%v", err)
+	}
+
+	probe := newEphemeralSecretStore()
+	if err := probe.Set(context.Background(), "readiness", "value"); err != nil {
+		t.Fatal(err)
+	}
+	if value, err := probe.Get(context.Background(), "readiness"); err != nil || value != "value" {
+		t.Fatalf("probe value=%q err=%v", value, err)
+	}
+	if err := probe.Delete(context.Background(), "readiness"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := probe.Get(context.Background(), "readiness"); err != keyring.ErrNotFound {
+		t.Fatalf("deleted probe remained available err=%v", err)
+	}
+}
+
 func TestMasterKeyAndFixedGeminiServerStore(t *testing.T) {
 	directory := t.TempDir()
 	masterPath := filepath.Join(directory, "master.key")
@@ -69,5 +111,32 @@ func TestMasterKeyAndFixedGeminiServerStore(t *testing.T) {
 	}
 	if fixedGeminiModel != "gemini-3.5-flash-lite" || fixedGeminiEndpoint != "https://generativelanguage.googleapis.com/v1beta/openai" {
 		t.Fatal("Gemini preset changed")
+	}
+}
+
+func TestCloudflareEnvironmentSecretsAreValidatedWithoutDisclosure(t *testing.T) {
+	master := []byte("0123456789abcdef0123456789abcdef")
+	encoded := base64.StdEncoding.EncodeToString(master)
+	decoded, err := loadMasterKeyEnvironment(encoded)
+	if err != nil || string(decoded) != string(master) {
+		t.Fatalf("master length=%d err=%v", len(decoded), err)
+	}
+	clear(decoded)
+
+	for _, raw := range []string{"", "not-base64", base64.StdEncoding.EncodeToString([]byte("short"))} {
+		_, err := loadMasterKeyEnvironment(raw)
+		if err == nil || (raw != "" && strings.Contains(err.Error(), raw)) {
+			t.Fatalf("unsafe master environment value accepted or disclosed: length=%d err=%v", len(raw), err)
+		}
+	}
+
+	const geminiCanary = "cloudflare-gemini-CANARY"
+	gemini, err := loadGeminiAPIKeyEnvironment(geminiCanary)
+	if err != nil || string(gemini) != geminiCanary {
+		t.Fatalf("Gemini environment value length=%d err=%v", len(gemini), err)
+	}
+	clear(gemini)
+	if _, err := loadGeminiAPIKeyEnvironment("bad\nCANARY"); err == nil || strings.Contains(err.Error(), "CANARY") {
+		t.Fatalf("unsafe Gemini environment value accepted or disclosed: %v", err)
 	}
 }

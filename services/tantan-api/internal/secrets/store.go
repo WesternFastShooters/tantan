@@ -13,12 +13,13 @@ import (
 	"strings"
 	"time"
 
+	"tantan.local/tantan-api/internal/session"
 	"tantan.local/tantan-api/internal/storage"
 )
 
 const keyVersion = 1
 
-var ErrNotFound = errors.New("sealed secret not found")
+var ErrNotFound = session.ErrSecretNotFound
 
 type Config struct {
 	Store  *storage.Store

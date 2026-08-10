@@ -1,3 +1,21 @@
+# Tantan
+
+Tantan 是基于 Folo 前端改造的 Mobile Web/PWA：Go 服务同源代理 Folo 数据，并提供翻译、动态 Topic、每日推荐队列和 AI 筛选。Docker 部署、Gemini Secret、Folo 一次性令牌获取与续期见 [Docker 部署手册](docs/runbooks/docker-deployment.md)；本机启动见 [本地运维手册](docs/runbooks/local-operations.md)。
+
+单用户服务器首次绑定或 Folo 会话失效时，在电脑已登录的 `https://app.folo.is` 控制台执行下面命令，然后把弹窗中的一次性令牌粘贴到 `https://你的域名/login?setup=1`：
+
+```javascript
+fetch("https://api.folo.is/better-auth/one-time-token/generate", { credentials: "include" })
+  .then((r) => r.json())
+  .then(({ token }) => prompt("按 ⌘C 复制令牌，然后点确定", token))
+```
+
+绑定完成后，Android/iOS 浏览器只需通过 Cloudflare Access 登录你的唯一邮箱，Go 会自动关联唯一 Folo 账号；手机不需要控制台或令牌。
+
+> 当前交付物不包含 Electron、原生 App 或 `apps/mobile` 构建。下面保留上游 Folo 说明与许可证信息。
+
+---
+
 <div align="center">
   <a href="https://github.com/RSSNext/Folo">
     <img src="https://github.com/RSSNext/Folo/raw/refs/heads/dev/apps/desktop/layer/renderer/public/icon.svg" alt="Logo" width="80" height="80">

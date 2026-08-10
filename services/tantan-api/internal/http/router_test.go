@@ -43,6 +43,12 @@ func (store *replayStore) Reserve(_ context.Context, hash string, _ time.Time) (
 	store.reserved[hash] = true
 	return true, nil
 }
+
+type routerOwnerStore struct{ user session.User }
+
+func (store routerOwnerStore) FindOwner(context.Context) (session.User, bool, error) {
+	return store.user, store.user.ID != "", nil
+}
 func (store *replayStore) Release(_ context.Context, hash string) error {
 	delete(store.reserved, hash)
 	return nil
@@ -113,6 +119,15 @@ func TestListenAndPublicOriginConfigurationFailClosed(t *testing.T) {
 	}
 	if err := localhttp.ValidateListenAddr("127.0.0.1:3000"); err != nil {
 		t.Fatalf("rejected loopback address: %v", err)
+	}
+	if err := localhttp.ValidateRuntimeListenAddr("0.0.0.0:8080", true); err != nil {
+		t.Fatalf("rejected isolated Cloudflare container address: %v", err)
+	}
+	if err := localhttp.ValidateRuntimeListenAddr("0.0.0.0:8080", false); err == nil {
+		t.Fatal("accepted public bind outside isolated container mode")
+	}
+	if err := localhttp.ValidateRuntimeListenAddr("127.0.0.1:3000", true); err == nil {
+		t.Fatal("accepted loopback bind for Cloudflare container mode")
 	}
 	for _, config := range []localhttp.RouterConfig{
 		{PublicOrigin: "http://public.example.com"},
@@ -214,6 +229,108 @@ func TestRouterValidatesHostOriginAndTrustedProxyBeforeDispatch(t *testing.T) {
 	}
 	if strings.Contains(logs.String(), "CANARY") || strings.Contains(logs.String(), "attacker.invalid") {
 		t.Fatal("security log contains attacker-controlled authority")
+	}
+}
+
+func TestSingleUserSessionRequiresHeaderInjectedByTrustedProxy(t *testing.T) {
+	now := time.Date(2026, 8, 10, 10, 0, 0, 0, time.UTC)
+	sessions := session.NewStore(func() time.Time { return now })
+	secrets := &routerSecrets{values: map[string]string{auth.SingleUserSecretRef: "upstream-token"}}
+	bridge, err := auth.NewBridge(auth.Config{
+		PublicOrigin: publicOrigin,
+		FoloWebURL:   "https://app.folo.is",
+		Now:          func() time.Time { return now },
+		Sessions:     sessions,
+		Secrets:      secrets,
+		Replays:      &replayStore{reserved: map[string]bool{}},
+		Folo:         noOpFoloAuth{},
+		SingleUser:   true,
+		Owners:       routerOwnerStore{user: session.User{ID: "owner_1", Name: "Owner"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	router := newRouter(t, localhttp.RouterConfig{
+		TrustedProxyCIDRs:  []string{"10.0.0.0/8"},
+		SingleUserAccessID: "admin",
+		Auth:               bridge,
+		Sessions:           sessions,
+	})
+
+	for _, request := range []*stdhttp.Request{
+		forwardedRequest("192.0.2.10:1234", "reader.example.com", "https"),
+		forwardedRequest("10.2.3.4:1234", "reader.example.com", "https"),
+	} {
+		request.URL.Path = "/api/tantan/v1/session"
+		request.Header.Set("X-Tantan-Authenticated-Owner", "admin")
+		if strings.HasPrefix(request.RemoteAddr, "10.") {
+			request.Header.Del("X-Tantan-Authenticated-Owner")
+		}
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, request)
+		if response.Code == stdhttp.StatusOK {
+			t.Fatalf("untrusted request received a session: remote=%s", request.RemoteAddr)
+		}
+	}
+
+	trusted := forwardedRequest("10.2.3.4:1234", "reader.example.com", "https")
+	trusted.URL.Path = "/api/tantan/v1/session"
+	trusted.Header.Set("X-Tantan-Authenticated-Owner", "admin")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, trusted)
+	if response.Code != stdhttp.StatusOK || sessions.Len() != 1 {
+		t.Fatalf("trusted status=%d sessions=%d body=%s", response.Code, sessions.Len(), response.Body.String())
+	}
+}
+
+func TestSingleUserSessionAcceptsOnlyExactCloudflareGatewaySecret(t *testing.T) {
+	now := time.Date(2026, 8, 10, 10, 0, 0, 0, time.UTC)
+	sessions := session.NewStore(func() time.Time { return now })
+	secrets := &routerSecrets{values: map[string]string{auth.SingleUserSecretRef: "upstream-token"}}
+	bridge, err := auth.NewBridge(auth.Config{
+		PublicOrigin: publicOrigin,
+		FoloWebURL:   "https://app.folo.is",
+		Now:          func() time.Time { return now },
+		Sessions:     sessions,
+		Secrets:      secrets,
+		Replays:      &replayStore{reserved: map[string]bool{}},
+		Folo:         noOpFoloAuth{},
+		SingleUser:   true,
+		Owners:       routerOwnerStore{user: session.User{ID: "owner_1", Name: "Owner"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const gatewaySecret = "0123456789abcdef0123456789abcdef"
+	router := newRouter(t, localhttp.RouterConfig{
+		SingleUserAccessID: "admin",
+		GatewaySecret:      gatewaySecret,
+		Auth:               bridge,
+		Sessions:           sessions,
+	})
+
+	for _, supplied := range []string{"", "wrong", gatewaySecret + "x"} {
+		request := hostRequest("reader.example.com")
+		request.URL.Path = "/api/tantan/v1/session"
+		request.Header.Set("X-Tantan-Authenticated-Owner", "admin")
+		if supplied != "" {
+			request.Header.Set("X-Tantan-Gateway-Secret", supplied)
+		}
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, request)
+		if response.Code == stdhttp.StatusOK {
+			t.Fatalf("invalid gateway secret received a session: length=%d", len(supplied))
+		}
+	}
+
+	request := hostRequest("reader.example.com")
+	request.URL.Path = "/api/tantan/v1/session"
+	request.Header.Set("X-Tantan-Authenticated-Owner", "admin")
+	request.Header.Set("X-Tantan-Gateway-Secret", gatewaySecret)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != stdhttp.StatusOK || sessions.Len() != 1 {
+		t.Fatalf("Cloudflare gateway status=%d sessions=%d body=%s", response.Code, sessions.Len(), response.Body.String())
 	}
 }
 

@@ -3,7 +3,7 @@ import { act } from "react"
 import type { Root } from "react-dom/client"
 import { createRoot } from "react-dom/client"
 import { MemoryRouter, Route, Routes } from "react-router"
-import { afterEach, beforeAll, describe, expect, test, vi } from "vitest"
+import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest"
 
 import type { SessionResponse } from "~/lib/tantan-api/gen/types"
 
@@ -11,6 +11,7 @@ import { LoginRoute } from "./LoginRoute"
 
 const auth = vi.hoisted(() => ({
   getProviders: vi.fn(),
+  getSession: vi.fn(),
   socialStart: vi.fn(),
   email: vi.fn(),
   twoFactor: vi.fn(),
@@ -21,6 +22,7 @@ const auth = vi.hoisted(() => ({
 vi.mock("~/lib/tantan-api/client", () => ({
   TANTAN_API_ORIGIN: "http://127.0.0.1:3000",
   getFoloAuthProviders: auth.getProviders,
+  getLocalSession: auth.getSession,
   startFoloSocialLogin: auth.socialStart,
   signInWithFoloEmail: auth.email,
   verifyFoloTwoFactor: auth.twoFactor,
@@ -73,6 +75,10 @@ describe("LoginRoute", () => {
     ;(
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true
+  })
+
+  beforeEach(() => {
+    auth.getSession.mockRejectedValue(new Error("server is not bound"))
   })
 
   afterEach(async () => {
@@ -179,7 +185,25 @@ describe("LoginRoute", () => {
       "_blank",
       "noopener,noreferrer",
     )
-    expect(container.textContent).toContain("粘贴一次性授权令牌")
+    expect(container.textContent).toContain("管理员初始化 / 重新连接")
+  })
+
+  test("single-user deployment automatically enters on a new phone browser", async () => {
+    auth.getSession.mockResolvedValue(session)
+    ;({ container, root } = await renderLogin())
+
+    expect(container.textContent).toContain("Subscriptions destination")
+    expect(auth.getProviders).not.toHaveBeenCalled()
+  })
+
+  test("setup URL bypasses automatic session so the owner can reconnect Folo", async () => {
+    auth.getSession.mockResolvedValue(session)
+    auth.getProviders.mockResolvedValue({ providers: ["token"] })
+    ;({ container, root } = await renderLogin("/login?setup=1"))
+
+    expect(auth.getSession).not.toHaveBeenCalled()
+    expect(container.textContent).toContain("管理员初始化 / 重新连接")
+    expect(container.querySelector('input[name="token"]')).not.toBeNull()
   })
 
   test("SEC-03 rejects an external returnTo and submits authorization tokens only in the body", async () => {
@@ -187,11 +211,6 @@ describe("LoginRoute", () => {
     auth.token.mockResolvedValue(session)
     ;({ container, root } = await renderLogin("/login?returnTo=https%3A%2F%2Fevil.example"))
 
-    await click(
-      Array.from(container.querySelectorAll("button")).find((button) =>
-        button.textContent?.includes("授权令牌"),
-      ) ?? null,
-    )
     setInputValue(container.querySelector('input[name="token"]')!, "one-time-secret")
     await act(async () => container!.querySelector("form")?.requestSubmit())
 

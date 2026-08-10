@@ -83,3 +83,28 @@ func TestLocalSessionStoresOnlyCSRFHashAndValidatesInConstantTime(t *testing.T) 
 		t.Fatal("CSRF validation accepted the wrong value or retained plaintext")
 	}
 }
+
+func TestLocalSessionCanShareServerSecretWithoutSharingBrowserCookie(t *testing.T) {
+	now := time.Date(2026, 8, 10, 10, 0, 0, 0, time.UTC)
+	store := session.NewStore(func() time.Time { return now })
+	raw, err := session.NewToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	csrf, err := session.NewCSRFToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sharedRef := session.HashToken("single-user-folo-binding")
+	record, err := store.CreateWithCSRFAndSecretRef(context.Background(), raw, csrf, sharedRef, session.User{ID: "owner_1", Name: "Owner"}, now.Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if record.SecretRef != sharedRef || record.IDHash == sharedRef {
+		t.Fatalf("browser session did not preserve the shared secret reference: %#v", record)
+	}
+	loaded, ok, err := store.LookupRaw(context.Background(), raw)
+	if err != nil || !ok || loaded.SecretRef != sharedRef {
+		t.Fatalf("loaded=%#v ok=%v err=%v", loaded, ok, err)
+	}
+}

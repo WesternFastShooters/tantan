@@ -1,7 +1,9 @@
 package http
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -19,35 +21,42 @@ import (
 )
 
 const (
-	version           = "dev"
-	defaultOrigin     = "http://127.0.0.1:3000"
-	localAPIPrefix    = "/api/tantan/v1/"
-	foloAPIPrefix     = "/api/folo"
-	maximumHeaderSize = 8 * 1024
+	version                = "dev"
+	defaultOrigin          = "http://127.0.0.1:3000"
+	localAPIPrefix         = "/api/tantan/v1/"
+	foloAPIPrefix          = "/api/folo"
+	maximumHeaderSize      = 8 * 1024
+	singleUserAccessHeader = "X-Tantan-Authenticated-Owner"
+	gatewaySecretHeader    = "X-Tantan-Gateway-Secret"
 )
 
 type RouterConfig struct {
-	PublicOrigin      string
-	TrustedProxyCIDRs []string
-	Auth              *auth.Bridge
-	Proxy             *folo.Proxy
-	Sessions          *session.Store
-	Local             stdhttp.Handler
-	Health            stdhttp.Handler
-	Static            stdhttp.Handler
-	Logger            *slog.Logger
+	PublicOrigin       string
+	TrustedProxyCIDRs  []string
+	SingleUserAccessID string
+	GatewaySecret      string
+	Auth               *auth.Bridge
+	Proxy              *folo.Proxy
+	Sessions           *session.Store
+	Local              stdhttp.Handler
+	Health             stdhttp.Handler
+	Static             stdhttp.Handler
+	Logger             *slog.Logger
 }
 
 type router struct {
-	publicOrigin   *url.URL
-	trustedProxies []*net.IPNet
-	auth           *auth.Bridge
-	proxy          *folo.Proxy
-	sessions       *session.Store
-	local          stdhttp.Handler
-	health         stdhttp.Handler
-	static         stdhttp.Handler
-	logger         *slog.Logger
+	publicOrigin       *url.URL
+	trustedProxies     []*net.IPNet
+	singleUserAccessID string
+	gatewaySecretHash  [sha256.Size]byte
+	hasGatewaySecret   bool
+	auth               *auth.Bridge
+	proxy              *folo.Proxy
+	sessions           *session.Store
+	local              stdhttp.Handler
+	health             stdhttp.Handler
+	static             stdhttp.Handler
+	logger             *slog.Logger
 }
 
 func NewRouter(config RouterConfig) (stdhttp.Handler, error) {
@@ -59,6 +68,12 @@ func NewRouter(config RouterConfig) (stdhttp.Handler, error) {
 	if err != nil {
 		return nil, err
 	}
+	if config.SingleUserAccessID != "" && (strings.TrimSpace(config.SingleUserAccessID) != config.SingleUserAccessID || len(config.SingleUserAccessID) > 128 || strings.ContainsAny(config.SingleUserAccessID, "\r\n\x00")) {
+		return nil, errors.New("single-user access identity is invalid")
+	}
+	if config.GatewaySecret != "" && (len(config.GatewaySecret) < 32 || len(config.GatewaySecret) > 256 || strings.ContainsAny(config.GatewaySecret, "\r\n\x00")) {
+		return nil, errors.New("gateway secret is invalid")
+	}
 	logger := config.Logger
 	if logger == nil {
 		logger = slog.New(slog.NewJSONHandler(io.Discard, nil))
@@ -67,21 +82,38 @@ func NewRouter(config RouterConfig) (stdhttp.Handler, error) {
 	if health == nil {
 		health = defaultHealthHandler()
 	}
-	return &router{
-		publicOrigin:   publicOrigin,
-		trustedProxies: trustedProxies,
-		auth:           config.Auth,
-		proxy:          config.Proxy,
-		sessions:       config.Sessions,
-		local:          config.Local,
-		health:         health,
-		static:         config.Static,
-		logger:         logger,
-	}, nil
+	result := &router{
+		publicOrigin:       publicOrigin,
+		trustedProxies:     trustedProxies,
+		singleUserAccessID: config.SingleUserAccessID,
+		auth:               config.Auth,
+		proxy:              config.Proxy,
+		sessions:           config.Sessions,
+		local:              config.Local,
+		health:             health,
+		static:             config.Static,
+		logger:             logger,
+	}
+	if config.GatewaySecret != "" {
+		result.gatewaySecretHash = sha256.Sum256([]byte(config.GatewaySecret))
+		result.hasGatewaySecret = true
+	}
+	return result, nil
 }
 
 func ValidateListenAddr(address string) error {
-	if address != "127.0.0.1:3000" {
+	return ValidateRuntimeListenAddr(address, false)
+}
+
+func ValidateRuntimeListenAddr(address string, cloudflareContainer bool) error {
+	expected := "127.0.0.1:3000"
+	if cloudflareContainer {
+		expected = "0.0.0.0:8080"
+	}
+	if address != expected {
+		if cloudflareContainer {
+			return errors.New("Cloudflare container listen address must be exactly 0.0.0.0:8080")
+		}
 		return errors.New("listen address must be exactly 127.0.0.1:3000")
 	}
 	return nil
@@ -105,6 +137,7 @@ func (router *router) ServeHTTP(writer stdhttp.ResponseWriter, request *stdhttp.
 		router.logRequest(request, recorder.status, startedAt, "ORIGIN_REJECTED")
 		return
 	}
+	request = router.withTrustedSingleUserAccess(request)
 	if isMutation(request.Method) && request.Header.Get("Origin") == "" {
 		writeError(recorder, requestID, stdhttp.StatusForbidden, "ORIGIN_REJECTED", "请求来源不受信任", false)
 		router.logRequest(request, recorder.status, startedAt, "ORIGIN_REJECTED")
@@ -251,6 +284,26 @@ func (router *router) withOptionalSession(request *stdhttp.Request) (*stdhttp.Re
 	return request.WithContext(session.WithRecord(request.Context(), record)), nil
 }
 
+func (router *router) withTrustedSingleUserAccess(request *stdhttp.Request) *stdhttp.Request {
+	if router.singleUserAccessID == "" || request.Header.Get(singleUserAccessHeader) != router.singleUserAccessID {
+		return request
+	}
+	trustedProxy := router.isTrustedProxy(request.RemoteAddr)
+	trustedGateway := router.validGatewaySecret(request.Header.Get(gatewaySecretHeader))
+	if !trustedProxy && !trustedGateway {
+		return request
+	}
+	return request.WithContext(auth.WithTrustedSingleUserAccess(request.Context()))
+}
+
+func (router *router) validGatewaySecret(supplied string) bool {
+	if !router.hasGatewaySecret || supplied == "" || len(supplied) > 256 {
+		return false
+	}
+	suppliedHash := sha256.Sum256([]byte(supplied))
+	return hmac.Equal(router.gatewaySecretHash[:], suppliedHash[:])
+}
+
 func (router *router) validAuthority(request *stdhttp.Request) bool {
 	if headerBytes(request.Header) > maximumHeaderSize {
 		return false
@@ -308,6 +361,8 @@ func sanitizeBrowserCredentials(request *stdhttp.Request) *stdhttp.Request {
 		"X-Forwarded-For",
 		"X-Forwarded-Host",
 		"X-Forwarded-Proto",
+		singleUserAccessHeader,
+		gatewaySecretHeader,
 		"X-Real-Ip",
 	} {
 		sanitized.Header.Del(name)

@@ -1,0 +1,23 @@
+{
+  "name": "@tantan/cloudflare",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "pnpm validate:config && wrangler deploy",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "validate:config": "node scripts/validate-config.mjs"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "0.3.7",
+    "jose": "6.2.1",
+    "jsonc-parser": "3.3.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260708.1",
+    "typescript": "catalog:",
+    "vitest": "4.1.10",
+    "wrangler": "4.107.1"
+  }
+}

@@ -1,0 +1,32 @@
+exec: "/app/tantan-api serve"
+shutdown-sync-timeout: 30s
+shutdown-sync-interval: 500ms
+verify-compaction: true
+
+logging:
+  level: info
+  type: json
+  stderr: false
+
+snapshot:
+  interval: 6h
+  retention: 168h
+
+validation:
+  interval: 6h
+
+dbs:
+  - path: /var/lib/tantan/tantan.sqlite
+    restore-if-db-not-exists: true
+    monitor-interval: 1s
+    checkpoint-interval: 1m
+    busy-timeout: 5s
+    replica:
+      type: s3
+      bucket: ${TANTAN_REPLICA_BUCKET}
+      path: ${TANTAN_REPLICA_PATH}
+      endpoint: ${TANTAN_REPLICA_ENDPOINT}
+      region: auto
+      force-path-style: true
+      sync-interval: 5s
+      auto-recover: true

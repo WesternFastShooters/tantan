@@ -25,6 +25,8 @@ func runManagementCommand(ctx context.Context, arguments []string, output io.Wri
 		return false, nil
 	}
 	switch arguments[0] {
+	case "migrate":
+		return true, runMigrateCommand(ctx, arguments[1:])
 	case "doctor":
 		return true, runDoctorCommand(ctx, arguments[1:], output)
 	case "backup":
@@ -36,6 +38,20 @@ func runManagementCommand(ctx context.Context, arguments []string, output io.Wri
 	default:
 		return false, nil
 	}
+}
+
+func runMigrateCommand(ctx context.Context, arguments []string) error {
+	flags := flag.NewFlagSet("migrate", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	dataDirectory := flags.String("data-dir", configuredDataDirectory(), "local Tantan data directory")
+	if err := flags.Parse(arguments); err != nil || flags.NArg() != 0 {
+		return errors.New("migrate accepts no positional arguments")
+	}
+	store, err := storage.Open(ctx, storage.Config{DataDir: *dataDirectory})
+	if err != nil {
+		return err
+	}
+	return store.Close()
 }
 
 func runDoctorCommand(ctx context.Context, arguments []string, output io.Writer) error {

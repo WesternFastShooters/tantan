@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router"
 
 import {
   getFoloAuthProviders,
+  getLocalSession,
   isFoloTwoFactorChallenge,
   signInWithFoloEmail,
   signInWithFoloToken,
@@ -51,6 +52,7 @@ export function LoginRoute() {
   const location = useLocation()
   const navigate = useNavigate()
   const returnTo = safeReturnTo(location.search)
+  const setupRequested = new URLSearchParams(location.search).get("setup") === "1"
   const [providers, setProviders] = useState<FoloAuthProvider[]>([])
   const [mode, setMode] = useState<LoginMode>("providers")
   const [email, setEmail] = useState("")
@@ -66,13 +68,30 @@ export function LoginRoute() {
 
   useEffect(() => {
     const controller = new AbortController()
-    void getFoloAuthProviders(controller.signal)
-      .then((response) => setProviders(response.providers))
-      .catch((reason) => {
+    const initialize = async () => {
+      if (!setupRequested) {
+        try {
+          await getLocalSession(controller.signal)
+          if (!controller.signal.aborted) void navigate(returnTo, { replace: true })
+          return
+        } catch {
+          if (controller.signal.aborted) return
+        }
+      }
+      try {
+        const response = await getFoloAuthProviders(controller.signal)
+        if (controller.signal.aborted) return
+        setProviders(response.providers)
+        if (response.providers.length === 1 && response.providers[0] === "token") {
+          setMode("token")
+        }
+      } catch (reason) {
         if (!controller.signal.aborted) setError(errorMessage(reason))
-      })
+      }
+    }
+    void initialize()
     return () => controller.abort()
-  }, [])
+  }, [navigate, returnTo, setupRequested])
 
   const finish = (_session: SessionResponse) => {
     setError(null)
@@ -282,9 +301,10 @@ export function LoginRoute() {
         {mode === "token" && (
           <form className="space-y-3" onSubmit={submitToken}>
             <div className="mb-4 text-center">
-              <h2 className="text-lg font-semibold">粘贴一次性授权令牌</h2>
+              <h2 className="text-lg font-semibold">管理员初始化 / 重新连接</h2>
               <p className="mt-1 text-sm leading-6 text-zinc-400">
-                在 Folo 完成登录后，复制授权令牌并粘贴到这里
+                仅在电脑上首次绑定或 Folo
+                会话失效时粘贴一次性令牌。绑定完成后，手机会自动进入，不需要令牌。
               </p>
             </div>
             <input
@@ -303,11 +323,17 @@ export function LoginRoute() {
               disabled={pending}
               className="min-h-12 w-full rounded-xl bg-orange-500 px-4 font-semibold text-white disabled:opacity-50"
             >
-              {pending ? "登录中…" : "继续登录"}
+              {pending ? "连接中…" : "绑定并进入"}
             </button>
-            <button type="button" className="min-h-11 w-full text-sm text-zinc-400" onClick={reset}>
-              返回其他登录方式
-            </button>
+            {providers.length > 1 && (
+              <button
+                type="button"
+                className="min-h-11 w-full text-sm text-zinc-400"
+                onClick={reset}
+              >
+                返回其他登录方式
+              </button>
+            )}
           </form>
         )}
       </section>

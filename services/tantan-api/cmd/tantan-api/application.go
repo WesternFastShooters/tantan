@@ -34,22 +34,25 @@ import (
 const cursorKeyAccount = "cursor-v1"
 
 type applicationConfig struct {
-	DataDir           string
-	StaticDir         string
-	PublicOrigin      string
-	TrustedProxyCIDRs []string
-	Upstream          *url.URL
-	FoloWebURL        *url.URL
-	Client            *stdhttp.Client
-	FoloSecrets       session.SecretStore
-	FoloMasterKey     []byte
-	AISecrets         ai.SecretStore
-	ProbeKeychain     ops.Keychain
-	CursorSecrets     ops.Keychain
-	Logger            *slog.Logger
-	Now               func() time.Time
-	Version           string
-	StartWorkers      bool
+	DataDir            string
+	StaticDir          string
+	PublicOrigin       string
+	TrustedProxyCIDRs  []string
+	SingleUser         bool
+	SingleUserAccessID string
+	GatewaySecret      string
+	Upstream           *url.URL
+	FoloWebURL         *url.URL
+	Client             *stdhttp.Client
+	FoloSecrets        session.SecretStore
+	FoloMasterKey      []byte
+	AISecrets          ai.SecretStore
+	ProbeKeychain      ops.Keychain
+	CursorSecrets      ops.Keychain
+	Logger             *slog.Logger
+	Now                func() time.Time
+	Version            string
+	StartWorkers       bool
 }
 
 type application struct {
@@ -63,7 +66,7 @@ type application struct {
 }
 
 func newApplication(ctx context.Context, config applicationConfig) (*application, error) {
-	if config.DataDir == "" || config.PublicOrigin == "" || config.Upstream == nil || config.FoloWebURL == nil || config.AISecrets == nil || config.ProbeKeychain == nil || config.CursorSecrets == nil || (config.FoloSecrets == nil && len(config.FoloMasterKey) != 32) {
+	if config.DataDir == "" || config.PublicOrigin == "" || config.Upstream == nil || config.FoloWebURL == nil || config.AISecrets == nil || config.ProbeKeychain == nil || config.CursorSecrets == nil || (config.FoloSecrets == nil && len(config.FoloMasterKey) != 32) || (config.SingleUser && config.SingleUserAccessID == "") {
 		return nil, errors.New("application data, Folo and Keychain dependencies are required")
 	}
 	if config.Now == nil {
@@ -155,6 +158,8 @@ func newApplication(ctx context.Context, config applicationConfig) (*application
 		Replays:      replays,
 		Folo:         foloAuth,
 		Now:          config.Now,
+		SingleUser:   config.SingleUser,
+		Owners:       sessionBackend,
 		OnSessionCreated: func(sessionContext context.Context, record session.Record) error {
 			_, _, enqueueErr := enqueueSync(sessionContext, store, record.User.ID, "all", config.Now().UTC())
 			return enqueueErr
@@ -210,11 +215,18 @@ func newApplication(ctx context.Context, config applicationConfig) (*application
 		}
 	}
 	health := localhttp.NewHealthHandler(config.Version, readiness)
-	handler, err := localhttp.NewRouter(localhttp.RouterConfig{PublicOrigin: config.PublicOrigin, TrustedProxyCIDRs: config.TrustedProxyCIDRs, Auth: bridge, Proxy: proxy, Sessions: sessions, Local: local, Health: health, Static: static, Logger: config.Logger})
+	handler, err := localhttp.NewRouter(localhttp.RouterConfig{PublicOrigin: config.PublicOrigin, TrustedProxyCIDRs: config.TrustedProxyCIDRs, SingleUserAccessID: config.SingleUserAccessID, GatewaySecret: config.GatewaySecret, Auth: bridge, Proxy: proxy, Sessions: sessions, Local: local, Health: health, Static: static, Logger: config.Logger})
 	if err != nil {
 		return fail(err)
 	}
 	source, err := syncer.NewHTTPSource(syncer.HTTPSourceConfig{Upstream: config.Upstream, Client: client, Token: func(tokenContext context.Context, userID string) (string, error) {
+		if config.SingleUser {
+			owner, ok, ownerErr := sessionBackend.FindOwner(tokenContext)
+			if ownerErr != nil || !ok || owner.ID != userID {
+				return "", errors.New("single-user Folo binding was not found")
+			}
+			return foloSecrets.Get(tokenContext, auth.SingleUserSecretRef)
+		}
 		var sessionHash string
 		if err := store.DB().QueryRowContext(tokenContext, "SELECT secret_ref FROM local_sessions WHERE user_id=? ORDER BY last_seen_at DESC LIMIT 1", userID).Scan(&sessionHash); err != nil {
 			return "", errors.New("active Folo session was not found")

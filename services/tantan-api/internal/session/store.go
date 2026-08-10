@@ -101,14 +101,18 @@ func (store *Store) Create(ctx context.Context, raw string, user User, expiresAt
 }
 
 func (store *Store) CreateWithCSRF(ctx context.Context, raw, csrf string, user User, expiresAt time.Time) (Record, error) {
+	return store.CreateWithCSRFAndSecretRef(ctx, raw, csrf, HashToken(raw), user, expiresAt)
+}
+
+func (store *Store) CreateWithCSRFAndSecretRef(ctx context.Context, raw, csrf, secretRef string, user User, expiresAt time.Time) (Record, error) {
 	now := store.now().UTC()
-	if len(raw) < 40 || len(csrf) < 40 || strings.TrimSpace(user.ID) == "" || strings.TrimSpace(user.Name) == "" || !expiresAt.After(now) {
+	if len(raw) < 40 || len(csrf) < 40 || len(secretRef) != sha256.Size*2 || strings.TrimSpace(user.ID) == "" || strings.TrimSpace(user.Name) == "" || !expiresAt.After(now) {
 		return Record{}, errors.New("invalid local session")
 	}
 	idHash := HashToken(raw)
 	record := Record{
 		IDHash:    idHash,
-		SecretRef: idHash,
+		SecretRef: secretRef,
 		CSRFHash:  HashCSRF(csrf),
 		User:      user,
 		Timezone:  "Asia/Shanghai",
