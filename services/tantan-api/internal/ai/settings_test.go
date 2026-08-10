@@ -146,22 +146,25 @@ func TestProviderUsesOnlyFixedGeminiOpenAIEndpoint(t *testing.T) {
 	if !ok || responseFormat["type"] != "json_schema" {
 		t.Fatalf("response_format=%#v", observedBody["response_format"])
 	}
-	jsonSchema, ok := responseFormat["json_schema"].(map[string]any)
-	if !ok {
+	envelope, ok := responseFormat["json_schema"].(map[string]any)
+	if !ok || envelope["name"] != ai.EnrichmentSchemaName || envelope["strict"] != true {
 		t.Fatalf("json_schema=%#v", responseFormat["json_schema"])
 	}
-	providerSchema, ok := jsonSchema["schema"].(map[string]any)
+	compatible, ok := envelope["schema"].(map[string]any)
 	if !ok {
-		t.Fatalf("provider schema=%#v", jsonSchema["schema"])
+		t.Fatalf("schema=%#v", envelope["schema"])
 	}
-	properties, ok := providerSchema["properties"].(map[string]any)
-	if !ok {
-		t.Fatalf("provider properties=%#v", providerSchema["properties"])
-	}
+	assertGeminiCompatibleSchema(t, compatible)
+	properties := compatible["properties"].(map[string]any)
 	version := properties["version"].(map[string]any)
-	title := properties["titleZh"].(map[string]any)
-	if version["type"] != "integer" || version["const"] != nil || title["type"] != "string" || title["minLength"] != float64(1) {
-		t.Fatalf("Gemini schema adaptation version=%#v title=%#v", version, title)
+	if version["type"] != "integer" || len(version["enum"].([]any)) != 1 || version["enum"].([]any)[0] != float64(1) {
+		t.Fatalf("version schema=%#v", version)
+	}
+	for _, field := range []string{"titleZh", "contentZh"} {
+		translation := properties[field].(map[string]any)
+		if translation["type"] != "string" {
+			t.Fatalf("%s schema=%#v", field, translation)
+		}
 	}
 	encoded, _ := json.Marshal(observedBody)
 	if strings.Contains(string(encoded), aiKeyCanary) {
@@ -181,6 +184,69 @@ func TestProviderUsesOnlyFixedGeminiOpenAIEndpoint(t *testing.T) {
 			t.Fatalf("unsafe provider address %s was accepted", address)
 		}
 	}
+}
+
+func TestProviderSendsAllApprovedSchemasThroughGeminiCompatibilityLayer(t *testing.T) {
+	for _, schemaName := range []string{ai.EnrichmentSchemaName, ai.TopicSchemaName, ai.FilterSchemaName} {
+		t.Run(schemaName, func(t *testing.T) {
+			client, err := ai.NewProviderClient(ai.ProviderClientConfig{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+				var body map[string]any
+				if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+					t.Fatalf("decode body: %v", err)
+				}
+				responseFormat := body["response_format"].(map[string]any)
+				envelope := responseFormat["json_schema"].(map[string]any)
+				if envelope["name"] != schemaName || envelope["strict"] != true {
+					t.Fatalf("json_schema=%#v", envelope)
+				}
+				assertGeminiCompatibleSchema(t, envelope["schema"])
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     http.Header{"Content-Type": []string{"application/json"}},
+					Body:       io.NopCloser(strings.NewReader(`{"choices":[{"message":{"content":"{}"}}]}`)),
+					Request:    request,
+				}, nil
+			})})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := client.Generate(context.Background(), aiKeyCanary, ai.GenerationRequest{SchemaName: schemaName, SystemPrompt: "Return JSON", UserPrompt: "fixture"}); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func assertGeminiCompatibleSchema(t *testing.T, value any) {
+	t.Helper()
+	unsupported := map[string]bool{
+		"$schema":     true,
+		"$id":         true,
+		"title":       true,
+		"description": true,
+		"const":       true,
+		"pattern":     true,
+		"minLength":   true,
+		"maxLength":   true,
+		"uniqueItems": true,
+	}
+	var visit func(any)
+	visit = func(node any) {
+		switch typed := node.(type) {
+		case map[string]any:
+			for key, child := range typed {
+				if unsupported[key] {
+					t.Errorf("unsupported schema keyword %q escaped", key)
+				}
+				visit(child)
+			}
+		case []any:
+			for _, child := range typed {
+				visit(child)
+			}
+		}
+	}
+	visit(value)
 }
 
 func TestProviderRejectsUnknownSchemaBeforeNetwork(t *testing.T) {

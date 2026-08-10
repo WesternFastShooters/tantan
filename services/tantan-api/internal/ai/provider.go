@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -192,79 +193,115 @@ func fixedResponseFormat(schemaName string) (map[string]any, error) {
 	if schemaName == ConnectionSchemaName {
 		return map[string]any{"type": "json_object"}, nil
 	}
-	approved := map[string]string{
+	approvedFiles := map[string]string{
 		EnrichmentSchemaName: EnrichmentSchemaName + ".schema.json",
 		TopicSchemaName:      TopicSchemaName + ".schema.json",
 		FilterSchemaName:     FilterSchemaName + ".schema.json",
 	}
-	filename, ok := approved[schemaName]
-	if !ok {
+	filename, approved := approvedFiles[schemaName]
+	if !approved {
 		return nil, errors.New("AI output schema is not approved")
 	}
-	contents, err := schema.Read(filename)
+	raw, err := schema.Read(filename)
 	if err != nil {
 		return nil, errors.New("read approved AI output schema failed")
 	}
-	var document map[string]any
-	if err := json.Unmarshal(contents, &document); err != nil {
-		return nil, errors.New("approved AI output schema is invalid")
+	var approvedSchema map[string]any
+	if err := json.Unmarshal(raw, &approvedSchema); err != nil {
+		return nil, errors.New("decode approved AI output schema failed")
 	}
-	normalizeProviderSchema(document)
+	compatible, ok := geminiCompatibleSchema(approvedSchema).(map[string]any)
+	if !ok {
+		return nil, errors.New("convert approved AI output schema failed")
+	}
 	if schemaName == EnrichmentSchemaName {
-		requireProviderTranslation(document)
+		properties, ok := compatible["properties"].(map[string]any)
+		if !ok {
+			return nil, errors.New("approved enrichment schema has no properties")
+		}
+		// Only fully translated entries may enter the display pool. Requiring
+		// strings here prevents nullable translations from wasting a provider call.
+		properties["titleZh"] = map[string]any{"type": "string"}
+		properties["contentZh"] = map[string]any{"type": "string"}
 	}
 	return map[string]any{
 		"type": "json_schema",
 		"json_schema": map[string]any{
 			"name":   schemaName,
 			"strict": true,
-			"schema": document,
+			"schema": compatible,
 		},
 	}, nil
 }
 
-// Gemini's OpenAI-compatible structured-output implementation needs an
-// explicit primitive type for constant values. Keep the byte-for-byte approved
-// schema snapshots untouched and adapt only the schema sent to the fixed
-// provider endpoint.
-func normalizeProviderSchema(value any) {
+// geminiCompatibleSchema keeps only the JSON Schema subset accepted by
+// Gemini structured outputs. Responses still pass the complete approved
+// schema locally before being persisted.
+func geminiCompatibleSchema(value any) any {
 	switch typed := value.(type) {
 	case map[string]any:
-		if constant, ok := typed["const"]; ok {
-			delete(typed, "const")
-			typed["enum"] = []any{constant}
-			if _, present := typed["type"]; !present {
-				switch constant.(type) {
-				case float64:
-					typed["type"] = "integer"
-				case string:
-					typed["type"] = "string"
-				case bool:
-					typed["type"] = "boolean"
+		converted := make(map[string]any)
+		for key, child := range typed {
+			switch key {
+			case "properties", "$defs":
+				children, ok := child.(map[string]any)
+				if !ok {
+					continue
 				}
+				convertedChildren := make(map[string]any, len(children))
+				for name, childSchema := range children {
+					convertedChildren[name] = geminiCompatibleSchema(childSchema)
+				}
+				converted[key] = convertedChildren
+			case "items", "additionalProperties":
+				converted[key] = geminiCompatibleSchema(child)
+			case "prefixItems", "anyOf", "oneOf":
+				children, ok := child.([]any)
+				if !ok {
+					continue
+				}
+				convertedChildren := make([]any, 0, len(children))
+				for _, childSchema := range children {
+					convertedChildren = append(convertedChildren, geminiCompatibleSchema(childSchema))
+				}
+				converted[key] = convertedChildren
+			case "const":
+				converted["enum"] = []any{child}
+				if _, exists := converted["type"]; !exists {
+					if inferred := jsonSchemaType(child); inferred != "" {
+						converted["type"] = inferred
+					}
+				}
+			case "type", "format", "enum", "minItems", "maxItems", "minimum", "maximum", "required", "$ref":
+				converted[key] = child
 			}
 		}
-		for _, child := range typed {
-			normalizeProviderSchema(child)
-		}
+		return converted
 	case []any:
+		converted := make([]any, 0, len(typed))
 		for _, child := range typed {
-			normalizeProviderSchema(child)
+			converted = append(converted, geminiCompatibleSchema(child))
 		}
+		return converted
+	default:
+		return typed
 	}
 }
 
-func requireProviderTranslation(document map[string]any) {
-	properties, ok := document["properties"].(map[string]any)
-	if !ok {
-		return
-	}
-	for _, field := range []string{"titleZh", "contentZh"} {
-		property, ok := properties[field].(map[string]any)
-		if !ok {
-			continue
+func jsonSchemaType(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return "string"
+	case bool:
+		return "boolean"
+	case float64:
+		if math.Trunc(typed) == typed {
+			return "integer"
 		}
-		property["type"] = "string"
-		property["minLength"] = float64(1)
+		return "number"
+	case nil:
+		return "null"
+	default:
+		return ""
 	}
 }
